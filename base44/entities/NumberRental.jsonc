@@ -1,0 +1,87 @@
+{
+  "name": "NumberRental",
+  "type": "object",
+  "properties": {
+    "rentalRef": {
+      "type": "string",
+      "description": "Public rental reference, format VN-YYYYMMDD-XXXXXX"
+    },
+    "transactionId": {
+      "type": "string"
+    },
+    "listingId": {
+      "type": "string",
+      "description": "Reference to VirtualNumberListing"
+    },
+    "buyerUserId": {
+      "type": "string"
+    },
+    "sellerUserId": {
+      "type": "string"
+    },
+    "service": {
+      "type": "string"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Total buyer amount held in escrow for this rental"
+    },
+    "sellerPayout": {
+      "type": "number",
+      "description": "Amount the seller receives when the buyer completes"
+    },
+    "commission": {
+      "type": "number"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "completed",
+        "expired",
+        "cancelled"
+      ],
+      "default": "active"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "End of the rental window; afterwards the workflow auto-refunds the buyer"
+    },
+    "completedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "listingId",
+    "buyerUserId",
+    "sellerUserId",
+    "amount",
+    "status",
+    "expiresAt"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "$or": [
+        {
+          "data.buyerUserId": "{{user.id}}"
+        },
+        {
+          "data.sellerUserId": "{{user.id}}"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}

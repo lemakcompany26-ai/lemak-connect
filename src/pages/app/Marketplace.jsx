@@ -9,6 +9,7 @@ import PurchaseDialog from '@/components/marketplace/PurchaseDialog';
 import SellerStatusCard from '@/components/marketplace/SellerStatusCard';
 import SellerApplicationForm from '@/components/marketplace/SellerApplicationForm';
 import OrderCard from '@/components/marketplace/OrderCard';
+import OrderChatDialog from '@/components/marketplace/OrderChatDialog';
 import { formatNaira } from '@/lib/format';
 
 const DEFAULT_SELL_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScImMvathwSUGku7WKY_R4E9eo2Ps9k23Fs8qWpU0GmneNAIQ/viewform?usp=headers';
@@ -23,6 +24,7 @@ export default function Marketplace() {
   const [settings, setSettings] = useState({});
   const [tab, setTab] = useState('browse');
   const [buying, setBuying] = useState(null);
+  const [chatOrder, setChatOrder] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const load = () => {
@@ -138,17 +140,18 @@ export default function Marketplace() {
           <div className="space-y-3">
             <h3 className="text-sm font-bold text-white uppercase tracking-wide">Buying</h3>
             {myBuyingOrders.length === 0 && <div className="text-xs text-slate-500 py-2">No purchase orders yet.</div>}
-            {myBuyingOrders.map(o => <OrderCard key={o.id} order={o} mode="buying" busy={busy === o.id} onAction={orderAction} />)}
+            {myBuyingOrders.map(o => <OrderCard key={o.id} order={o} mode="buying" busy={busy === o.id} onAction={orderAction} onChat={setChatOrder} />)}
           </div>
           <div className="space-y-3">
             <h3 className="text-sm font-bold text-white uppercase tracking-wide">Selling</h3>
             {mySellingOrders.length === 0 && <div className="text-xs text-slate-500 py-2">No sale orders yet.</div>}
-            {mySellingOrders.map(o => <OrderCard key={o.id} order={o} mode="selling" busy={busy === o.id} onAction={orderAction} />)}
+            {mySellingOrders.map(o => <OrderCard key={o.id} order={o} mode="selling" busy={busy === o.id} onAction={orderAction} onChat={setChatOrder} />)}
           </div>
         </TabsContent>
       </Tabs>
 
       <PurchaseDialog listing={buying} busy={busy === true || busy === 'purchase'} onClose={() => setBuying(null)} onConfirm={purchase} />
+      <OrderChatDialog order={chatOrder} onClose={() => setChatOrder(null)} />
     </div>
   );
 }

@@ -1,0 +1,86 @@
+{
+  "name": "VirtualNumberListing",
+  "type": "object",
+  "properties": {
+    "listingRef": {
+      "type": "string",
+      "description": "Public listing reference, format VN-YYYYMMDD-XXXXXX"
+    },
+    "sellerUserId": {
+      "type": "string",
+      "description": "Base44 user id of the seller"
+    },
+    "sellerName": {
+      "type": "string"
+    },
+    "sellerRecordId": {
+      "type": "string",
+      "description": "Reference to the approved MarketplaceSeller record"
+    },
+    "service": {
+      "type": "string",
+      "description": "What the number receives OTPs for, e.g. WhatsApp"
+    },
+    "country": {
+      "type": "string",
+      "default": "Nigeria"
+    },
+    "number": {
+      "type": "string",
+      "description": "The phone number. Never exposed publicly \u2014 revealed only to an active renter"
+    },
+    "price": {
+      "type": "number",
+      "description": "Price per rental window"
+    },
+    "rentalMinutes": {
+      "type": "number",
+      "default": 15,
+      "description": "Length of one rental window in minutes"
+    },
+    "description": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "approved",
+        "suspended",
+        "delisted"
+      ],
+      "default": "approved"
+    },
+    "isActive": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "sellerUserId",
+    "service",
+    "number",
+    "price",
+    "rentalMinutes",
+    "status"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "$or": [
+        {
+          "data.sellerUserId": "{{user.id}}"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}

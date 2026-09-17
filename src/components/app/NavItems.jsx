@@ -22,7 +22,7 @@ export const SERVICE_NAV = [
   { to: '/app/education', label: 'Education', icon: GraduationCap, soon: true },
   { to: '/app/epin', label: 'ePIN / Recharge', icon: Ticket, soon: true },
   { to: '/app/broadband', label: 'Broadband', icon: Globe, soon: true },
-  { to: '/app/virtual-numbers', label: 'Virtual Numbers', icon: Phone, soon: true },
+  { to: '/app/virtual-numbers', label: 'Virtual Numbers', icon: Phone, soon: false },
   { to: '/app/social-growth', label: 'Social Growth', icon: TrendingUp, soon: true }
 ];
 

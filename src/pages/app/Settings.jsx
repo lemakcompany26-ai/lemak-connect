@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useApp } from '@/lib/AppContext';
 import { useAuth } from '@/lib/AuthContext';
 import SecurityPinCard from '@/components/app/SecurityPinCard';
+import BiometricCard from '@/components/app/BiometricCard';
 
 const PREF_ROWS = [
   ['transactionAlerts', 'Transactions', 'Receipts, success and refund alerts'],
@@ -67,6 +68,8 @@ export default function Settings() {
       </div>
 
       <SecurityPinCard />
+
+      <BiometricCard />
 
       <div className="rounded-3xl border border-border bg-card p-6">
         <h3 className="font-heading font-bold text-sm flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-primary" /> Account</h3>

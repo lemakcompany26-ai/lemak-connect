@@ -32,7 +32,7 @@ export default async function(req: Request): Promise<Response> {
 
     // Transaction PIN gate (active only when enabled in Settings → Security)
     try {
-      await assertPinForPurchase(service, user.id, pin);
+      await assertPinForPurchase(service, user.id, pin, body.biometricToken);
     } catch (e) {
       return Response.json({ error: e.message }, { status: e.statusCode || 403 });
     }

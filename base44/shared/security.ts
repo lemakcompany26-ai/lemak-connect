@@ -96,12 +96,39 @@ export async function verifyPin(service, userId, pin, opts = {}) {
     (PIN_MAX_ATTEMPTS - attempts === 1 ? ' attempt' : ' attempts') + ' remaining.', 401);
 }
 
+// Consume a one-time biometric approval token (from manageBiometric).
+// Returns true exactly once — the stored token is deleted on use.
+export async function consumeBiometricApproval(service, userId, token) {
+  const rows = await service.entities.BiometricChallenge.filter({ userId, type: 'approval' }, '-created_date', 10);
+  for (const row of rows) {
+    if (row.expiresAt && new Date(row.expiresAt) <= new Date()) continue;
+    const hash = await hashPin(token, row.salt);
+    if (hash === row.value) {
+      await service.entities.BiometricChallenge.delete(row.id);
+      return true;
+    }
+  }
+  return false;
+}
+
 // Purchase gate: passes when no PIN exists or purchase protection is off.
-export async function assertPinForPurchase(service, userId, pin) {
+// Accepts either the transaction PIN or a one-time biometric approval token.
+export async function assertPinForPurchase(service, userId, pin, biometricToken) {
   const credential = await getPinCredential(service, userId);
   if (!credential || !credential.requireForPurchases) return;
-  if (!pin) {
-    throw pinError('Enter your transaction PIN to complete this purchase', 403);
+  if (pin) {
+    await verifyPin(service, userId, pin, { context: 'purchase' });
+    return;
   }
-  await verifyPin(service, userId, pin, { context: 'purchase' });
+  if (biometricToken) {
+    const ok = await consumeBiometricApproval(service, userId, String(biometricToken));
+    if (ok) {
+      await logSecurityEvent(service, userId, 'biometric_verified', {
+        severity: 'info', description: 'Purchase authorized with biometric unlock'
+      });
+      return;
+    }
+    throw pinError('Biometric unlock was not valid. Enter your transaction PIN.', 403);
+  }
+  throw pinError('Enter your transaction PIN or use biometric unlock to complete this purchase', 403);
 }

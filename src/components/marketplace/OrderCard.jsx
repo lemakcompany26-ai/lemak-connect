@@ -1,9 +1,9 @@
-import { ShieldCheck } from 'lucide-react';
+import { MessageCircle, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import StatusBadge from '@/components/admin/marketplace/StatusBadge';
 import { formatNaira, formatDate } from '@/lib/format';
 
-export default function OrderCard({ order, mode, busy, onAction }) {
+export default function OrderCard({ order, mode, busy, onAction, onChat }) {
   const isBuying = mode === 'buying';
   return (
     <div className="rounded-2xl bg-mk-card border border-mk-border p-4">
@@ -21,6 +21,11 @@ export default function OrderCard({ order, mode, busy, onAction }) {
         <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
           <ShieldCheck className="w-3.5 h-3.5 text-mk-brown-soft" /> Escrow-protected
         </div>
+        {onChat && (
+          <Button size="sm" variant="ghost" className="h-9 text-slate-300 hover:text-white font-semibold" onClick={() => onChat(order)}>
+            <MessageCircle className="w-3.5 h-3.5 mr-1" /> Chat
+          </Button>
+        )}
         {isBuying && order.status === 'delivered' && (
           <Button size="sm" className="h-9 ml-auto bg-mk-blue hover:bg-mk-blue/90 text-white font-bold" disabled={busy} onClick={() => onAction('confirm', order)}>
             Confirm Delivery

@@ -1,0 +1,65 @@
+{
+  "name": "RentalMessage",
+  "type": "object",
+  "properties": {
+    "rentalId": {
+      "type": "string",
+      "description": "Reference to NumberRental"
+    },
+    "buyerUserId": {
+      "type": "string",
+      "description": "Copied from the rental so access rules can hide it from anyone else"
+    },
+    "sellerUserId": {
+      "type": "string"
+    },
+    "senderRole": {
+      "type": "string",
+      "enum": [
+        "buyer",
+        "seller",
+        "system"
+      ]
+    },
+    "senderName": {
+      "type": "string"
+    },
+    "content": {
+      "type": "string"
+    },
+    "isOtp": {
+      "type": "boolean",
+      "default": false,
+      "description": "True when this message delivers an OTP code"
+    }
+  },
+  "required": [
+    "rentalId",
+    "buyerUserId",
+    "senderRole",
+    "content"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "$or": [
+        {
+          "data.buyerUserId": "{{user.id}}"
+        },
+        {
+          "data.sellerUserId": "{{user.id}}"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}

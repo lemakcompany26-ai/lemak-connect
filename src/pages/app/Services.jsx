@@ -7,6 +7,7 @@ const LIVE_ROUTES = {
   airtime: '/app/airtime',
   data: '/app/data',
   marketplace: '/app/marketplace',
+  'virtual-numbers': '/app/virtual-numbers',
   social_growth_placeholder: null
 };
 

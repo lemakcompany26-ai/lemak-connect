@@ -1,0 +1,59 @@
+{
+  "name": "OrderMessage",
+  "type": "object",
+  "properties": {
+    "orderId": {
+      "type": "string",
+      "description": "Reference to MarketplaceOrder"
+    },
+    "buyerUserId": {
+      "type": "string",
+      "description": "Copied from the order so access rules can hide it from anyone else"
+    },
+    "sellerUserId": {
+      "type": "string"
+    },
+    "senderRole": {
+      "type": "string",
+      "enum": [
+        "buyer",
+        "seller"
+      ]
+    },
+    "senderName": {
+      "type": "string"
+    },
+    "content": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "orderId",
+    "buyerUserId",
+    "senderRole",
+    "content"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "$or": [
+        {
+          "data.buyerUserId": "{{user.id}}"
+        },
+        {
+          "data.sellerUserId": "{{user.id}}"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}

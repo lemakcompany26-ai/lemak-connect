@@ -24,6 +24,7 @@ export default function Airtime() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
   const [pin, setPin] = useState('');
+  const [biometricToken, setBiometricToken] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,7 +39,8 @@ export default function Airtime() {
       const res = await base44.functions.invoke('purchaseAirtime', {
         network, phoneNumber, amount: Number(amount),
         promoCode: promo ? promo.code : null,
-        pin: pin || null
+        pin: pin || null,
+        biometricToken: biometricToken || null
       });
       const d = res.data || res;
       if (d.wallet) setWalletLocal(d.wallet);
@@ -50,6 +52,7 @@ export default function Airtime() {
     } finally {
       setProcessing(false);
       setLoading(false);
+      setBiometricToken('');
     }
   };
 
@@ -124,7 +127,7 @@ export default function Airtime() {
 
         <PromoCodeInput serviceSlug="airtime" providerCost={Number(amount) || 0} onValidated={setPromo} />
 
-        <TransactionPinInput value={pin} onChange={setPin} />
+        <TransactionPinInput value={pin} onChange={setPin} biometricToken={biometricToken} onBiometricToken={setBiometricToken} />
 
         {error && (
           <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">

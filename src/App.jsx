@@ -27,6 +27,7 @@ import AppServices from '@/pages/app/Services';
 import Airtime from '@/pages/app/Airtime';
 import Data from '@/pages/app/Data';
 import ServiceSoon from '@/pages/app/ServiceSoon';
+import VirtualNumbers from '@/pages/app/VirtualNumbers';
 import WalletPage from '@/pages/app/Wallet';
 import Transactions from '@/pages/app/Transactions';
 import Notifications from '@/pages/app/Notifications';
@@ -99,7 +100,7 @@ const AuthenticatedApp = () => {
           <Route path="/app/education" element={<ServiceSoon service="Education" />} />
           <Route path="/app/epin" element={<ServiceSoon service="ePIN / Recharge" />} />
           <Route path="/app/broadband" element={<ServiceSoon service="Broadband" />} />
-          <Route path="/app/virtual-numbers" element={<ServiceSoon service="Virtual Numbers" />} />
+          <Route path="/app/virtual-numbers" element={<VirtualNumbers />} />
           <Route path="/app/social-growth" element={<ServiceSoon service="Social Growth" />} />
           <Route path="/app/wallet" element={<WalletPage />} />
           <Route path="/app/transactions" element={<Transactions />} />

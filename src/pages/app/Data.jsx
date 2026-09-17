@@ -25,6 +25,7 @@ export default function Data() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
   const [pin, setPin] = useState('');
+  const [biometricToken, setBiometricToken] = useState('');
 
   const loadPlans = async (net) => {
     setPlans(null); setPlansError(''); setSelectedPlan(null);
@@ -54,7 +55,8 @@ export default function Data() {
       const res = await base44.functions.invoke('purchaseData', {
         network, phoneNumber, planId: selectedPlan.id,
         promoCode: promo ? promo.code : null,
-        pin: pin || null
+        pin: pin || null,
+        biometricToken: biometricToken || null
       });
       const d = res.data || res;
       if (d.wallet) setWalletLocal(d.wallet);
@@ -66,6 +68,7 @@ export default function Data() {
     } finally {
       setProcessing(false);
       setLoading(false);
+      setBiometricToken('');
     }
   };
 
@@ -151,7 +154,7 @@ export default function Data() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <PromoCodeInput serviceSlug="data" providerCost={selectedPlan ? selectedPlan.providerCost : 0} onValidated={setPromo} />
-          <TransactionPinInput value={pin} onChange={setPin} />
+          <TransactionPinInput value={pin} onChange={setPin} biometricToken={biometricToken} onBiometricToken={setBiometricToken} />
           {error && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /> {error}

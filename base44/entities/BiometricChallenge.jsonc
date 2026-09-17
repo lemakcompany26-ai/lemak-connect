@@ -1,0 +1,42 @@
+{
+  "name": "BiometricChallenge",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "register",
+        "assert",
+        "approval"
+      ],
+      "description": "register/assert = WebAuthn ceremony challenge; approval = short-lived purchase approval token (stored hashed)"
+    },
+    "value": {
+      "type": "string",
+      "description": "Challenge (base64url) or salted SHA-256 hash of the approval token"
+    },
+    "salt": {
+      "type": "string",
+      "description": "Salt used to hash the approval token (approval type only)"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "userId",
+    "type",
+    "value",
+    "expiresAt"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}

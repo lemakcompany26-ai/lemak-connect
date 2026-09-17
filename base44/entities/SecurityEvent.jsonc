@@ -23,7 +23,11 @@
         "pin_failed",
         "pin_locked",
         "pin_require_purchases_enabled",
-        "pin_require_purchases_disabled"
+        "pin_require_purchases_disabled",
+        "biometric_registered",
+        "biometric_removed",
+        "biometric_verified",
+        "biometric_failed"
       ]
     },
     "severity": {

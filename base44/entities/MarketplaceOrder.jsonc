@@ -1,0 +1,89 @@
+{
+  "name": "MarketplaceOrder",
+  "type": "object",
+  "properties": {
+    "transactionId": {
+      "type": "string"
+    },
+    "buyerUserId": {
+      "type": "string"
+    },
+    "sellerId": {
+      "type": "string",
+      "description": "Reference to MarketplaceSeller"
+    },
+    "listingId": {
+      "type": "string"
+    },
+    "listingTitle": {
+      "type": "string"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Total buyer amount held in escrow"
+    },
+    "platformFee": {
+      "type": "number",
+      "description": "Platform fee percentage applied at purchase time"
+    },
+    "sellerPayout": {
+      "type": "number"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "paid",
+        "in_progress",
+        "delivered",
+        "confirmed",
+        "completed",
+        "refunded",
+        "cancelled"
+      ],
+      "default": "pending"
+    },
+    "deliveryDueAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deliveredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "confirmedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payoutAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "buyerUserId",
+    "sellerId",
+    "listingId",
+    "amount",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.buyerUserId": "{{user.id}}"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}

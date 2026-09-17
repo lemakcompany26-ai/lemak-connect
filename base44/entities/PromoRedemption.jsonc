@@ -1,0 +1,36 @@
+{
+  "name": "PromoRedemption",
+  "type": "object",
+  "properties": {
+    "promoCodeId": {
+      "type": "string"
+    },
+    "promoCode": {
+      "type": "string"
+    },
+    "userId": {
+      "type": "string"
+    },
+    "transactionId": {
+      "type": "string"
+    },
+    "discountApplied": {
+      "type": "number"
+    },
+    "redeemedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "promoCodeId",
+    "promoCode",
+    "userId"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}

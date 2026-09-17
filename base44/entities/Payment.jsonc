@@ -1,0 +1,72 @@
+{
+  "name": "Payment",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string"
+    },
+    "reference": {
+      "type": "string",
+      "description": "Paystack payment reference"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Amount in kobo charged by Paystack"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "initialized",
+        "pending",
+        "successful",
+        "failed",
+        "abandoned"
+      ],
+      "default": "initialized"
+    },
+    "channel": {
+      "type": "string"
+    },
+    "paidAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "gatewayResponse": {
+      "type": "object"
+    },
+    "idempotencyKey": {
+      "type": "string"
+    },
+    "creditedWallet": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether wallet has been credited for this payment"
+    }
+  },
+  "required": [
+    "userId",
+    "reference",
+    "amount",
+    "status"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "data.userId": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}

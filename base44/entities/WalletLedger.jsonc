@@ -1,0 +1,77 @@
+{
+  "name": "WalletLedger",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string"
+    },
+    "walletId": {
+      "type": "string"
+    },
+    "transactionId": {
+      "type": "string",
+      "description": "Reference to the related Transaction record"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "deposit",
+        "purchase",
+        "refund",
+        "reversal",
+        "adjustment",
+        "fee",
+        "promo",
+        "withdrawal"
+      ]
+    },
+    "amount": {
+      "type": "number",
+      "description": "Signed amount: positive = credit, negative = debit"
+    },
+    "balanceBefore": {
+      "type": "number"
+    },
+    "balanceAfter": {
+      "type": "number"
+    },
+    "reference": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "description": "Prevents duplicate debit/refund operations"
+    }
+  },
+  "required": [
+    "userId",
+    "walletId",
+    "type",
+    "amount",
+    "balanceBefore",
+    "balanceAfter"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "data.userId": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}

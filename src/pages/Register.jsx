@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserPlus, Mail, Lock, Loader2 } from "lucide-react";
+import { UserPlus, Mail, Lock, Loader2, User, AtSign, Phone, Gift } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
@@ -12,6 +12,10 @@ import { toast } from "@/components/ui/use-toast";
 import { safeReturnTo } from "@/lib/authReturnTo";
 
 export default function Register() {
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
+  const [phone, setPhone] = useState("");
+  const [promoCode, setPromoCode] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -27,6 +31,19 @@ export default function Register() {
       setError("Passwords do not match");
       return;
     }
+    if (!fullName.trim() || !username.trim() || !phone.trim()) {
+      setError("Please fill in your full name, username and phone number");
+      return;
+    }
+    localStorage.setItem(
+      "lemak_pending_onboarding",
+      JSON.stringify({
+        fullName: fullName.trim(),
+        username: username.trim().toLowerCase(),
+        phone: phone.trim(),
+        promoCode: promoCode.trim()
+      })
+    );
     setLoading(true);
     try {
       await base44.auth.register({ email, password });
@@ -45,6 +62,14 @@ export default function Register() {
       const result = await base44.auth.verifyOtp({ email, otpCode });
       if (result?.access_token) {
         base44.auth.setToken(result.access_token);
+      }
+      // Create profile, wallet (₦0.00) and notification preferences
+      try {
+        const pending = JSON.parse(localStorage.getItem("lemak_pending_onboarding") || "{}");
+        await base44.functions.invoke("onboardUser", pending);
+        localStorage.removeItem("lemak_pending_onboarding");
+      } catch (onboardErr) {
+        // retried automatically after login if it failed
       }
       window.location.href = safeReturnTo();
     } catch (err) {
@@ -167,6 +192,70 @@ export default function Register() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="fullName">Full Name</Label>
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+            <Input
+              id="fullName"
+              type="text"
+              autoComplete="name"
+              placeholder="Adaeze Okafor"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="pl-10 h-12"
+              required
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="username">Username</Label>
+            <div className="relative">
+              <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+              <Input
+                id="username"
+                type="text"
+                autoComplete="username"
+                placeholder="adaeze_o"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="pl-10 h-12"
+                required
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number</Label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+              <Input
+                id="phone"
+                type="tel"
+                autoComplete="tel"
+                placeholder="08012345678"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="pl-10 h-12"
+                required
+              />
+            </div>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="promoCode">Promo Code <span className="text-muted-foreground font-normal">(optional)</span></Label>
+          <div className="relative">
+            <Gift className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+            <Input
+              id="promoCode"
+              type="text"
+              placeholder="e.g. WELCOME10"
+              value={promoCode}
+              onChange={(e) => setPromoCode(e.target.value)}
+              className="pl-10 h-12"
+            />
+          </div>
+        </div>
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <div className="relative">

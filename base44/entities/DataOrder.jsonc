@@ -1,0 +1,87 @@
+{
+  "name": "DataOrder",
+  "type": "object",
+  "properties": {
+    "transactionId": {
+      "type": "string"
+    },
+    "userId": {
+      "type": "string"
+    },
+    "network": {
+      "type": "string",
+      "enum": [
+        "MTN",
+        "Airtel",
+        "Glo",
+        "9mobile"
+      ]
+    },
+    "phoneNumber": {
+      "type": "string"
+    },
+    "planId": {
+      "type": "string",
+      "description": "Provider plan identifier"
+    },
+    "planName": {
+      "type": "string"
+    },
+    "planSize": {
+      "type": "string",
+      "description": "e.g. 1GB, 500MB"
+    },
+    "validity": {
+      "type": "string"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Provider cost"
+    },
+    "customerPrice": {
+      "type": "number"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "processing",
+        "successful",
+        "failed",
+        "refunded"
+      ],
+      "default": "pending"
+    },
+    "providerReference": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "transactionId",
+    "userId",
+    "network",
+    "phoneNumber",
+    "planId",
+    "amount"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "data.userId": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}

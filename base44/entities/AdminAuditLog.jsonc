@@ -1,0 +1,38 @@
+{
+  "name": "AdminAuditLog",
+  "type": "object",
+  "properties": {
+    "adminUserId": {
+      "type": "string"
+    },
+    "adminEmail": {
+      "type": "string"
+    },
+    "action": {
+      "type": "string",
+      "description": "e.g. approve_seller, update_fee_rule, disable_promo"
+    },
+    "entityType": {
+      "type": "string"
+    },
+    "entityId": {
+      "type": "string"
+    },
+    "details": {
+      "type": "object"
+    },
+    "ipAddress": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "adminUserId",
+    "adminEmail",
+    "action"
+  ],
+  "rls": {
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}

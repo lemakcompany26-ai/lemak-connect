@@ -1,0 +1,74 @@
+{
+  "name": "SupportConversation",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "channel": {
+      "type": "string",
+      "enum": [
+        "ai",
+        "human"
+      ],
+      "default": "ai"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "pending",
+        "resolved",
+        "closed"
+      ],
+      "default": "open"
+    },
+    "lastMessageAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "assignedTo": {
+      "type": "string",
+      "description": "Admin user id for human support"
+    }
+  },
+  "required": [
+    "userId",
+    "channel",
+    "status"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "data.userId": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.userId": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": false
+  }
+}

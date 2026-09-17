@@ -1,0 +1,83 @@
+{
+  "name": "FeeRule",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "global",
+        "service"
+      ],
+      "description": "Applies to all services or a specific service"
+    },
+    "serviceSlug": {
+      "type": "string",
+      "description": "Required when scope=service"
+    },
+    "fixedFee": {
+      "type": "number",
+      "default": 0
+    },
+    "percentageFee": {
+      "type": "number",
+      "default": 0,
+      "description": "Percentage of provider cost"
+    },
+    "providerCharge": {
+      "type": "number",
+      "default": 0,
+      "description": "Fixed provider charge passed through"
+    },
+    "adminMarkup": {
+      "type": "number",
+      "default": 0,
+      "description": "Additional markup percentage"
+    },
+    "minimumFee": {
+      "type": "number",
+      "default": 0
+    },
+    "maximumFee": {
+      "type": "number"
+    },
+    "isActive": {
+      "type": "boolean",
+      "default": true
+    },
+    "priority": {
+      "type": "number",
+      "default": 0,
+      "description": "Higher priority rules override lower ones"
+    }
+  },
+  "required": [
+    "name",
+    "scope",
+    "isActive"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

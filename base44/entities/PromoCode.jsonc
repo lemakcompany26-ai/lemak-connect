@@ -1,0 +1,87 @@
+{
+  "name": "PromoCode",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "description": "The code customers enter"
+    },
+    "description": {
+      "type": "string"
+    },
+    "discountType": {
+      "type": "string",
+      "enum": [
+        "percentage",
+        "fixed"
+      ]
+    },
+    "discountValue": {
+      "type": "number",
+      "description": "Percentage (0-100) or fixed amount in NGN"
+    },
+    "minimumTransaction": {
+      "type": "number",
+      "default": 0
+    },
+    "maximumDiscount": {
+      "type": "number",
+      "description": "Maximum discount amount in NGN for percentage promos"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "totalUsageLimit": {
+      "type": "number"
+    },
+    "totalUsageCount": {
+      "type": "number",
+      "default": 0
+    },
+    "perUserLimit": {
+      "type": "number",
+      "default": 1
+    },
+    "restrictedToService": {
+      "type": "string",
+      "description": "Optional service slug this promo is restricted to"
+    },
+    "newUsersOnly": {
+      "type": "boolean",
+      "default": false
+    },
+    "isActive": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "code",
+    "discountType",
+    "discountValue",
+    "isActive"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

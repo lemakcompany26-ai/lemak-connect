@@ -1,0 +1,83 @@
+{
+  "name": "NotificationPreference",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string"
+    },
+    "emailEnabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "transactionAlerts": {
+      "type": "boolean",
+      "default": true
+    },
+    "walletAlerts": {
+      "type": "boolean",
+      "default": true
+    },
+    "paymentAlerts": {
+      "type": "boolean",
+      "default": true
+    },
+    "marketplaceAlerts": {
+      "type": "boolean",
+      "default": true
+    },
+    "virtualNumberAlerts": {
+      "type": "boolean",
+      "default": true
+    },
+    "smmAlerts": {
+      "type": "boolean",
+      "default": true
+    },
+    "securityAlerts": {
+      "type": "boolean",
+      "default": true
+    },
+    "promotionalAlerts": {
+      "type": "boolean",
+      "default": true
+    },
+    "systemAlerts": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "userId"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "data.userId": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.userId": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": false
+  }
+}

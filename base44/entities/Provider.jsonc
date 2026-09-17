@@ -1,0 +1,80 @@
+{
+  "name": "Provider",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "e.g. Bigisubs, Paystack, OTP provider, SMM provider"
+    },
+    "slug": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "vtu",
+        "payment",
+        "otp",
+        "smm",
+        "email"
+      ],
+      "description": "What kind of external service this provider offers"
+    },
+    "apiUrlSecretName": {
+      "type": "string",
+      "description": "Name of the Base44 secret holding the API URL"
+    },
+    "apiKeySecretName": {
+      "type": "string",
+      "description": "Name of the Base44 secret holding the API key"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "operational",
+        "degraded",
+        "error",
+        "not_configured"
+      ],
+      "default": "not_configured"
+    },
+    "lastHealthCheckAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "supportsServices": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Slugs of services this provider supports"
+    }
+  },
+  "required": [
+    "name",
+    "slug",
+    "type"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "name": "Transaction",
+  "type": "object",
+  "properties": {
+    "transactionId": {
+      "type": "string",
+      "description": "Public transaction reference, format LMK-YYYYMMDD-XXXXXXXX"
+    },
+    "userId": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "airtime",
+        "data",
+        "electricity",
+        "cable",
+        "betting",
+        "education",
+        "epin",
+        "broadband",
+        "virtual_number",
+        "smm",
+        "marketplace",
+        "wallet_funding",
+        "withdrawal",
+        "refund",
+        "adjustment"
+      ]
+    },
+    "service": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Total amount debited from customer wallet"
+    },
+    "fee": {
+      "type": "number",
+      "default": 0
+    },
+    "providerCost": {
+      "type": "number",
+      "default": 0
+    },
+    "customerPrice": {
+      "type": "number"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "processing",
+        "successful",
+        "failed",
+        "reversed",
+        "refunded"
+      ],
+      "default": "pending"
+    },
+    "providerReference": {
+      "type": "string"
+    },
+    "recipient": {
+      "type": "string",
+      "description": "Phone number, meter number, smartcard, betting ID, etc."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Service-specific details"
+    },
+    "idempotencyKey": {
+      "type": "string"
+    },
+    "failureReason": {
+      "type": "string"
+    },
+    "completedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "transactionId",
+    "userId",
+    "type",
+    "amount",
+    "customerPrice",
+    "status"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "data.userId": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}

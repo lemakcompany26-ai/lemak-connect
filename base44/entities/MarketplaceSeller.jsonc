@@ -1,0 +1,96 @@
+{
+  "name": "MarketplaceSeller",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string"
+    },
+    "fullName": {
+      "type": "string"
+    },
+    "username": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string",
+      "format": "email"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Phone/WhatsApp number"
+    },
+    "accountType": {
+      "type": "string",
+      "enum": [
+        "Individual",
+        "Business",
+        "Agency",
+        "Freelancer",
+        "Service Provider",
+        "Digital Product Seller"
+      ]
+    },
+    "category": {
+      "type": "string",
+      "description": "Primary service category"
+    },
+    "serviceTitle": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "price": {
+      "type": "number"
+    },
+    "currency": {
+      "type": "string",
+      "default": "NGN"
+    },
+    "deliveryTime": {
+      "type": "string"
+    },
+    "portfolioUrl": {
+      "type": "string"
+    },
+    "sellerTerms": {
+      "type": "string"
+    },
+    "verificationInfo": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected",
+        "suspended"
+      ],
+      "default": "pending"
+    },
+    "reviewNotes": {
+      "type": "string"
+    },
+    "reviewedBy": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "userId",
+    "fullName",
+    "email",
+    "accountType",
+    "status"
+  ],
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": false
+  }
+}

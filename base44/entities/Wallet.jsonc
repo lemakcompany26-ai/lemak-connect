@@ -1,0 +1,52 @@
+{
+  "name": "Wallet",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string",
+      "description": "Base44 user id owning this wallet"
+    },
+    "currency": {
+      "type": "string",
+      "default": "NGN"
+    },
+    "balance": {
+      "type": "number",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "frozen",
+        "closed"
+      ],
+      "default": "active"
+    }
+  },
+  "required": [
+    "userId",
+    "currency",
+    "balance"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "data.userId": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}

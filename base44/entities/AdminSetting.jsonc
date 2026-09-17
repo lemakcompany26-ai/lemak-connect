@@ -1,0 +1,57 @@
+{
+  "name": "AdminSetting",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "description": "Unique setting key, e.g. marketplace_fee_percent, google_sell_form_url"
+    },
+    "value": {
+      "type": "string"
+    },
+    "label": {
+      "type": "string",
+      "description": "Human-readable label"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "general",
+        "marketplace",
+        "google_links",
+        "email",
+        "notifications"
+      ],
+      "default": "general"
+    },
+    "isEditable": {
+      "type": "boolean",
+      "default": true
+    },
+    "updatedBy": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "key",
+    "value"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": true,
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

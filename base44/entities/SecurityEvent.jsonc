@@ -1,0 +1,47 @@
+{
+  "name": "SecurityEvent",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string"
+    },
+    "eventType": {
+      "type": "string",
+      "enum": [
+        "login",
+        "logout",
+        "password_change",
+        "failed_login",
+        "suspicious_activity",
+        "wallet_access_denied",
+        "role_change",
+        "account_suspended",
+        "account_blocked"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "critical"
+      ],
+      "default": "info"
+    },
+    "description": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "userId",
+    "eventType"
+  ],
+  "rls": {
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}

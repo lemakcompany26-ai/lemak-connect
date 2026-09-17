@@ -1,0 +1,74 @@
+{
+  "name": "MarketplaceListing",
+  "type": "object",
+  "properties": {
+    "sellerId": {
+      "type": "string",
+      "description": "Reference to MarketplaceSeller record"
+    },
+    "sellerUserId": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string"
+    },
+    "price": {
+      "type": "number"
+    },
+    "currency": {
+      "type": "string",
+      "default": "NGN"
+    },
+    "deliveryTime": {
+      "type": "string"
+    },
+    "portfolioUrl": {
+      "type": "string"
+    },
+    "images": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "pending_approval",
+        "approved",
+        "rejected",
+        "suspended",
+        "delisted"
+      ],
+      "default": "pending_approval"
+    },
+    "isActive": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "sellerId",
+    "title",
+    "category",
+    "price",
+    "status"
+  ],
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": false
+  }
+}

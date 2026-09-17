@@ -12,6 +12,8 @@ import ServicesPage from '@/pages/ServicesPage';
 import HowItWorks from '@/pages/HowItWorks';
 import MarketplacePublic from '@/pages/MarketplacePublic';
 import SupportPage from '@/pages/SupportPage';
+import Terms from '@/pages/Terms';
+import Privacy from '@/pages/Privacy';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import ForgotPassword from '@/pages/ForgotPassword';
@@ -74,6 +76,8 @@ const AuthenticatedApp = () => {
       <Route path="/how-it-works" element={<HowItWorks />} />
       <Route path="/marketplace" element={<MarketplacePublic />} />
       <Route path="/support" element={<SupportPage />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
 
       {/* Auth routes */}
       <Route path="/login" element={<Login />} />

@@ -38,6 +38,11 @@ export default function PublicFooter() {
       <div className="border-t border-white/10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-white/40">
           <span>© {new Date().getFullYear()} Lemak Connect. All rights reserved.</span>
+          <span className="flex items-center gap-3">
+            <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+            <span aria-hidden="true">·</span>
+            <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+          </span>
           <span>Built for Nigerians. Fast. Secure. Reliable.</span>
         </div>
       </div>

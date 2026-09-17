@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useApp } from '@/lib/AppContext';
 import { formatNaira, formatNairaShort, NIGERIAN_NETWORKS } from '@/lib/format';
 import PromoCodeInput from '@/components/app/PromoCodeInput';
+import TransactionProcessingOverlay, { PROCESSING_DURATION_MS } from '@/components/app/TransactionProcessingOverlay';
 
 const NETWORK_COLORS = { MTN: 'bg-yellow-400', Airtel: 'bg-red-500', Glo: 'bg-green-600', '9mobile': 'bg-emerald-700' };
 
@@ -19,6 +20,7 @@ export default function Data() {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [promo, setPromo] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
 
@@ -43,6 +45,9 @@ export default function Data() {
     if (!/^0\d{10}$/.test(phoneNumber)) return setError('Enter a valid 11-digit phone number');
     if (!selectedPlan) return setError('Select a data plan');
     setLoading(true);
+    setProcessing(true);
+    // Branded pre-provider preparation window. No provider request is made during this animation.
+    await new Promise(resolve => setTimeout(resolve, PROCESSING_DURATION_MS));
     try {
       const res = await base44.functions.invoke('purchaseData', {
         network, phoneNumber, planId: selectedPlan.id,
@@ -56,6 +61,7 @@ export default function Data() {
       setError((d && (d.error || d.message)) || err.message || 'Purchase failed');
       if (d && d.wallet) setWalletLocal(d.wallet);
     } finally {
+      setProcessing(false);
       setLoading(false);
     }
   };
@@ -89,6 +95,7 @@ export default function Data() {
 
   return (
     <div className="max-w-lg space-y-6">
+      <TransactionProcessingOverlay visible={processing} />
       <div>
         <h1 className="font-heading text-2xl font-extrabold flex items-center gap-2.5"><Wifi className="w-6 h-6 text-primary" /> Data Bundles</h1>
         <p className="text-sm text-muted-foreground mt-1">Real network plans, loaded live from our provider.</p>

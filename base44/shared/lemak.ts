@@ -11,14 +11,16 @@ export function isStaffRole(role) {
   return ['admin', 'super_admin', 'moderator'].includes(role);
 }
 
-// Unique server-generated transaction reference: LMK-YYYYMMDD-XXXXXXXX
+// Unique server-generated transaction reference: LEM-YYYYMMDD-XXXXXXXX
 export function generateTransactionId() {
   const now = new Date();
   const y = now.getUTCFullYear();
   const m = String(now.getUTCMonth() + 1).padStart(2, '0');
   const d = String(now.getUTCDate()).padStart(2, '0');
-  const rand = Math.random().toString(36).slice(2, 10).toUpperCase().padEnd(8, 'X');
-  return `LMK-${y}${m}${d}-${rand}`;
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  const rand = Array.from(bytes, b => b.toString(36).padStart(2, '0')).join('').toUpperCase().padEnd(8, 'X').slice(0, 8);
+  return `LEM-${y}${m}${d}-${rand}`;
 }
 
 export function round2(n) {

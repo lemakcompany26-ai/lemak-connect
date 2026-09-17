@@ -26,6 +26,10 @@ import Dashboard from '@/pages/app/Dashboard';
 import AppServices from '@/pages/app/Services';
 import Airtime from '@/pages/app/Airtime';
 import Data from '@/pages/app/Data';
+import Cable from '@/pages/app/Cable';
+import Betting from '@/pages/app/Betting';
+import Epin from '@/pages/app/Epin';
+import SocialGrowth from '@/pages/app/SocialGrowth';
 import ServiceSoon from '@/pages/app/ServiceSoon';
 import VirtualNumbers from '@/pages/app/VirtualNumbers';
 import WalletPage from '@/pages/app/Wallet';
@@ -96,13 +100,13 @@ const AuthenticatedApp = () => {
           <Route path="/app/airtime" element={<Airtime />} />
           <Route path="/app/data" element={<Data />} />
           <Route path="/app/electricity" element={<ServiceSoon service="Electricity" />} />
-          <Route path="/app/cable" element={<ServiceSoon service="Cable TV" />} />
-          <Route path="/app/betting" element={<ServiceSoon service="Betting" />} />
+          <Route path="/app/cable" element={<Cable />} />
+          <Route path="/app/betting" element={<Betting />} />
           <Route path="/app/education" element={<ServiceSoon service="Education" />} />
-          <Route path="/app/epin" element={<ServiceSoon service="ePIN / Recharge" />} />
+          <Route path="/app/epin" element={<Epin />} />
           <Route path="/app/broadband" element={<ServiceSoon service="Broadband" />} />
           <Route path="/app/virtual-numbers" element={<VirtualNumbers />} />
-          <Route path="/app/social-growth" element={<ServiceSoon service="Social Growth" />} />
+          <Route path="/app/social-growth" element={<SocialGrowth />} />
           <Route path="/app/wallet" element={<WalletPage />} />
           <Route path="/app/transactions" element={<Transactions />} />
           <Route path="/app/notifications" element={<Notifications />} />

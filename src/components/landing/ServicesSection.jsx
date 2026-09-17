@@ -5,13 +5,13 @@ export const ALL_SERVICES = [
   { slug: 'airtime', name: 'Airtime', icon: Smartphone, desc: 'Instant top-ups for MTN, Airtel, Glo & 9mobile.', live: true },
   { slug: 'data', name: 'Data Bundles', icon: Wifi, desc: 'Real network bundles at unbeatable prices.', live: true },
   { slug: 'electricity', name: 'Electricity', icon: Lightbulb, desc: 'Prepaid & postpaid tokens for major discos.', live: false },
-  { slug: 'cable', name: 'Cable TV', icon: Tv, desc: 'DStv, GOtv & StarTimes subscriptions.', live: false },
-  { slug: 'betting', name: 'Betting', icon: Trophy, desc: 'Fund Bet9ja, SportyBet, 1xBet & more.', live: false },
+  { slug: 'cable', name: 'Cable TV', icon: Tv, desc: 'DStv, GOtv & StarTimes subscriptions.', live: true },
+  { slug: 'betting', name: 'Betting', icon: Trophy, desc: 'Fund Bet9ja, SportyBet, 1xBet & more.', live: true },
   { slug: 'education', name: 'Education', icon: GraduationCap, desc: 'WAEC, JAMB & NECO result-checker pins.', live: false },
-  { slug: 'epin', name: 'ePIN / Recharge', icon: Ticket, desc: 'Digital recharge pins, delivered instantly.', live: false },
+  { slug: 'epin', name: 'ePIN / Recharge', icon: Ticket, desc: 'Digital recharge pins, delivered instantly.', live: true },
   { slug: 'broadband', name: 'Broadband', icon: Globe, desc: 'Home & office internet subscriptions.', live: false },
   { slug: 'virtual-numbers', name: 'Virtual Numbers', icon: Phone, desc: 'OTP numbers for WhatsApp, Telegram & more.', live: false },
-  { slug: 'social-growth', name: 'Social Growth', icon: TrendingUp, desc: 'Real likes, views & followers that stick.', live: false },
+  { slug: 'social-growth', name: 'Social Growth', icon: TrendingUp, desc: 'Real likes, views & followers that stick.', live: true },
   { slug: 'analytics', name: 'Social Analytics', icon: BarChart3, desc: 'Track your orders & growth performance.', live: false },
   { slug: 'marketplace', name: 'Marketplace', icon: Store, desc: 'Buy & sell trusted digital services.', live: true }
 ];

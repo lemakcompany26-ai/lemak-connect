@@ -6,6 +6,10 @@ import { useApp } from '@/lib/AppContext';
 const LIVE_ROUTES = {
   airtime: '/app/airtime',
   data: '/app/data',
+  cable: '/app/cable',
+  betting: '/app/betting',
+  epin: '/app/epin',
+  'social-growth': '/app/social-growth',
   marketplace: '/app/marketplace',
   'virtual-numbers': '/app/virtual-numbers',
   social_growth_placeholder: null

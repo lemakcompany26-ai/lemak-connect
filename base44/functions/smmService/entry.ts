@@ -17,9 +17,26 @@ export default async function(req: Request): Promise<Response> {
     const body = await req.json();
     const action = String(body.action || '');
 
-    if (action === 'services') {
+    if (action === 'categories') {
       const services = await fetchSmmServices();
-      return Response.json({ services });
+      const counts = {};
+      for (const s of services) {
+        counts[s.category] = (counts[s.category] || 0) + 1;
+      }
+      const categories = Object.entries(counts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      return Response.json({ categories });
+    }
+
+    if (action === 'services') {
+      const category = String(body.category || '').trim();
+      const search = String(body.search || '').trim().toLowerCase();
+      const limit = Math.min(Math.max(Number(body.limit) || 200, 1), 500);
+      let services = await fetchSmmServices();
+      if (category) services = services.filter(s => s.category === category);
+      if (search) services = services.filter(s => s.name.toLowerCase().includes(search) || s.category.toLowerCase().includes(search));
+      return Response.json({ services: services.slice(0, limit) });
     }
 
     if (action === 'preview') {

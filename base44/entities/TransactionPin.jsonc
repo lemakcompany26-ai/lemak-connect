@@ -1,0 +1,54 @@
+{
+  "name": "TransactionPin",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string",
+      "description": "Base44 user id this PIN belongs to"
+    },
+    "pinHash": {
+      "type": "string",
+      "description": "Salted SHA-256 hash of the PIN. Never stored or returned in readable form."
+    },
+    "salt": {
+      "type": "string"
+    },
+    "failedAttempts": {
+      "type": "number",
+      "default": 0
+    },
+    "lockedUntil": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Temporary lockout timestamp after repeated wrong attempts"
+    },
+    "requireForPurchases": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether purchases must re-verify the PIN"
+    },
+    "lastChangedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "userId",
+    "pinHash",
+    "salt"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": false,
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": false
+  }
+}

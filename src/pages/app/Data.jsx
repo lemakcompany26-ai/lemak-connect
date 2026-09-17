@@ -8,6 +8,7 @@ import { useApp } from '@/lib/AppContext';
 import { formatNaira, formatNairaShort, NIGERIAN_NETWORKS } from '@/lib/format';
 import PromoCodeInput from '@/components/app/PromoCodeInput';
 import TransactionProcessingOverlay, { PROCESSING_DURATION_MS } from '@/components/app/TransactionProcessingOverlay';
+import TransactionPinInput from '@/components/app/TransactionPinInput';
 
 const NETWORK_COLORS = { MTN: 'bg-yellow-400', Airtel: 'bg-red-500', Glo: 'bg-green-600', '9mobile': 'bg-emerald-700' };
 
@@ -23,6 +24,7 @@ export default function Data() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
+  const [pin, setPin] = useState('');
 
   const loadPlans = async (net) => {
     setPlans(null); setPlansError(''); setSelectedPlan(null);
@@ -51,7 +53,8 @@ export default function Data() {
     try {
       const res = await base44.functions.invoke('purchaseData', {
         network, phoneNumber, planId: selectedPlan.id,
-        promoCode: promo ? promo.code : null
+        promoCode: promo ? promo.code : null,
+        pin: pin || null
       });
       const d = res.data || res;
       if (d.wallet) setWalletLocal(d.wallet);
@@ -148,6 +151,7 @@ export default function Data() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <PromoCodeInput serviceSlug="data" providerCost={selectedPlan ? selectedPlan.providerCost : 0} onValidated={setPromo} />
+          <TransactionPinInput value={pin} onChange={setPin} />
           {error && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /> {error}

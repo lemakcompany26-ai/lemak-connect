@@ -16,7 +16,14 @@
         "wallet_access_denied",
         "role_change",
         "account_suspended",
-        "account_blocked"
+        "account_blocked",
+        "pin_created",
+        "pin_changed",
+        "pin_reset",
+        "pin_failed",
+        "pin_locked",
+        "pin_require_purchases_enabled",
+        "pin_require_purchases_disabled"
       ]
     },
     "severity": {

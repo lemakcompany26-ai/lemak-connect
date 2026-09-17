@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { generateTransactionId, calculatePrice, validatePromo, redeemPromo, debitWallet, creditWallet, notifyUser, sendUserEmail, emailTemplate, round2 } from '../../shared/lemak.ts';
 import { getVtuConfig, purchaseDataViaProvider, fetchDataPlans, isProviderSuccess, extractProviderReference } from '../../shared/vtu.ts';
+import { assertPinForPurchase } from '../../shared/security.ts';
 
 // Data purchase flow. The plan's cost is re-verified against the provider
 // catalogue — the frontend price is never trusted.
@@ -12,7 +13,7 @@ export default async function(req: Request): Promise<Response> {
     const service = base44.asServiceRole;
 
     const body = await req.json();
-    const { network, phoneNumber, planId, promoCode, idempotencyKey } = body;
+    const { network, phoneNumber, planId, promoCode, idempotencyKey, pin } = body;
 
     if (!['MTN', 'Airtel', 'Glo', '9mobile'].includes(network)) {
       return Response.json({ error: 'Select a valid network' }, { status: 400 });
@@ -27,6 +28,13 @@ export default async function(req: Request): Promise<Response> {
     const profile = profiles && profiles[0] ? profiles[0] : null;
     if (profile && profile.accountStatus !== 'active') {
       return Response.json({ error: 'Your account is ' + profile.accountStatus + '. Contact support for help.' }, { status: 403 });
+    }
+
+    // Transaction PIN gate (active only when enabled in Settings → Security)
+    try {
+      await assertPinForPurchase(service, user.id, pin);
+    } catch (e) {
+      return Response.json({ error: e.message }, { status: e.statusCode || 403 });
     }
 
     // Re-verify plan and cost against the provider catalogue (authoritative)

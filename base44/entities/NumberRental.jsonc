@@ -11,13 +11,14 @@
     },
     "listingId": {
       "type": "string",
-      "description": "Reference to VirtualNumberListing"
+      "description": "Reference to VirtualNumberListing. For live provider rentals: PROVIDER-A / PROVIDER-B"
     },
     "buyerUserId": {
       "type": "string"
     },
     "sellerUserId": {
-      "type": "string"
+      "type": "string",
+      "description": "Base44 user id of the seller. 'system' for live provider rentals"
     },
     "service": {
       "type": "string"
@@ -27,11 +28,34 @@
       "description": "Total buyer amount held in escrow for this rental"
     },
     "sellerPayout": {
-      "type": "number",
-      "description": "Amount the seller receives when the buyer completes"
+      "type": "number"
     },
     "commission": {
       "type": "number"
+    },
+    "product": {
+      "type": "string",
+      "enum": [
+        "sms",
+        "email"
+      ],
+      "description": "Live provider rentals only: SMS number or temporary email OTP address"
+    },
+    "provider": {
+      "type": "string",
+      "description": "Provider id for live rentals, e.g. fleexa"
+    },
+    "serverId": {
+      "type": "string",
+      "description": "Which OTP server (a / b) served this live rental"
+    },
+    "providerOrderId": {
+      "type": "string",
+      "description": "Provider-side order id used to poll for the OTP"
+    },
+    "deliveredHandle": {
+      "type": "string",
+      "description": "Live rentals only: the purchased phone number or email address, revealed to the renter"
     },
     "status": {
       "type": "string",
@@ -60,7 +84,7 @@
     "sellerTypingAt": {
       "type": "string",
       "format": "date-time",
-      "description": "Last time the seller was typing in the rental chat (typing indicator)"
+      "description": "Last time the seller was typing in the rental chat (typing indicator). For live provider rentals, refreshed while the OTP is being fetched"
     }
   },
   "required": [

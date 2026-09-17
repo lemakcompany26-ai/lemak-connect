@@ -9,6 +9,7 @@ import ListingCard from '@/components/vnum/ListingCard';
 import RentalCard from '@/components/vnum/RentalCard';
 import RentalChatDialog from '@/components/vnum/RentalChatDialog';
 import CreateListingForm from '@/components/vnum/CreateListingForm';
+import ProviderBrowse from '@/components/vnum/ProviderBrowse';
 import { formatNaira } from '@/lib/format';
 
 export default function VirtualNumbers() {
@@ -78,7 +79,11 @@ export default function VirtualNumbers() {
   };
 
   const cancel = async (rental) => {
-    await call({ action: 'cancel', rentalId: rental.id }, 'Rental cancelled', 'You were refunded in full.');
+    if (rental.provider) {
+      await call({ action: 'provider_cancel', rentalId: rental.id }, 'Rental cancelled', 'You were refunded in full.');
+    } else {
+      await call({ action: 'cancel', rentalId: rental.id }, 'Rental cancelled', 'You were refunded in full.');
+    }
   };
 
   const toggleListing = async (listing) => {
@@ -89,6 +94,33 @@ export default function VirtualNumbers() {
   };
 
   const myActiveCount = (myRentals || []).filter(r => r.status === 'active').length;
+
+  // Live provider rentals: poll the provider for the OTP while the page is
+  // open. When it arrives it lands in the rental chat + a notification.
+  useEffect(() => {
+    const activeProvider = (myRentals || [])
+      .filter(r => r.provider && r.status === 'active')
+      .slice(0, 3);
+    if (!activeProvider.length) return;
+    const timer = setInterval(async () => {
+      for (const r of activeProvider) {
+        try {
+          const res = await base44.functions.invoke('virtualNumbers', { action: 'provider_check', rentalId: r.id });
+          const d = res.data || res;
+          if (d && d.otp) {
+            toast({ title: 'OTP received 🔑', description: 'Your code is waiting in the rental chat.' });
+            load();
+            return;
+          }
+          if (d && d.status && d.status !== 'waiting' && d.status !== 'active') {
+            load();
+            return;
+          }
+        } catch (e) { /* keep polling */ }
+      }
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [myRentals]);
 
   return (
     <div className="rounded-3xl bg-mk-bg border border-mk-border p-4 sm:p-6 space-y-6">
@@ -124,16 +156,23 @@ export default function VirtualNumbers() {
           <TabsTrigger value="sell" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Sell</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="browse" className="mt-5">
-          {listings === null && <div className="py-16 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-mk-blue" /></div>}
-          {listings && listings.length === 0 && (
-            <div className="py-16 text-center border border-dashed border-mk-border rounded-2xl">
-              <Phone className="w-10 h-10 text-slate-600 mx-auto" />
-              <p className="mt-3 text-sm text-slate-400">No numbers listed yet. Approved sellers can add theirs in the Sell tab.</p>
+        <TabsContent value="browse" className="mt-5 space-y-5">
+          <ProviderBrowse
+            onRented={(rental) => { setTab('rentals'); setChat({ rental, role: 'buyer' }); load(); }}
+          />
+
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wide">From verified sellers</h3>
+            {listings === null && <div className="py-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-mk-blue" /></div>}
+            {listings && listings.length === 0 && (
+              <div className="py-10 text-center border border-dashed border-mk-border rounded-2xl">
+                <Phone className="w-10 h-10 text-slate-600 mx-auto" />
+                <p className="mt-3 text-sm text-slate-400">No seller numbers listed yet. Approved sellers can add theirs in the Sell tab.</p>
+              </div>
+            )}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(listings || []).map(l => <ListingCard key={l.id} listing={l} busy={busy} onRent={rent} />)}
             </div>
-          )}
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {(listings || []).map(l => <ListingCard key={l.id} listing={l} busy={busy} onRent={rent} />)}
           </div>
         </TabsContent>
 

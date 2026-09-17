@@ -39,7 +39,7 @@ export default function RentalCard({ rental, role, busy, onComplete, onCancel, o
 
       {rental.number && (
         <div className="mt-3 flex items-center justify-between rounded-xl bg-mk-card2 px-3 py-2.5">
-          <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Number</span>
+          <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{rental.product === 'email' ? 'Email address' : 'Number'}</span>
           <span className="text-sm font-mono font-bold text-white select-all">{rental.number}</span>
         </div>
       )}
@@ -54,11 +54,21 @@ export default function RentalCard({ rental, role, busy, onComplete, onCancel, o
         <Button size="sm" variant="ghost" className="h-9 text-slate-300 hover:text-white font-semibold" disabled={busy} onClick={() => onChat(rental)}>
           <MessageCircle className="w-3.5 h-3.5 mr-1" /> Chat / OTP
         </Button>
-        {isBuyer && rental.status === 'active' && (
+        {isBuyer && rental.status === 'active' && !rental.provider && (
           <>
             <Button size="sm" className="h-9 ml-auto bg-mk-blue hover:bg-mk-blue/90 text-white font-bold" disabled={busy} onClick={() => onComplete(rental)}>
               <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Mark received
             </Button>
+            <Button size="sm" variant="outline" className="h-9 border-rose-500/40 text-rose-400 hover:bg-rose-500/10 font-semibold" disabled={busy} onClick={() => onCancel(rental)}>
+              <XCircle className="w-3.5 h-3.5 mr-1" /> Cancel
+            </Button>
+          </>
+        )}
+        {isBuyer && rental.status === 'active' && rental.provider && (
+          <>
+            <span className="ml-auto text-[11px] text-mk-blue-soft flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" /> Waiting for your OTP…
+            </span>
             <Button size="sm" variant="outline" className="h-9 border-rose-500/40 text-rose-400 hover:bg-rose-500/10 font-semibold" disabled={busy} onClick={() => onCancel(rental)}>
               <XCircle className="w-3.5 h-3.5 mr-1" /> Cancel
             </Button>

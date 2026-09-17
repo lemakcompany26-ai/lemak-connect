@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { creditWallet, notifyUser } from '../../shared/lemak.ts';
+import { getOtpServer, cancelSmsRequest, cancelEmailOtp } from '../../shared/otp.ts';
 
 // Sweeper invoked every 5 minutes by the "Expire Virtual Number Rentals"
 // workflow. Expires overdue rentals and auto-refunds the buyer — fully
@@ -16,6 +17,15 @@ export default async function(req: Request): Promise<Response> {
     const failures = [];
     for (const rental of expired) {
       try {
+        if (rental.provider && rental.serverId) {
+          const server = getOtpServer(rental.serverId);
+          if (server) {
+            try {
+              if (rental.product === 'email') await cancelEmailOtp(server, rental.providerOrderId);
+              else await cancelSmsRequest(server, rental.providerOrderId);
+            } catch (e) { /* provider-side refund handled by them */ }
+          }
+        }
         await creditWallet(service, {
           userId: rental.buyerUserId, transactionId: rental.transactionId,
           type: 'refund', amount: rental.amount, reference: rental.rentalRef,
@@ -35,12 +45,14 @@ export default async function(req: Request): Promise<Response> {
           message: `Your ${rental.service} number rental (${rental.rentalRef}) expired. ₦${Number(rental.amount).toLocaleString()} has been refunded to your wallet.`,
           actionUrl: '/app/wallet'
         });
-        await notifyUser(service, {
-          userId: rental.sellerUserId, type: 'marketplace',
-          title: 'Rental expired',
-          message: `Rental ${rental.rentalRef} expired without buyer confirmation. The buyer was refunded automatically.`,
-          actionUrl: '/app/virtual-numbers'
-        });
+        if (!rental.provider) {
+          await notifyUser(service, {
+            userId: rental.sellerUserId, type: 'marketplace',
+            title: 'Rental expired',
+            message: `Rental ${rental.rentalRef} expired without buyer confirmation. The buyer was refunded automatically.`,
+            actionUrl: '/app/virtual-numbers'
+          });
+        }
         refunded++;
       } catch (e) {
         failures.push({ rentalRef: rental.rentalRef, error: e.message });

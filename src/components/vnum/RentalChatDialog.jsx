@@ -20,6 +20,7 @@ export default function RentalChatDialog({ rental, role, onClose }) {
   const [isOtp, setIsOtp] = useState(false);
   const [sending, setSending] = useState(false);
   const [typing, setTyping] = useState({ buyer: null, seller: null });
+  const [liveStatus, setLiveStatus] = useState(null);
   const [, setTick] = useState(0);
   const lastTypingPing = useRef(0);
 
@@ -44,7 +45,11 @@ export default function RentalChatDialog({ rental, role, onClose }) {
     setDraft('');
     setIsOtp(false);
     setTyping({ buyer: rental.buyerTypingAt || null, seller: rental.sellerTypingAt || null });
+    setLiveStatus(rental.status);
     load();
+    if (rental.provider && rental.status === 'active') {
+      base44.functions.invoke('virtualNumbers', { action: 'provider_check', rentalId: rental.id }).catch(() => {});
+    }
     const unsubscribe = base44.entities.RentalMessage.subscribe((event) => {
       const d = event.data || {};
       if (d.rentalId === rental.id) load();
@@ -53,6 +58,7 @@ export default function RentalChatDialog({ rental, role, onClose }) {
       const d = event.data || {};
       if (d.id === rental.id) {
         setTyping({ buyer: d.buyerTypingAt || null, seller: d.sellerTypingAt || null });
+        setLiveStatus(d.status || null);
       }
     });
     const ticker = setInterval(() => setTick(t => t + 1), 2000);
@@ -89,6 +95,9 @@ export default function RentalChatDialog({ rental, role, onClose }) {
 
   if (!rental) return null;
 
+  const status = liveStatus || rental.status;
+  const otpDelivered = (messages || []).some(m => m.isOtp);
+
   return (
     <Dialog open={!!rental} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="bg-mk-card border-mk-border text-slate-100 max-w-lg">
@@ -97,7 +106,7 @@ export default function RentalChatDialog({ rental, role, onClose }) {
             <MessageCircle className="w-4 h-4 text-mk-blue" /> {rental.service} OTP chat
           </DialogTitle>
           <DialogDescription className="text-slate-400 text-xs">
-            Rental {rental.rentalRef} · private between buyer and seller. {rental.status !== 'active' ? 'This rental has ended — chat is read-only.' : ''}
+            Rental {rental.rentalRef} · private between buyer and seller. {status !== 'active' ? 'This rental has ended — chat is read-only.' : ''}
           </DialogDescription>
         </DialogHeader>
 
@@ -109,7 +118,9 @@ export default function RentalChatDialog({ rental, role, onClose }) {
             <div className="h-full flex items-center justify-center text-xs text-slate-500 text-center px-4">
               {role === 'seller'
                 ? 'The buyer is waiting — paste the OTP code as soon as it arrives.'
-                : 'Waiting for the seller to send your OTP. You can also ask questions here.'}
+                : rental.provider
+                  ? 'Your OTP is being fetched from the provider — it will appear here automatically.'
+                  : 'Waiting for the seller to send your OTP. You can also ask questions here.'}
             </div>
           )}
           {messages && messages.map(m => {
@@ -136,12 +147,13 @@ export default function RentalChatDialog({ rental, role, onClose }) {
 
         <TypingIndicator
           visible={(() => {
+            if (role === 'buyer' && rental.provider && status === 'active' && !otpDelivered) return true;
             const otherTypingAt = role === 'buyer' ? typing.seller : typing.buyer;
-            return otherTypingAt && Date.now() - new Date(otherTypingAt).getTime() < TYPING_FRESH_MS;
+            return Boolean(otherTypingAt && Date.now() - new Date(otherTypingAt).getTime() < TYPING_FRESH_MS);
           })()}
         />
 
-        {rental.status === 'active' && (
+        {status === 'active' && (
           <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); send(); }}>
             <div className="flex gap-2">
               <Input

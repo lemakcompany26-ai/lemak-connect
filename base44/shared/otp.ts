@@ -44,12 +44,14 @@ export function getOtpServers() {
     {
       id: 'a',
       label: 'Server A (primary)',
+      provider: 'fleexa',
       url: secrets.get('OTP_PROVIDER_API_URL'),
       key: secrets.get('OTP_PROVIDER_API_KEY')
     },
     {
       id: 'b',
-      label: 'Server B (fallback)',
+      label: 'Server B (SMSPool)',
+      provider: 'smspool',
       url: secrets.get('OTP_SERVER_B_URL'),
       key: secrets.get('OTP_SERVER_B_KEY')
     }
@@ -112,22 +114,116 @@ export async function otpServerRequest(path, options) {
   throw lastError || new Error('All OTP servers are unreachable.');
 }
 
+// ---------- SMSPool adapter (Server B) ----------
+// Server B speaks the SMSPool API (https://api.smspool.net): form-encoded
+// POSTs with the key in the body. Prices are USD and are converted to NGN
+// at a conservative fixed rate. SMSPool has no email OTP product.
+const SMSPOOL_COUNTRY = 'US';
+const SMSPOOL_USD_NGN = 1600;
+let smspoolServicesCache = null;
+
+function isSmspool(server) {
+  return String((server && server.id) || '').toLowerCase() === 'b';
+}
+
+async function smspoolPost(server, path, fields) {
+  if (!server || !server.url || !server.key) {
+    const err = new Error('This OTP server is not configured.');
+    err.statusCode = 503;
+    throw err;
+  }
+  const res = await fetch(server.url.replace(/\/+$/, '') + path, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Bearer ${server.key}` // without this header the API 404s
+    },
+    body: new URLSearchParams({ key: server.key, ...(fields || {}) }).toString()
+  });
+  let payload = null;
+  try { payload = await res.json(); } catch (e) { payload = null; }
+  if (!res.ok || (payload && payload.success === 0)) {
+    const msg = (payload && payload.errors && payload.errors[0] && payload.errors[0].message) ||
+      (payload && payload.message) || `OTP provider error (HTTP ${res.status})`;
+    const err = new Error(msg);
+    err.statusCode = res.status === 429 ? 429 : 502;
+    err.providerError = true;
+    throw err;
+  }
+  return payload;
+}
+
+// Resolve a lowercase service id (whatsapp, google…) to SMSPool's exact
+// service name via the public service list (cached per invocation).
+async function smspoolExactName(server, wanted) {
+  if (!smspoolServicesCache) {
+    const data = await smspoolPost(server, '/request/services');
+    smspoolServicesCache = Array.isArray(data) ? data : [];
+  }
+  const target = String(wanted || '').toLowerCase();
+  return smspoolServicesCache.find(s => String(s.name).toLowerCase() === target) ||
+    smspoolServicesCache.find(s => String(s.name).toLowerCase().startsWith(target)) ||
+    smspoolServicesCache.find(s => String(s.name).toLowerCase().includes(target)) || null;
+}
+
+function smspoolUnavailable(message) {
+  const err = new Error(message);
+  err.statusCode = 400;
+  return err;
+}
+
 // ---------- Fleexa-compatible helpers (per server) ----------
 
 export async function otpServerStatus(server) {
+  if (isSmspool(server)) {
+    const data = await smspoolPost(server, '/request/balance');
+    return { balance: data && data.balance };
+  }
   return await serverFetch(server, '/balance');
 }
 
 export async function listSmsServices(server) {
+  if (isSmspool(server)) {
+    if (!smspoolServicesCache) {
+      const data = await smspoolPost(server, '/request/services');
+      smspoolServicesCache = Array.isArray(data) ? data : [];
+    }
+    // SMSPool does not expose per-service stock; quantity null means
+    // "available on demand" — the purchase itself fails gracefully if empty.
+    return smspoolServicesCache.map(s => ({ id: String(s.name).toLowerCase(), quantity: null }));
+  }
   const data = await serverFetch(server, '/sms4/apps');
   return Array.isArray(data) ? data : [];
 }
 
 export async function getSmsPrice(server, serviceName) {
+  if (isSmspool(server)) {
+    const exactName = await smspoolExactName(server, serviceName);
+    if (!exactName) throw smspoolUnavailable('That service is not available on this server.');
+    const data = await smspoolPost(server, '/request/price', {
+      service: exactName.name, country: SMSPOOL_COUNTRY
+    });
+    const usd = Number(data.price) || 0;
+    if (!usd) throw smspoolUnavailable('No price available for this service right now.');
+    return { price_ngn: usd * SMSPOOL_USD_NGN };
+  }
   return await serverFetch(server, '/sms4/prices?serviceName=' + encodeURIComponent(serviceName));
 }
 
 export async function buySmsNumber(server, serviceName) {
+  if (isSmspool(server)) {
+    const exactName = await smspoolExactName(server, serviceName);
+    if (!exactName) throw smspoolUnavailable('That service is not available on this server.');
+    const data = await smspoolPost(server, '/purchase/sms', {
+      service: exactName.name, country: SMSPOOL_COUNTRY
+    });
+    return {
+      number: data.number, phone: data.number,
+      id: data.order_id, requestId: data.order_id,
+      expires_in: Number(data.expires_in) || 0,
+      amount_paid: 0
+    };
+  }
   return await serverFetch(server, '/sms4/buy', {
     method: 'POST',
     body: JSON.stringify({ serviceName })
@@ -135,10 +231,27 @@ export async function buySmsNumber(server, serviceName) {
 }
 
 export async function checkSmsRequest(server, requestId) {
+  if (isSmspool(server)) {
+    const data = await smspoolPost(server, '/sms/check', { orderid: String(requestId) });
+    // SMSPool statuses: 1 pending, 2 receiving, 3/4 SMS received, 5/6/7 cancelled or timed out
+    const n = Number(data.status) || 0;
+    const received = n === 3 || n === 4;
+    const code = data.sms && String(data.sms) !== '0' && String(data.sms).toLowerCase() !== 'null'
+      ? String(data.sms) : null;
+    return {
+      status: received ? 'received' : (n >= 5 ? 'cancelled' : 'pending'),
+      sms_code: received ? code : null,
+      full_sms: received ? (data.full_sms || null) : null
+    };
+  }
   return await serverFetch(server, '/sms4/check/' + encodeURIComponent(String(requestId)));
 }
 
 export async function cancelSmsRequest(server, requestId) {
+  if (isSmspool(server)) {
+    await smspoolPost(server, '/sms/cancel', { orderid: String(requestId) });
+    return { ok: true };
+  }
   return await serverFetch(server, '/sms4/cancel', {
     method: 'POST',
     body: JSON.stringify({ requestId })
@@ -146,11 +259,13 @@ export async function cancelSmsRequest(server, requestId) {
 }
 
 export async function listEmailProducts(server) {
+  if (isSmspool(server)) return []; // SMSPool has no email OTP product
   const data = await serverFetch(server, '/email/products');
   return Array.isArray(data) ? data : [];
 }
 
 export async function buyEmailOtp(server, domain, site) {
+  if (isSmspool(server)) throw smspoolUnavailable('Email OTP is not available on this server.');
   return await serverFetch(server, '/email/buy', {
     method: 'POST',
     body: JSON.stringify({ domain, site })
@@ -158,10 +273,12 @@ export async function buyEmailOtp(server, domain, site) {
 }
 
 export async function checkEmailOtp(server, emailId) {
+  if (isSmspool(server)) throw smspoolUnavailable('Email OTP is not available on this server.');
   return await serverFetch(server, '/email/check/' + encodeURIComponent(String(emailId)));
 }
 
 export async function cancelEmailOtp(server, emailId) {
+  if (isSmspool(server)) throw smspoolUnavailable('Email OTP is not available on this server.');
   return await serverFetch(server, '/email/cancel', {
     method: 'POST',
     body: JSON.stringify({ requestId: emailId })

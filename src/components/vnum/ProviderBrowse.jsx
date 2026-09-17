@@ -61,7 +61,11 @@ export default function ProviderBrowse({ onRented }) {
   const inStock = useMemo(() => {
     const all = {};
     for (const s of catalog || []) {
-      for (const svc of s.smsServices || []) all[svc.id] = Math.max(all[svc.id] || 0, svc.quantity);
+      for (const svc of s.smsServices || []) {
+        // null quantity (SMSPool) = available on demand, tracked as -1
+        if (svc.quantity === null || svc.quantity === undefined) all[svc.id] = -1;
+        else all[svc.id] = all[svc.id] === -1 ? -1 : Math.max(all[svc.id] || 0, svc.quantity);
+      }
     }
     return all;
   }, [catalog]);
@@ -180,9 +184,11 @@ export default function ProviderBrowse({ onRented }) {
                     className={'w-full flex items-center justify-between px-3 py-2 text-left ' + (service === id ? 'bg-mk-blue/15' : '')}
                   >
                     <span className="text-xs font-semibold text-slate-200 capitalize">{id}</span>
-                    {(inStock[id] || 0) > 0
-                      ? <span className="text-[10px] font-bold text-emerald-400">{inStock[id]} in stock</span>
-                      : <span className="text-[10px] text-slate-500">out of stock</span>}
+                    {inStock[id] === -1
+                      ? <span className="text-[10px] font-bold text-emerald-400">available</span>
+                      : (inStock[id] || 0) > 0
+                        ? <span className="text-[10px] font-bold text-emerald-400">{inStock[id]} in stock</span>
+                        : <span className="text-[10px] text-slate-500">out of stock</span>}
                   </button>
                 ))}
                 {serviceOptions.length === 0 && (
@@ -218,9 +224,9 @@ export default function ProviderBrowse({ onRented }) {
           <div className="space-y-2.5">
             {catalog.map(s => {
               const price = prices[s.id];
-              const stockQty = product === 'sms' ? (inStock[service] || 0) : 1;
+              const stockQty = product === 'sms' ? (inStock[service] === undefined ? 0 : inStock[service]) : 1;
               const canRent = s.online && service && price && price !== 'unavailable' &&
-                (product === 'email' || stockQty > 0);
+                (product === 'email' || stockQty === -1 || stockQty > 0);
               return (
                 <div key={s.id} className="rounded-xl border border-mk-border bg-mk-card2 px-3.5 py-3 flex items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -232,8 +238,14 @@ export default function ProviderBrowse({ onRented }) {
                     <div className="text-[11px] text-slate-400 mt-1">
                       {s.online
                         ? (product === 'sms'
-                            ? ((inStock[service] || 0) > 0 ? `${inStock[service]} live numbers in stock` : 'Out of stock — restocks frequently')
-                            : 'Live email addresses')
+                            ? (inStock[service] === -1
+                                ? 'US non-VoIP numbers — 1,300+ services ready'
+                                : (inStock[service] || 0) > 0
+                                  ? `${inStock[service]} live numbers in stock`
+                                  : 'Out of stock — restocks frequently')
+                            : ((s.emailProducts || []).length > 0
+                                ? 'Live email addresses'
+                                : 'Not available for email OTP'))
                         : (s.configured ? 'Temporarily unreachable' : 'Not configured yet')}
                     </div>
                   </div>

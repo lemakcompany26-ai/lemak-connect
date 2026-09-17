@@ -344,7 +344,7 @@ export default async function(req: Request): Promise<Response> {
             entry.online = true;
             try {
               const apps = await listSmsServices(s);
-              const inStock = (apps || []).filter(a => Number(a.quantity) > 0);
+              const inStock = (apps || []).filter(a => a.quantity === null || Number(a.quantity) > 0);
               entry.smsStock = inStock.length;
               entry.smsServices = inStock.slice(0, 150).map(a => ({ id: a.id, quantity: Number(a.quantity) }));
             } catch (e) { /* stock list unavailable on this server */ }
@@ -426,10 +426,12 @@ export default async function(req: Request): Promise<Response> {
 
       let handle = '';
       let providerOrderId = '';
+      let providerExpiresIn = 0;
       try {
         if (product === 'sms') {
           const order = await buySmsNumber(server, serviceName);
           handle = String((order && (order.phone || order.number)) || '');
+          providerExpiresIn = Number(order && order.expires_in) || 0;
           providerOrderId = String((order && (order.id || order.activation_id || order.requestId)) || '');
           const paid = Number(order && order.amount_paid) || 0;
           if (paid > providerCost) {
@@ -470,7 +472,9 @@ export default async function(req: Request): Promise<Response> {
         return Response.json({ error: 'The provider did not return your number. You were refunded — please try again.' }, { status: 502 });
       }
 
-      const minutes = product === 'sms' ? 20 : 60;
+      const minutes = product === 'sms'
+        ? (providerExpiresIn > 60 ? Math.min(20, Math.max(3, Math.ceil(providerExpiresIn / 60))) : 20)
+        : 60;
       const now = new Date().toISOString();
       const expiresAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
       const rental = await service.entities.NumberRental.create({
@@ -479,14 +483,14 @@ export default async function(req: Request): Promise<Response> {
         buyerUserId: user.id, sellerUserId: 'system',
         service: product === 'sms' ? `${serviceName} (live number)` : `${serviceName} (email OTP)`,
         amount: customerPrice, sellerPayout: 0, commission: 0,
-        product, provider: 'fleexa', serverId: server.id,
+        product, provider: (server.provider || (server.id === 'b' ? 'smspool' : 'fleexa')), serverId: server.id,
         providerOrderId, deliveredHandle: handle,
         status: 'active', expiresAt, sellerTypingAt: now
       });
       await service.entities.Transaction.create({
         transactionId, userId: user.id, type: 'virtual_number',
         service: `Virtual ${product === 'sms' ? 'Number' : 'Email OTP'} — ${serviceName}`,
-        provider: 'fleexa', amount: customerPrice,
+        provider: (server.provider || (server.id === 'b' ? 'smspool' : 'fleexa')), amount: customerPrice,
         fee: customerPrice - providerCost, providerCost, customerPrice,
         status: 'processing', recipient: handle,
         metadata: {

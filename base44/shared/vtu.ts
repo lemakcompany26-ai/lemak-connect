@@ -3,23 +3,34 @@ import { secrets } from 'base44:runtime';
 // VTU provider client (Bigisubs). All provider calls happen server-side only.
 // API key and URL are stored in Base44 secrets and never sent to the frontend.
 
+// Provider: Bigisub. API base is https://api.bigisub.ng with
+// "Authorization: Token <key>" auth. The BIGISUBS_API_URL secret is an
+// optional override (any /api or /api/v2 suffix is stripped so paths are
+// never doubled). Purchases require BIGISUB_PIN — the 4-digit Bigisub
+// transaction PIN — stored in Base44 secrets and never sent to the frontend.
 export function getVtuConfig() {
   const apiKey = secrets.get('BIGISUBS_API_KEY');
-  const apiUrl = secrets.get('BIGISUBS_API_URL');
-  return { apiKey, apiUrl, configured: Boolean(apiKey && apiUrl) };
+  const apiUrl = secrets.get('BIGISUBS_API_URL') || 'https://api.bigisub.ng';
+  const pin = secrets.get('BIGISUB_PIN');
+  return { apiKey, apiUrl, pin, configured: Boolean(apiKey) };
+}
+
+function providerBase(apiUrl) {
+  return String(apiUrl || 'https://api.bigisub.ng')
+    .replace(/\/+$/, '')
+    .replace(/\/api\/v2$/, '')
+    .replace(/\/api$/, '');
 }
 
 async function vtuRequest(config, path, opts) {
   const method = (opts && opts.method) || 'GET';
   const body = opts && opts.body;
-  const url = `${String(config.apiUrl).replace(/\/+$/, '')}${path}`;
+  const url = `${providerBase(config.apiUrl)}${path}`;
   const res = await fetch(url, {
     method,
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.apiKey}`,
-      'api-key': String(config.apiKey),
-      'x-api-key': String(config.apiKey)
+      'Authorization': `Token ${config.apiKey}`
     },
     body: body ? JSON.stringify(body) : undefined
   });
@@ -35,6 +46,7 @@ async function vtuRequest(config, path, opts) {
 export function isProviderSuccess(response) {
   const d = response && response.data;
   if (!d) return false;
+  if (d.success === true) return true;
   if (typeof d.status === 'boolean') return d.status === true;
   if (typeof d.status === 'string') {
     const s = d.status.toLowerCase();
@@ -73,9 +85,9 @@ export async function fetchDataPlans(network) {
     throw err;
   }
   const attempts = [
-    `/api/data/plans?network=${encodeURIComponent(network)}`,
-    `/data/plans?network=${encodeURIComponent(network)}`,
-    `/api/plans?network=${encodeURIComponent(network)}`
+    `/api/v2/data/plans?network=${encodeURIComponent(network)}`,
+    `/api/v2/data/plans?network=${encodeURIComponent(network)}`,
+    `/api/data/plans?network=${encodeURIComponent(network)}`
   ];
   let lastResponse = null;
   for (const path of attempts) {
@@ -96,8 +108,8 @@ export async function fetchDataPlans(network) {
 export async function purchaseAirtimeViaProvider(opts) {
   const { network, phoneNumber, amount, reference } = opts;
   const config = getVtuConfig();
-  const payload = { network, phone: phoneNumber, amount, reference };
-  const attempts = ['/api/airtime/topup', '/airtime/topup', '/api/airtime', '/airtime'];
+  const payload = { network, phone_number: phoneNumber, amount, pin: config.pin, pin_code: config.pin, reference };
+  const attempts = ['/api/v2/airtime/purchase', '/api/v2/airtime/purchase/'];
   let lastResponse = null;
   for (const path of attempts) {
     try {
@@ -113,8 +125,8 @@ export async function purchaseAirtimeViaProvider(opts) {
 export async function purchaseDataViaProvider(opts) {
   const { network, phoneNumber, planId, reference } = opts;
   const config = getVtuConfig();
-  const payload = { network, phone: phoneNumber, plan_id: planId, planId, reference };
-  const attempts = ['/api/data/purchase', '/data/purchase', '/api/data/order', '/data/order'];
+  const payload = { network, phone_number: phoneNumber, plan: planId, pin: config.pin, pin_code: config.pin, reference };
+  const attempts = ['/api/v2/data/purchase', '/api/v2/data/purchase/'];
   let lastResponse = null;
   for (const path of attempts) {
     try {

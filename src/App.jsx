@@ -10,6 +10,7 @@ import ScrollToTop from './components/ScrollToTop';
 import Landing from '@/pages/Landing';
 import ServicesPage from '@/pages/ServicesPage';
 import HowItWorks from '@/pages/HowItWorks';
+import MarketplacePublic from '@/pages/MarketplacePublic';
 import SupportPage from '@/pages/SupportPage';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -71,6 +72,7 @@ const AuthenticatedApp = () => {
       <Route path="/" element={<Landing />} />
       <Route path="/services" element={<ServicesPage />} />
       <Route path="/how-it-works" element={<HowItWorks />} />
+      <Route path="/marketplace" element={<MarketplacePublic />} />
       <Route path="/support" element={<SupportPage />} />
 
       {/* Auth routes */}

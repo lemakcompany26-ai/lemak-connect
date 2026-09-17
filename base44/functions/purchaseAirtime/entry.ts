@@ -81,7 +81,7 @@ export default async function(req: Request): Promise<Response> {
 
     // Provider availability
     const config = getVtuConfig();
-    if (!config.configured) {
+    if (!config.configured || !config.pin) {
       await creditWallet(service, {
         userId: user.id, transactionId, type: 'refund', amount: payable,
         reference: transactionId, description: 'Refund — airtime service unavailable',

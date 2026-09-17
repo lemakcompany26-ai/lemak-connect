@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import {
   generateTransactionId, debitWallet, creditWallet,
-  computeMarketplaceFees, notifyUser
+  computeMarketplaceFees, notifyUser, calculatePrice
 } from '../../shared/lemak.ts';
 import {
   getOtpServers, getOtpServer, otpServerStatus, listSmsServices, getSmsPrice,
@@ -314,17 +314,9 @@ export default async function(req: Request): Promise<Response> {
 
     // ---------- Live provider numbers (Fleexa-compatible: Server A / B) ----------
 
-    async function getOtpMarkup() {
-      const rows = await service.entities.AdminSetting.filter({ key: 'otp_markup_percent' }, '-created_date', 1);
-      const pct = rows && rows[0] ? Number(rows[0].value) : 25;
-      return Number.isFinite(pct) && pct >= 0 ? pct : 25;
-    }
-
-    function customerPriceFor(providerPrice, markupPct) {
-      const base = Number(providerPrice) || 0;
-      if (!base) return 0;
-      return Math.ceil((base * (1 + markupPct / 100)) / 10) * 10;
-    }
+    // Live provider rental prices (SMS + email OTP) follow the same backend
+    // fee engine as every other service — Admin → Pricing fee rules apply to
+    // the provider cost under the 'virtual_number' service.
 
     if (action === 'provider_catalog') {
       const servers = [];
@@ -363,14 +355,14 @@ export default async function(req: Request): Promise<Response> {
       const server = getOtpServer(body.serverId);
       if (!server) return Response.json({ error: 'Unknown server' }, { status: 400 });
       const product = body.product === 'email' ? 'email' : 'sms';
-      const markupPct = await getOtpMarkup();
       if (product === 'sms') {
         const serviceName = String(body.serviceName || '').trim().toLowerCase().slice(0, 40);
         if (!serviceName) return Response.json({ error: 'Choose a service first' }, { status: 400 });
         const price = await getSmsPrice(server, serviceName);
         const providerPrice = Number(price.price_ngn) || 0;
         if (!providerPrice) return Response.json({ error: 'No price available for this service right now' }, { status: 502 });
-        return Response.json({ ok: true, customerPrice: customerPriceFor(providerPrice, markupPct) });
+        const pricing = await calculatePrice(service, 'virtual_number', providerPrice);
+        return Response.json({ ok: true, customerPrice: pricing.customerPrice });
       }
       const domain = String(body.domain || '').trim().slice(0, 80);
       const products = await listEmailProducts(server);
@@ -378,7 +370,8 @@ export default async function(req: Request): Promise<Response> {
       if (!match) return Response.json({ error: 'That email domain is not available' }, { status: 400 });
       const providerPrice = Number(match.price_ngn) || 0;
       if (!providerPrice) return Response.json({ error: 'No price available for this domain right now' }, { status: 502 });
-      return Response.json({ ok: true, customerPrice: customerPriceFor(providerPrice, markupPct) });
+      const pricing = await calculatePrice(service, 'virtual_number', providerPrice);
+      return Response.json({ ok: true, customerPrice: pricing.customerPrice });
     }
 
     if (action === 'provider_rent') {
@@ -387,7 +380,6 @@ export default async function(req: Request): Promise<Response> {
         return Response.json({ error: 'Choose an available server' }, { status: 400 });
       }
       const product = body.product === 'email' ? 'email' : 'sms';
-      const markupPct = await getOtpMarkup();
       let serviceName = '';
       let providerCost = 0;
       let customerPrice = 0;
@@ -406,7 +398,8 @@ export default async function(req: Request): Promise<Response> {
         providerCost = Number(match.price_ngn) || 0;
         if (!providerCost) return Response.json({ error: 'This email domain is not available right now' }, { status: 502 });
       }
-      customerPrice = customerPriceFor(providerCost, markupPct);
+      const pricing = await calculatePrice(service, 'virtual_number', providerCost);
+      customerPrice = pricing.customerPrice;
 
       const transactionId = generateTransactionId();
       let debit;

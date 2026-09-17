@@ -31,6 +31,17 @@ module.exports = {
   				'1': 'hsl(var(--chart-1))', '2': 'hsl(var(--chart-2))', '3': 'hsl(var(--chart-3))',
   				'4': 'hsl(var(--chart-4))', '5': 'hsl(var(--chart-5)'
   			},
+  			mk: {
+  				DEFAULT: 'hsl(var(--mk-blue))',
+  				blue: 'hsl(var(--mk-blue))',
+  				'blue-soft': 'hsl(var(--mk-blue-soft))',
+  				brown: 'hsl(var(--mk-brown))',
+  				'brown-soft': 'hsl(var(--mk-brown-soft))',
+  				bg: 'hsl(var(--mk-bg))',
+  				card: 'hsl(var(--mk-card))',
+  				card2: 'hsl(var(--mk-card2))',
+  				border: 'hsl(var(--mk-border))'
+  			},
   			sidebar: {
   				DEFAULT: 'hsl(var(--sidebar-background))',
   				foreground: 'hsl(var(--sidebar-foreground))',

@@ -2,6 +2,10 @@
   "name": "MarketplaceListing",
   "type": "object",
   "properties": {
+    "listingId": {
+      "type": "string",
+      "description": "Public listing reference, format MKT-YYYYMMDD-XXXXXX"
+    },
     "sellerId": {
       "type": "string",
       "description": "Reference to MarketplaceSeller record"
@@ -41,17 +45,55 @@
       "type": "string",
       "enum": [
         "draft",
-        "pending_approval",
+        "pending",
         "approved",
         "rejected",
+        "changes_requested",
         "suspended",
         "delisted"
       ],
-      "default": "pending_approval"
+      "default": "pending"
     },
     "isActive": {
       "type": "boolean",
       "default": true
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "google_form",
+        "in_app",
+        "admin"
+      ],
+      "default": "in_app",
+      "description": "Where this listing came from"
+    },
+    "submissionId": {
+      "type": "string",
+      "description": "Google Form submission / row identifier"
+    },
+    "submittedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Form submission timestamp"
+    },
+    "syncHash": {
+      "type": "string",
+      "description": "Hash of the submitted row, used to detect updated submissions"
+    },
+    "rejectionReason": {
+      "type": "string"
+    },
+    "adminMessage": {
+      "type": "string",
+      "description": "Admin feedback when changes are requested"
+    },
+    "reviewedBy": {
+      "type": "string"
+    },
+    "reviewedAt": {
+      "type": "string",
+      "format": "date-time"
     }
   },
   "required": [
@@ -62,13 +104,35 @@
     "status"
   ],
   "rls": {
-    "create": true,
-    "read": true,
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "data.status": "approved"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
     "update": {
       "user_condition": {
         "role": "admin"
       }
     },
-    "delete": false
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
   }
 }

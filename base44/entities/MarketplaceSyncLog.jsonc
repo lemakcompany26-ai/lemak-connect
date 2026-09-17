@@ -1,0 +1,72 @@
+{
+  "name": "MarketplaceSyncLog",
+  "type": "object",
+  "properties": {
+    "ranAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "trigger": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "scheduled"
+      ],
+      "default": "manual"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "partial",
+        "error"
+      ],
+      "default": "success"
+    },
+    "importedCount": {
+      "type": "number",
+      "default": 0
+    },
+    "updatedCount": {
+      "type": "number",
+      "default": 0
+    },
+    "skippedCount": {
+      "type": "number",
+      "default": 0
+    },
+    "errorMessage": {
+      "type": "string"
+    },
+    "details": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "ranAt",
+    "trigger",
+    "status"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

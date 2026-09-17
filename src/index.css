@@ -43,6 +43,16 @@
     --sidebar-accent-foreground: 210 40% 96%;
     --sidebar-border: 224 40% 22%;
     --sidebar-ring: 217 91% 60%;
+
+    /* Marketplace dark theme (blue + brown) */
+    --mk-bg: 220 30% 6%;
+    --mk-card: 216 26% 10%;
+    --mk-card2: 214 22% 14%;
+    --mk-border: 216 18% 22%;
+    --mk-blue: 211 100% 50%;
+    --mk-blue-soft: 211 100% 70%;
+    --mk-brown: 25 76% 31%;
+    --mk-brown-soft: 28 48% 60%;
   }
 
   .dark {

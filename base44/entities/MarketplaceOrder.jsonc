@@ -12,22 +12,48 @@
       "type": "string",
       "description": "Reference to MarketplaceSeller"
     },
+    "sellerUserId": {
+      "type": "string",
+      "description": "Base44 user id of the seller, when available"
+    },
     "listingId": {
       "type": "string"
     },
     "listingTitle": {
       "type": "string"
     },
+    "listingPrice": {
+      "type": "number",
+      "description": "Price of the listing at purchase time"
+    },
+    "buyerFee": {
+      "type": "number",
+      "description": "Buyer service fee charged at purchase"
+    },
+    "commission": {
+      "type": "number",
+      "description": "Marketplace commission (platform fee) charged on this order"
+    },
+    "platformFee": {
+      "type": "number",
+      "description": "Marketplace commission percentage applied at purchase time"
+    },
     "amount": {
       "type": "number",
       "description": "Total buyer amount held in escrow"
     },
-    "platformFee": {
-      "type": "number",
-      "description": "Platform fee percentage applied at purchase time"
-    },
     "sellerPayout": {
       "type": "number"
+    },
+    "payoutStatus": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "paid",
+        "manual"
+      ],
+      "default": "pending",
+      "description": "manual = seller has no app account, payout done outside the platform"
     },
     "status": {
       "type": "string",
@@ -68,10 +94,14 @@
     "status"
   ],
   "rls": {
+    "create": false,
     "read": {
       "$or": [
         {
           "data.buyerUserId": "{{user.id}}"
+        },
+        {
+          "data.sellerUserId": "{{user.id}}"
         },
         {
           "created_by_id": "{{user.id}}"

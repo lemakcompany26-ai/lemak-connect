@@ -202,6 +202,85 @@ export async function sendUserEmail(opts) {
   }
 }
 
+// ---------- Marketplace ----------
+
+// Authoritative marketplace charge + Google link settings, with defaults.
+export const MARKETPLACE_SETTING_DEFAULTS = {
+  marketplace_commission_percent: '15',
+  marketplace_buyer_fee_percent: '0',
+  marketplace_buyer_fixed_fee: '0',
+  marketplace_seller_listing_fee: '0',
+  marketplace_fixed_fee: '0',
+  marketplace_minimum_fee: '0',
+  marketplace_maximum_fee: '0',
+  marketplace_currency: 'NGN',
+  google_sell_form_url: 'https://docs.google.com/forms/d/e/1FAIpQLScImMvathwSUGku7WKY_R4E9eo2Ps9k23Fs8qWpU0GmneNAIQ/viewform?usp=headers',
+  google_buy_sheet_url: 'https://docs.google.com/spreadsheets/d/1JJcLb_Nw2C-witaftZYpVqp6pW0RlCo9h967yzhcDc/edit?usp=drivesdk',
+  google_form_response_sheet_url: 'https://docs.google.com/spreadsheets/d/1xIItGN3jRwTqymNdHq5RJK2EvwlHOOIccu20DhjmVJ8/edit?usp=drivesdk'
+};
+
+export async function getMarketplaceSettings(service) {
+  const rows = await service.entities.AdminSetting.list('-created_date', 200);
+  const map = { ...MARKETPLACE_SETTING_DEFAULTS };
+  for (const row of rows || []) {
+    if (row.key && row.value !== undefined && row.value !== null && String(row.value) !== '') {
+      map[row.key] = String(row.value);
+    }
+  }
+  return map;
+}
+
+// All marketplace fee calculation happens here, on the backend.
+export async function computeMarketplaceFees(service, saleAmount) {
+  const s = await getMarketplaceSettings(service);
+  const sale = round2(Math.max(0, Number(saleAmount) || 0));
+  const commissionPct = Number(s.marketplace_commission_percent) || 0;
+  const fixedFee = Number(s.marketplace_fixed_fee) || 0;
+  const buyerFeePct = Number(s.marketplace_buyer_fee_percent) || 0;
+  const buyerFixedFee = Number(s.marketplace_buyer_fixed_fee) || 0;
+  const minFee = Number(s.marketplace_minimum_fee) || 0;
+  const maxFee = Number(s.marketplace_maximum_fee) || 0;
+  let commission = round2((sale * commissionPct) / 100 + fixedFee);
+  if (commission < minFee) commission = minFee;
+  if (maxFee > 0 && commission > maxFee) commission = maxFee;
+  commission = round2(commission);
+  const buyerFee = round2((sale * buyerFeePct) / 100 + buyerFixedFee);
+  const buyerTotal = round2(sale + buyerFee);
+  const sellerReceives = round2(Math.max(0, sale - commission));
+  const platformReceives = round2(commission + buyerFee);
+  return {
+    saleAmount: sale,
+    commission,
+    commissionPercent: commissionPct,
+    buyerFee,
+    buyerTotal,
+    sellerReceives,
+    platformReceives,
+    sellerListingFee: Number(s.marketplace_seller_listing_fee) || 0,
+    currency: s.marketplace_currency || 'NGN'
+  };
+}
+
+export function generateListingId() {
+  const now = new Date();
+  const y = now.getUTCFullYear();
+  const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(now.getUTCDate()).padStart(2, '0');
+  const rand = Math.random().toString(36).slice(2, 8).toUpperCase().padEnd(6, 'X');
+  return `MKT-${y}${m}${d}-${rand}`;
+}
+
+// Notify every staff member (admin / super_admin / moderator).
+export async function notifyAdmins(service, opts) {
+  try {
+    const profiles = await service.entities.UserProfile.list('-created_date', 500);
+    const staff = (profiles || []).filter(p => isStaffRole(p.role));
+    for (const p of staff) {
+      await notifyUser(service, { ...opts, userId: p.userId });
+    }
+  } catch (e) { /* non-fatal */ }
+}
+
 export function emailTemplate(title, bodyHtml) {
   return `<!doctype html><html><body style="font-family:Arial,Helvetica,sans-serif;background:#f1f5f9;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden">

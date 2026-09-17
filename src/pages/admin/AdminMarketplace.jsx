@@ -1,141 +1,141 @@
 import { useEffect, useState } from 'react';
-import { Check, X, Loader2, Pause, RotateCcw } from 'lucide-react';
+import { Store, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { formatNaira, formatDate } from '@/lib/format';
-
-function SellerRow({ seller, onAct, busy }) {
-  const statusStyles = {
-    approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    rejected: 'bg-red-50 text-red-700 border-red-200',
-    suspended: 'bg-amber-50 text-amber-700 border-amber-200',
-    pending: 'bg-blue-50 text-blue-700 border-blue-200'
-  };
-  return (
-    <div className="rounded-2xl border border-border bg-card p-5">
-      <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-bold">{seller.fullName}</span>
-            <span className="text-xs text-muted-foreground">@{seller.username}</span>
-            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${statusStyles[seller.status] || ''}`}>{seller.status}</span>
-          </div>
-          <div className="text-xs text-muted-foreground mt-1">{seller.email} · {seller.phone || '—'} · {seller.accountType}</div>
-          <div className="mt-2 text-sm font-semibold">{seller.serviceTitle} — {formatNaira(seller.price)}</div>
-          <div className="text-xs text-muted-foreground">{seller.category} · Delivery: {seller.deliveryTime || '—'}</div>
-          <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">{seller.description}</p>
-          {seller.portfolioUrl && <a href={seller.portfolioUrl} target="_blank" rel="noreferrer" className="text-xs text-primary font-medium">{seller.portfolioUrl}</a>}
-          <div className="mt-1 text-[11px] text-muted-foreground/70">Applied {formatDate(seller.created_date)}{seller.reviewedBy ? ` · reviewed by ${seller.reviewedBy}` : ''}</div>
-        </div>
-        {seller.status === 'pending' && (
-          <div className="flex gap-2 shrink-0">
-            <Button size="sm" className="h-9 font-semibold" disabled={busy} onClick={() => onAct(seller, 'approve_seller')}><Check className="w-4 h-4 mr-1" /> Approve</Button>
-            <Button size="sm" variant="outline" className="h-9 font-semibold text-destructive border-destructive/30" disabled={busy} onClick={() => onAct(seller, 'reject_seller')}><X className="w-4 h-4 mr-1" /> Reject</Button>
-          </div>
-        )}
-        {seller.status === 'approved' && (
-          <Button size="sm" variant="outline" className="h-9 shrink-0 font-semibold" disabled={busy} onClick={() => onAct(seller, 'suspend_seller')}>
-            <Pause className="w-4 h-4 mr-1" /> Suspend
-          </Button>
-        )}
-        {(seller.status === 'suspended' || seller.status === 'rejected') && (
-          <Button size="sm" variant="outline" className="h-9 shrink-0 font-semibold" disabled={busy} onClick={() => onAct(seller, 'reinstate_seller')}>
-            <RotateCcw className="w-4 h-4 mr-1" /> Reinstate
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ListingRow({ listing, onAct, busy }) {
-  const statusStyles = {
-    approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    rejected: 'bg-red-50 text-red-700 border-red-200',
-    delisted: 'bg-amber-50 text-amber-700 border-amber-200',
-    pending_approval: 'bg-blue-50 text-blue-700 border-blue-200'
-  };
-  return (
-    <div className="rounded-2xl border border-border bg-card p-5 flex flex-col sm:flex-row sm:items-center gap-3">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-bold">{listing.title}</span>
-          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${statusStyles[listing.status] || ''}`}>{listing.status.replace('_', ' ')}</span>
-        </div>
-        <div className="text-xs text-muted-foreground mt-0.5">{listing.category} · {formatNaira(listing.price)} · {formatDate(listing.created_date)}</div>
-      </div>
-      {listing.status === 'pending_approval' && (
-        <div className="flex gap-2 shrink-0">
-          <Button size="sm" className="h-9 font-semibold" disabled={busy} onClick={() => onAct(listing, 'approve_listing')}><Check className="w-4 h-4 mr-1" /> Publish</Button>
-          <Button size="sm" variant="outline" className="h-9 font-semibold text-destructive border-destructive/30" disabled={busy} onClick={() => onAct(listing, 'reject_listing')}><X className="w-4 h-4 mr-1" /> Reject</Button>
-        </div>
-      )}
-      {listing.status === 'approved' && (
-        <Button size="sm" variant="outline" className="h-9 shrink-0 font-semibold" disabled={busy} onClick={() => onAct(listing, 'delist_listing')}>Delist</Button>
-      )}
-    </div>
-  );
-}
+import MarketplaceStats from '@/components/admin/marketplace/MarketplaceStats';
+import ListingsPanel from '@/components/admin/marketplace/ListingsPanel';
+import SellersPanel from '@/components/admin/marketplace/SellersPanel';
+import OrdersPanel from '@/components/admin/marketplace/OrdersPanel';
+import ChargesPanel from '@/components/admin/marketplace/ChargesPanel';
 
 export default function AdminMarketplace() {
   const { toast } = useToast();
   const [sellers, setSellers] = useState(null);
   const [listings, setListings] = useState(null);
+  const [orders, setOrders] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [lastSync, setLastSync] = useState(undefined);
+  const [syncing, setSyncing] = useState(false);
   const [busyId, setBusyId] = useState(null);
 
   const load = () => {
     base44.entities.MarketplaceSeller.list('-created_date', 200).then(setSellers).catch(() => setSellers([]));
     base44.entities.MarketplaceListing.list('-created_date', 200).then(setListings).catch(() => setListings([]));
+    base44.entities.MarketplaceOrder.list('-created_date', 200).then(setOrders).catch(() => setOrders([]));
+    base44.entities.AdminSetting.list('-created_date', 200)
+      .then(rows => setSettings(Object.fromEntries((rows || []).map(r => [r.key, r.value]))))
+      .catch(() => setSettings({}));
+    base44.entities.MarketplaceSyncLog.list('-created_date', 1)
+      .then(l => setLastSync(l && l[0] ? l[0] : null))
+      .catch(() => setLastSync(null));
   };
   useEffect(() => { load(); }, []);
 
-  const act = async (record, action) => {
+  const act = async (action, record, data) => {
     setBusyId(record.id);
     try {
-      await base44.functions.invoke('adminAction', { action, targetId: record.id });
+      await base44.functions.invoke('adminAction', { action, targetId: record.id, data });
       toast({ title: 'Done' });
       load();
+      return true;
     } catch (err) {
       toast({ title: 'Action failed', description: (err.response && err.response.data && err.response.data.error) || err.message, variant: 'destructive' });
+      return false;
     } finally {
       setBusyId(null);
     }
   };
 
-  const pendingSellers = (sellers || []).filter(s => s.status === 'pending');
-  const otherSellers = (sellers || []).filter(s => s.status !== 'pending');
-  const pendingListings = (listings || []).filter(l => l.status === 'pending_approval');
-  const otherListings = (listings || []).filter(l => l.status !== 'pending_approval');
+  const sync = async () => {
+    setSyncing(true);
+    try {
+      const res = await base44.functions.invoke('syncMarketplaceSubmissions', {});
+      const d = res.data || res;
+      if (d.requiresGoogleIntegration) {
+        toast({ title: 'Google integration required', description: d.message, variant: 'destructive' });
+      } else if (d.error) {
+        toast({ title: 'Sync failed', description: d.error, variant: 'destructive' });
+      } else {
+        toast({ title: 'Sync complete', description: `${d.imported} new submission(s), ${d.updated} updated, ${d.skipped} already imported.` });
+      }
+      load();
+    } catch (err) {
+      toast({ title: 'Sync failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const saveCharges = async (values) => {
+    try {
+      await base44.functions.invoke('adminAction', { action: 'save_marketplace_charges', data: values });
+      toast({ title: 'Charges saved', description: 'Marketplace charges updated. The change has been audited.' });
+      load();
+    } catch (err) {
+      toast({ title: 'Could not save charges', description: (err.response && err.response.data && err.response.data.error) || err.message, variant: 'destructive' });
+    }
+  };
+
+  const previewCharges = async (saleAmount) => {
+    const res = await base44.functions.invoke('adminAction', { action: 'preview_marketplace_charges', data: { saleAmount } });
+    return (res.data || res).breakdown;
+  };
+
+  const refundOrder = (order) => act('refund_marketplace_order', order);
+
+  const loading = sellers === null || listings === null || orders === null || settings === null;
+  const completed = (orders || []).filter(o => o.status === 'completed');
+  const stats = {
+    pendingSellers: (sellers || []).filter(s => s.status === 'pending').length,
+    pendingListings: (listings || []).filter(l => l.status === 'pending').length,
+    approvedListings: (listings || []).filter(l => l.status === 'approved').length,
+    rejectedListings: (listings || []).filter(l => l.status === 'rejected').length,
+    suspendedListings: (listings || []).filter(l => l.status === 'suspended').length,
+    orders: (orders || []).length,
+    revenue: completed.reduce((a, o) => a + (o.amount || 0), 0),
+    payouts: completed.reduce((a, o) => a + (o.sellerPayout || 0), 0),
+    platformFees: completed.reduce((a, o) => a + (o.commission || 0) + (o.buyerFee || 0), 0)
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="rounded-3xl bg-mk-bg border border-mk-border p-4 sm:p-6 space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-extrabold">Marketplace</h1>
-        <p className="text-sm text-muted-foreground mt-1">Seller verification and listing approvals. Nothing goes public without approval.</p>
+        <h1 className="font-heading text-2xl font-extrabold text-white flex items-center gap-2.5">
+          <Store className="w-6 h-6 text-mk-blue" /> Marketplace
+        </h1>
+        <p className="text-sm text-slate-400 mt-1">Seller submissions, listing approvals, orders and marketplace charges. Nothing goes public without approval.</p>
       </div>
 
-      <Tabs defaultValue="sellers">
-        <TabsList>
-          <TabsTrigger value="sellers">Sellers ({pendingSellers.length} pending)</TabsTrigger>
-          <TabsTrigger value="listings">Listings ({pendingListings.length} pending)</TabsTrigger>
-        </TabsList>
+      {loading ? (
+        <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-mk-blue" /></div>
+      ) : (
+        <Tabs defaultValue="overview">
+          <TabsList className="bg-mk-card2 border border-mk-border h-auto flex-wrap">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Overview</TabsTrigger>
+            <TabsTrigger value="listings" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Listings ({stats.pendingListings} pending)</TabsTrigger>
+            <TabsTrigger value="sellers" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Sellers ({stats.pendingSellers} pending)</TabsTrigger>
+            <TabsTrigger value="orders" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Orders</TabsTrigger>
+            <TabsTrigger value="charges" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Charges</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="sellers" className="mt-5 space-y-3">
-          {sellers === null && <div className="p-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>}
-          {pendingSellers.map(s => <SellerRow key={s.id} seller={s} onAct={act} busy={busyId === s.id} />)}
-          {otherSellers.map(s => <SellerRow key={s.id} seller={s} onAct={act} busy={busyId === s.id} />)}
-          {sellers && sellers.length === 0 && <div className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">No seller applications yet.</div>}
-        </TabsContent>
-
-        <TabsContent value="listings" className="mt-5 space-y-3">
-          {listings === null && <div className="p-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>}
-          {pendingListings.map(l => <ListingRow key={l.id} listing={l} onAct={act} busy={busyId === l.id} />)}
-          {otherListings.map(l => <ListingRow key={l.id} listing={l} onAct={act} busy={busyId === l.id} />)}
-          {listings && listings.length === 0 && <div className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">No listings yet.</div>}
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="overview" className="mt-5">
+            <MarketplaceStats stats={stats} syncing={syncing} lastSync={lastSync} onSync={sync} />
+          </TabsContent>
+          <TabsContent value="listings" className="mt-5">
+            <ListingsPanel listings={listings} sellers={sellers} busyId={busyId} onAct={act} />
+          </TabsContent>
+          <TabsContent value="sellers" className="mt-5">
+            <SellersPanel sellers={sellers} busyId={busyId} onAct={act} />
+          </TabsContent>
+          <TabsContent value="orders" className="mt-5">
+            <OrdersPanel orders={orders} busyId={busyId} onRefund={refundOrder} />
+          </TabsContent>
+          <TabsContent value="charges" className="mt-5">
+            <ChargesPanel settings={settings} saving={busyId !== null} onSave={saveCharges} onPreview={previewCharges} />
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }

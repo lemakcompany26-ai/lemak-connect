@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { isAdminEmail, isStaffRole, notifyUser } from '../../shared/lemak.ts';
+import { isAdminEmail, isStaffRole, notifyUser, creditWallet, computeMarketplaceFees } from '../../shared/lemak.ts';
 
 // Admin-only actions, each one audited. Roles are verified server-side
 // from the profile — never trusted from the frontend.
@@ -11,6 +11,11 @@ const ACTIONS = {
   approve_listing: 'listing',
   reject_listing: 'listing',
   delist_listing: 'listing',
+  suspend_listing: 'listing',
+  request_changes_listing: 'listing',
+  save_marketplace_charges: 'charges',
+  preview_marketplace_charges: 'charges',
+  refund_marketplace_order: 'order',
   update_user_status: 'profile',
   update_user_role: 'profile'
 };
@@ -63,11 +68,45 @@ export default async function(req: Request): Promise<Response> {
     }
 
     if (entityKind === 'listing') {
-      const statusMap = { approve_listing: 'approved', reject_listing: 'rejected', delist_listing: 'delisted' };
+      const statusMap = {
+        approve_listing: 'approved',
+        reject_listing: 'rejected',
+        delist_listing: 'delisted',
+        suspend_listing: 'suspended',
+        request_changes_listing: 'changes_requested'
+      };
       const listings = await service.entities.MarketplaceListing.filter({ id: targetId }, '-created_date', 1);
-      if (!listings || !listings[0]) return Response.json({ error: 'Listing not found' }, { status: 404 });
-      await service.entities.MarketplaceListing.update(targetId, { status: statusMap[action] });
-      await audit('MarketplaceListing', targetId, { status: statusMap[action] });
+      const listing = listings && listings[0];
+      if (!listing) return Response.json({ error: 'Listing not found' }, { status: 404 });
+      const newStatus = statusMap[action];
+      const now = new Date().toISOString();
+      const reason = (data && (data.reason || data.message)) || '';
+      const update = { status: newStatus, reviewedBy: user.email, reviewedAt: now };
+      if (action === 'reject_listing') update.rejectionReason = reason || null;
+      if (action === 'request_changes_listing') update.adminMessage = reason || null;
+      await service.entities.MarketplaceListing.update(targetId, update);
+
+      // Keep the seller record aligned with the listing decision
+      const sellerRows = await service.entities.MarketplaceSeller.filter({ id: listing.sellerId }, '-created_date', 1);
+      const seller = (sellerRows && sellerRows[0]) || null;
+      if (seller) {
+        const sellerStatusMap = { approved: 'approved', rejected: 'rejected', suspended: 'suspended', changes_requested: 'pending' };
+        const sellerUpdate = { reviewedBy: user.email, reviewedAt: now };
+        if (sellerStatusMap[newStatus]) sellerUpdate.status = sellerStatusMap[newStatus];
+        if (reason) sellerUpdate.reviewNotes = reason;
+        await service.entities.MarketplaceSeller.update(seller.id, sellerUpdate).catch(() => null);
+      }
+      if (seller && seller.userId) {
+        const notices = {
+          approve_listing: ['Listing approved 🎉', `Your listing "${listing.title}" is now live on the Lemak Connect marketplace.`],
+          reject_listing: ['Listing not approved', `Your listing "${listing.title}" was not approved. ${reason || 'Contact support for details.'}`],
+          request_changes_listing: ['Changes requested on your listing', `Admin feedback on "${listing.title}": ${reason || 'Please update your submission.'} Resubmit through the seller form to return to review.`],
+          suspend_listing: ['Listing suspended', `Your listing "${listing.title}" has been suspended by an administrator.`]
+        };
+        const n = notices[action];
+        if (n) await notifyUser(service, { userId: seller.userId, type: 'marketplace', title: n[0], message: n[1], actionUrl: '/app/marketplace' });
+      }
+      await audit('MarketplaceListing', targetId, { status: newStatus, reason: reason || null });
       return Response.json({ ok: true });
     }
 
@@ -104,6 +143,74 @@ export default async function(req: Request): Promise<Response> {
         });
       }
       await audit('UserProfile', targetId, data || {});
+      return Response.json({ ok: true });
+    }
+
+    if (entityKind === 'charges') {
+      if (action === 'preview_marketplace_charges') {
+        const saleAmount = Number((data || {}).saleAmount);
+        if (!isFinite(saleAmount) || saleAmount < 0) return Response.json({ error: 'Invalid sale amount' }, { status: 400 });
+        const breakdown = await computeMarketplaceFees(service, saleAmount);
+        return Response.json({ ok: true, breakdown });
+      }
+      const d = data || {};
+      const nums = {
+        marketplace_commission_percent: d.commissionPercent,
+        marketplace_buyer_fee_percent: d.buyerFeePercent,
+        marketplace_buyer_fixed_fee: d.buyerFixedFee,
+        marketplace_seller_listing_fee: d.sellerListingFee,
+        marketplace_fixed_fee: d.fixedFee,
+        marketplace_minimum_fee: d.minimumFee,
+        marketplace_maximum_fee: d.maximumFee
+      };
+      const cleaned = {};
+      for (const [key, raw] of Object.entries(nums)) {
+        if (raw === undefined || raw === null || String(raw) === '') continue;
+        const n = Number(raw);
+        if (!isFinite(n) || n < 0) return Response.json({ error: 'Fees cannot be negative' }, { status: 400 });
+        if ((key === 'marketplace_commission_percent' || key === 'marketplace_buyer_fee_percent') && n > 100) {
+          return Response.json({ error: 'Percentage fees cannot exceed 100' }, { status: 400 });
+        }
+        cleaned[key] = n;
+      }
+      const currency = d.currency ? String(d.currency).toUpperCase().slice(0, 3) : null;
+      for (const [key, value] of Object.entries(cleaned)) {
+        const rows = await service.entities.AdminSetting.filter({ key }, '-created_date', 1);
+        if (rows && rows[0]) await service.entities.AdminSetting.update(rows[0].id, { value: String(value), updatedBy: user.email });
+        else await service.entities.AdminSetting.create({ key, value: String(value), category: 'marketplace', updatedBy: user.email });
+      }
+      if (currency) {
+        const rows = await service.entities.AdminSetting.filter({ key: 'marketplace_currency' }, '-created_date', 1);
+        if (rows && rows[0]) await service.entities.AdminSetting.update(rows[0].id, { value: currency, updatedBy: user.email });
+        else await service.entities.AdminSetting.create({ key: 'marketplace_currency', value: currency, label: 'Marketplace Currency', category: 'marketplace', updatedBy: user.email });
+      }
+      await audit('AdminSetting', 'marketplace_charges', { ...cleaned, currency });
+      return Response.json({ ok: true, saved: { ...cleaned, currency } });
+    }
+
+    if (entityKind === 'order') {
+      const orders = await service.entities.MarketplaceOrder.filter({ id: targetId }, '-created_date', 1);
+      const order = orders && orders[0];
+      if (!order) return Response.json({ error: 'Order not found' }, { status: 404 });
+      if (['completed', 'refunded', 'cancelled'].includes(order.status)) {
+        return Response.json({ error: `Order is already ${order.status}` }, { status: 400 });
+      }
+      await creditWallet(service, {
+        userId: order.buyerUserId, transactionId: order.transactionId, type: 'refund',
+        amount: order.amount, reference: order.transactionId,
+        description: `Marketplace order refund: ${order.listingTitle || ''}`,
+        idempotencyKey: `mkt-refund-${order.id}`
+      });
+      await service.entities.MarketplaceOrder.update(order.id, { status: 'refunded' });
+      if (order.transactionId) {
+        const txs = await service.entities.Transaction.filter({ transactionId: order.transactionId }, '-created_date', 1);
+        if (txs && txs[0]) await service.entities.Transaction.update(txs[0].id, { status: 'refunded' }).catch(() => null);
+      }
+      await notifyUser(service, { userId: order.buyerUserId, type: 'marketplace', title: 'Marketplace order refunded', message: `Order ${order.transactionId} has been refunded to your wallet.`, actionUrl: '/app/marketplace' });
+      if (order.sellerUserId) {
+        await notifyUser(service, { userId: order.sellerUserId, type: 'marketplace', title: 'Marketplace order cancelled', message: `Order ${order.transactionId} was refunded to the buyer.`, actionUrl: '/app/marketplace' });
+      }
+      await audit('MarketplaceOrder', order.id, { refunded: order.amount, reason: (data && data.reason) || null });
       return Response.json({ ok: true });
     }
 

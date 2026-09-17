@@ -149,3 +149,114 @@ export async function purchaseDataViaProvider(opts) {
   }
   return lastResponse;
 }
+
+// --- Cable TV (DStv, GOtv, Startimes) ---
+
+export const CABLE_PROVIDERS = [
+  { code: 'dstv', name: 'DStv' },
+  { code: 'gotv', name: 'GOtv' },
+  { code: 'startimes', name: 'Startimes' }
+];
+
+export async function fetchCablePlans() {
+  const config = getVtuConfig();
+  if (!config.configured) {
+    const err = new Error('Cable service is temporarily unavailable. Please try again later.');
+    err.statusCode = 503;
+    throw err;
+  }
+  const response = await vtuRequest(config, '/api/v2/vtu/cable/plans/', { method: 'GET' });
+  const arr = extractPlansArray(response.data);
+  if (!arr) {
+    const err = new Error('Could not load cable packages right now. Please try again shortly.');
+    err.statusCode = 502;
+    throw err;
+  }
+  return arr;
+}
+
+export async function verifyCableCard(opts) {
+  const { cableName, cardNo } = opts;
+  const config = getVtuConfig();
+  return vtuRequest(config, '/api/v2/vtu/cable/verify/', {
+    method: 'POST',
+    body: { cable_name: cableName, card_no: cardNo }
+  });
+}
+
+export async function purchaseCableViaProvider(opts) {
+  const { cableName, cardNo, variationCode, amount } = opts;
+  const config = getVtuConfig();
+  const payload = { cable_name: cableName, card_no: cardNo, variation_code: variationCode, amount, pin: config.pin };
+  const response = await vtuRequest(config, '/api/v2/vtu/cable/purchase/', { method: 'POST', body: payload });
+  return response;
+}
+
+// --- Betting wallet funding ---
+
+export const BETTING_PROVIDERS = [
+  { code: 'bet9ja', name: 'Bet9ja' },
+  { code: 'sportybet', name: 'SportyBet' },
+  { code: '1xbet', name: '1xBet' },
+  { code: 'betking', name: 'BetKing' },
+  { code: 'msport', name: 'MSport' },
+  { code: 'bangbet', name: 'BangBet' },
+  { code: 'betway', name: 'Betway' },
+  { code: 'nairabet', name: 'NairaBet' }
+];
+
+export async function validateBettingCustomer(opts) {
+  const { billerCode, customerId } = opts;
+  const config = getVtuConfig();
+  return vtuRequest(config, '/api/v2/betting/validate/', {
+    method: 'POST',
+    body: { biller_code: billerCode, customer_id: customerId }
+  });
+}
+
+export async function fundBettingViaProvider(opts) {
+  const { billerCode, customerId, amount } = opts;
+  const config = getVtuConfig();
+  return vtuRequest(config, '/api/v2/betting/fund/', {
+    method: 'POST',
+    body: { biller_code: billerCode, customer_id: customerId, amount, pin_code: config.pin }
+  });
+}
+
+// --- ePIN / recharge pins ---
+
+export async function fetchRechargePinPlans() {
+  const config = getVtuConfig();
+  if (!config.configured) {
+    const err = new Error('ePIN service is temporarily unavailable. Please try again later.');
+    err.statusCode = 503;
+    throw err;
+  }
+  const response = await vtuRequest(config, '/api/v2/vtu/recharge-pin/plans/', { method: 'GET' });
+  const arr = extractPlansArray(response.data);
+  if (!arr) {
+    const err = new Error('Could not load ePIN packages right now. Please try again shortly.');
+    err.statusCode = 502;
+    throw err;
+  }
+  return arr;
+}
+
+export async function purchaseRechargePinViaProvider(opts) {
+  const { planId, quantity } = opts;
+  const config = getVtuConfig();
+  const payload = { plan: planId, pin: config.pin };
+  if (quantity) payload.quantity = quantity;
+  return vtuRequest(config, '/api/v2/vtu/recharge-pin/purchase/', { method: 'POST', body: payload });
+}
+
+// Best-effort customer-name extraction from a verification response.
+export function extractCustomerName(d) {
+  if (!d || typeof d !== 'object') return null;
+  const candidates = [d.customer_name, d.customerName, d.name, d.account_name, d.accountName,
+    d.data && (d.data.customer_name || d.data.customerName || d.data.name || d.data.account_name)];
+  for (const c of candidates) {
+    if (c && typeof c === 'string' && c.trim()) return c.trim();
+  }
+  return null;
+}

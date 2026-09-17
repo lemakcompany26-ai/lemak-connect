@@ -6,8 +6,10 @@ import {
 
 // Marketplace escrow order flow. All fees are calculated on the backend from
 // admin-configured charges; the frontend never supplies a price.
-// purchase -> escrow debit; deliver -> seller marks delivered;
-// confirm -> buyer confirms, seller payout, transaction completed.
+// purchase -> escrow debit + order (paid, awaiting delivery) + automatic
+// chat open with system messages + admin notification;
+// deliver -> seller submits the account URL for delivery;
+// confirm -> buyer releases escrow, seller payout (idempotent).
 
 export default async function(req: Request): Promise<Response> {
   try {
@@ -42,12 +44,18 @@ export default async function(req: Request): Promise<Response> {
       }
       const f = await computeMarketplaceFees(service, listing.price);
       const transactionId = generateTransactionId();
-      await debitWallet(service, {
+      const debit = await debitWallet(service, {
         userId: user.id, transactionId, type: 'purchase',
         amount: f.buyerTotal, reference: transactionId,
         description: `Marketplace order: ${listing.title}`,
         idempotencyKey: `mkt-escrow-${user.id}-${listing.id}`
       });
+      // Idempotency: the same buyer cannot be charged twice for the same listing
+      if (debit.duplicated) {
+        return Response.json({ error: 'You have already purchased this listing.' }, { status: 409 });
+      }
+      // Payment verified against the wallet -> order is PAID, awaiting delivery.
+      // Funds stay in escrow; nothing is released to the seller yet.
       const order = await service.entities.MarketplaceOrder.create({
         transactionId, buyerUserId: user.id,
         sellerId: listing.sellerId, sellerUserId,
@@ -55,7 +63,7 @@ export default async function(req: Request): Promise<Response> {
         listingPrice: f.saleAmount, buyerFee: f.buyerFee,
         commission: f.commission, platformFee: f.commissionPercent,
         amount: f.buyerTotal, sellerPayout: f.sellerReceives,
-        payoutStatus: 'pending', status: 'in_progress'
+        payoutStatus: 'pending', status: 'paid'
       });
       await service.entities.Transaction.create({
         transactionId, userId: user.id, type: 'marketplace',
@@ -66,20 +74,58 @@ export default async function(req: Request): Promise<Response> {
         recipient: (seller && (seller.username || seller.fullName)) || '',
         metadata: { orderId: order.id, listingId: listing.id, listingRef: listing.listingId, commission: f.commission, sellerPayout: f.sellerReceives }
       });
+
+      // The private order chat opens only now — after payment — seeded with
+      // automatic system messages for the buyer and seller.
+      const sysMsg = (content) => service.entities.OrderMessage.create({
+        orderId: order.id, buyerUserId: user.id, sellerUserId: sellerUserId || null,
+        senderRole: 'system', senderName: 'Lemak Connect', content
+      });
+      await sysMsg(
+        `Payment received successfully. Your order has been created.\n\n` +
+        `The seller has been notified. Please use this chat for delivery and testing.\n\n` +
+        `Your order ID is: ${order.id}\nYour transaction ID is: ${transactionId}`
+      );
+      await sysMsg(
+        `We received your payment.\n\nThe seller has been notified and delivery is now in progress.\n\n` +
+        `Expected delivery: ${listing.deliveryTime || 'as agreed with the seller'}\n\n` +
+        `You can use this chat to communicate with the seller and Lemak Connect support.\n` +
+        `Do not release or confirm completion until you have tested the delivered account.`
+      );
+      await sysMsg(
+        `New marketplace order received.\n\nA buyer has completed payment for your listing.\n\n` +
+        `Please provide the agreed account delivery information through the approved secure delivery process.\n\n` +
+        `Order ID: ${order.id}`
+      );
+
       await notifyUser(service, {
         userId: user.id, type: 'marketplace',
         title: 'Marketplace order placed',
-        message: `Your order ${transactionId} for "${listing.title}" is in escrow. ${round2(f.buyerTotal)} will be released to the seller after you confirm delivery.`,
+        message: `Your order ${transactionId} for "${listing.title}" is in escrow. ${round2(f.buyerTotal)} will be released to the seller only after you confirm delivery.`,
         actionUrl: '/app/marketplace'
       });
       if (sellerUserId) {
         await notifyUser(service, {
           userId: sellerUserId, type: 'marketplace',
           title: 'New marketplace order 🎉',
-          message: `${user.full_name || 'A buyer'} ordered "${listing.title}" (${transactionId}). Deliver, and your payout of ${round2(f.sellerReceives)} is released when the buyer confirms.`,
+          message: `${user.full_name || 'A buyer'} paid for "${listing.title}" (${transactionId}). Submit the account delivery from My Orders — your payout of ${round2(f.sellerReceives)} is released when the buyer confirms.`,
           actionUrl: '/app/marketplace'
         });
       }
+      await notifyAdmins(service, {
+        type: 'marketplace',
+        title: 'New marketplace payment received',
+        message:
+          `Listing: ${listing.title}\n` +
+          `Platform: ${listing.platform || listing.category}\n` +
+          `Account Type: ${listing.accountKind || '—'}\n` +
+          `Buyer: ${user.full_name || user.email}\n` +
+          `Seller: ${(seller && (seller.fullName || seller.email)) || '—'}\n` +
+          `Amount: ${round2(f.buyerTotal)}\n` +
+          `Transaction ID: ${transactionId}\n` +
+          `Order ID: ${order.id}\n\nAwaiting seller delivery.`,
+        actionUrl: '/admin/marketplace'
+      });
       return Response.json({ ok: true, order, transactionId });
     }
 
@@ -96,17 +142,36 @@ export default async function(req: Request): Promise<Response> {
         if (!['in_progress', 'paid', 'pending'].includes(order.status)) {
           return Response.json({ error: `Order cannot be delivered (status: ${order.status})` }, { status: 400 });
         }
-        await service.entities.MarketplaceOrder.update(order.id, { status: 'delivered', deliveredAt: now });
+        // Optional account/page/channel URL, validated server-side.
+        const accountUrl = String(body.accountUrl || '').trim();
+        if (accountUrl && !/^https?:\/\/[^\s]+\.[^\s]+/i.test(accountUrl)) {
+          return Response.json({ error: 'Account URL must be a valid http(s) link' }, { status: 400 });
+        }
+        await service.entities.MarketplaceOrder.update(order.id, {
+          status: 'delivered', deliveredAt: now,
+          ...(accountUrl ? { accountUrl } : {})
+        });
+        await service.entities.OrderMessage.create({
+          orderId: order.id, buyerUserId: order.buyerUserId, sellerUserId: order.sellerUserId || null,
+          senderRole: 'system', senderName: 'Lemak Connect',
+          content: `Seller has submitted the account for delivery.${accountUrl ? `\n\nAccount URL: ${accountUrl}` : ''}\n\nThe buyer can now test the account before confirming completion.`
+        });
         await notifyUser(service, {
           userId: order.buyerUserId, type: 'marketplace',
           title: 'Marketplace order delivered',
-          message: `"${order.listingTitle}" (${order.transactionId}) has been delivered. Confirm to release the seller's payout.`,
+          message: `"${order.listingTitle}" (${order.transactionId}) has been delivered. Test the account, then confirm to release the seller's payout.`,
           actionUrl: '/app/marketplace'
+        });
+        await notifyAdmins(service, {
+          type: 'marketplace',
+          title: 'Seller delivery submitted',
+          message: `Seller delivered order ${order.transactionId} (${order.listingTitle}).${accountUrl ? `\nAccount URL: ${accountUrl}` : ''} The buyer can now test before confirming.`,
+          actionUrl: '/admin/marketplace'
         });
         return Response.json({ ok: true });
       }
 
-      // confirm — buyer releases escrow
+      // confirm — buyer releases escrow AFTER testing the delivered account
       if (order.buyerUserId !== user.id) {
         return Response.json({ error: 'Only the buyer can confirm this order' }, { status: 403 });
       }
@@ -123,6 +188,11 @@ export default async function(req: Request): Promise<Response> {
         await service.entities.MarketplaceOrder.update(order.id, {
           status: 'completed', confirmedAt: now, payoutAt: now, payoutStatus: 'paid'
         });
+        await service.entities.OrderMessage.create({
+          orderId: order.id, buyerUserId: order.buyerUserId, sellerUserId: order.sellerUserId || null,
+          senderRole: 'system', senderName: 'Lemak Connect',
+          content: `Buyer confirmed completion.\n\nSeller payout is now being processed. Marketplace fees have been deducted from the sale amount.`
+        });
         await notifyUser(service, {
           userId: order.sellerUserId, type: 'marketplace',
           title: 'Marketplace payout received 💰',
@@ -133,6 +203,11 @@ export default async function(req: Request): Promise<Response> {
         // Sheet sellers may not have a Lemak account — flag for manual payout
         await service.entities.MarketplaceOrder.update(order.id, {
           status: 'completed', confirmedAt: now, payoutStatus: 'manual'
+        });
+        await service.entities.OrderMessage.create({
+          orderId: order.id, buyerUserId: order.buyerUserId, sellerUserId: null,
+          senderRole: 'system', senderName: 'Lemak Connect',
+          content: `Buyer confirmed completion.\n\nSeller payout is being processed according to the seller's configured payout method.`
         });
         await notifyAdmins(service, {
           type: 'marketplace',

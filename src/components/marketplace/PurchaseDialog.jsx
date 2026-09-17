@@ -24,6 +24,17 @@ export default function PurchaseDialog({ listing, busy, onClose, onConfirm }) {
         </DialogHeader>
         <div className="space-y-3">
           <div className="text-sm font-semibold text-white">{listing && listing.title}</div>
+          {listing && (listing.platform || listing.followersCount != null) && (
+            <div className="text-xs text-slate-400 space-y-0.5">
+              {listing.platform && (
+                <div>Platform: <span className="text-slate-200 font-semibold">{listing.platform}{listing.accountKind ? ` — ${listing.accountKind}` : ''}</span></div>
+              )}
+              {listing.followersCount != null && (
+                <div>{listing.accountKind === 'Channel' ? 'Subscribers' : 'Followers'}: <span className="text-slate-200 font-semibold">{Number(listing.followersCount).toLocaleString()}</span></div>
+              )}
+              <div>Monetisation: <span className="text-slate-200 font-semibold">{listing.monetised ? 'Monetised' : 'Unmonetised'}</span></div>
+            </div>
+          )}
           {!breakdown ? (
             <div className="py-6 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-mk-blue" /></div>
           ) : (

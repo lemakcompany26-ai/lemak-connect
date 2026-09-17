@@ -55,6 +55,10 @@
       "default": "pending",
       "description": "manual = seller has no app account, payout done outside the platform"
     },
+    "accountUrl": {
+      "type": "string",
+      "description": "Account/page/channel URL submitted by the seller at delivery (validated server-side)"
+    },
     "status": {
       "type": "string",
       "enum": [

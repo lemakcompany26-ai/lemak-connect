@@ -22,6 +22,70 @@
     "category": {
       "type": "string"
     },
+    "platform": {
+      "type": "string",
+      "description": "Social platform for account listings, e.g. Facebook, TikTok, Instagram, X / Twitter, YouTube"
+    },
+    "accountKind": {
+      "type": "string",
+      "enum": [
+        "Page",
+        "Account",
+        "Channel",
+        "Profile"
+      ],
+      "description": "Whether the listing is a page, account, channel or profile"
+    },
+    "followersCount": {
+      "type": "number",
+      "description": "Follower or subscriber count as claimed by the seller"
+    },
+    "monetised": {
+      "type": "boolean",
+      "description": "Seller's monetisation claim; only shown as verified after admin review of evidence"
+    },
+    "niche": {
+      "type": "string",
+      "description": "Content niche / category"
+    },
+    "audienceCountry": {
+      "type": "string"
+    },
+    "accountAgeYears": {
+      "type": "number"
+    },
+    "averageViews": {
+      "type": "number"
+    },
+    "averageLikes": {
+      "type": "number"
+    },
+    "averageComments": {
+      "type": "number"
+    },
+    "audienceAgeRange": {
+      "type": "string"
+    },
+    "audienceGender": {
+      "type": "string"
+    },
+    "revenueInfo": {
+      "type": "string",
+      "description": "Documented revenue information, only where legitimately verifiable"
+    },
+    "verificationStatus": {
+      "type": "string",
+      "enum": [
+        "unverified",
+        "pending_review",
+        "verified"
+      ],
+      "default": "unverified",
+      "description": "Admin-controlled. Sellers can never set this themselves; metrics only show as verified after admin review of evidence"
+    },
+    "deliveryMethod": {
+      "type": "string"
+    },
     "price": {
       "type": "number"
     },

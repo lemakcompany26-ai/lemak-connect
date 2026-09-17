@@ -17,8 +17,10 @@
       "type": "string",
       "enum": [
         "buyer",
-        "seller"
-      ]
+        "seller",
+        "system"
+      ],
+      "description": "system = automatic Lemak Connect order events"
     },
     "senderName": {
       "type": "string"

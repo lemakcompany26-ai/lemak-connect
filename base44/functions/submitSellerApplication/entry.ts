@@ -108,7 +108,15 @@ export default async function(req: Request): Promise<Response> {
       deliveryTime: clean(body.deliveryTime),
       portfolioUrl: clean(body.portfolioUrl),
       sellerTerms: clean(body.sellerTerms),
-      verificationInfo: clean(body.verificationInfo)
+      verificationInfo: clean(body.verificationInfo),
+      // Optional social media account listing details
+      platform: clean(body.platform),
+      accountKind: clean(body.accountKind),
+      followersCount: body.followersCount === '' || body.followersCount == null ? null : Math.max(0, Math.floor(Number(body.followersCount) || 0)),
+      monetised: !!body.monetised,
+      niche: clean(body.niche),
+      audienceCountry: clean(body.audienceCountry),
+      deliveryMethod: clean(body.deliveryMethod)
     };
 
     if (!data.fullName) return Response.json({ error: 'Enter your full name' }, { status: 400 });
@@ -121,6 +129,9 @@ export default async function(req: Request): Promise<Response> {
     if (!data.deliveryTime) return Response.json({ error: 'Enter a delivery time' }, { status: 400 });
     if (data.portfolioUrl && !/^https?:\/\//i.test(data.portfolioUrl)) {
       return Response.json({ error: 'Portfolio link must start with http:// or https://' }, { status: 400 });
+    }
+    if (data.accountKind && !['Page', 'Account', 'Channel', 'Profile'].includes(data.accountKind)) {
+      return Response.json({ error: 'Select a valid account type (Page, Account, Channel or Profile)' }, { status: 400 });
     }
 
     const submittedAt = new Date().toISOString();
@@ -159,6 +170,15 @@ export default async function(req: Request): Promise<Response> {
       listingId, sellerId: sellerRecord.id, sellerUserId: user.id,
       title: data.serviceTitle, description: data.description, category: data.category,
       price: data.price, currency: data.currency, deliveryTime: data.deliveryTime, portfolioUrl: data.portfolioUrl,
+      platform: data.platform || null,
+      accountKind: data.accountKind || null,
+      followersCount: data.followersCount,
+      monetised: data.monetised,
+      niche: data.niche || null,
+      audienceCountry: data.audienceCountry || null,
+      deliveryMethod: data.deliveryMethod || null,
+      // Sellers can never self-verify metrics — admin reviews evidence and sets this
+      verificationStatus: 'unverified',
       status: 'pending', isActive: true, source: 'in_app',
       submissionId: sheet.submissionId, submittedAt, syncHash: sheet.syncHash
     });

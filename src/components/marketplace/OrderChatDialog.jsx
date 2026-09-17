@@ -80,6 +80,15 @@ export default function OrderChatDialog({ order, onClose }) {
             </div>
           )}
           {messages && messages.map(m => {
+            if (m.senderRole === 'system') {
+              return (
+                <div key={m.id} className="flex justify-center">
+                  <div className="max-w-[92%] rounded-xl border border-mk-brown-soft/25 bg-mk-brown/15 px-3.5 py-2 text-[11px] leading-relaxed text-mk-brown-soft text-center whitespace-pre-wrap">
+                    {m.content}
+                  </div>
+                </div>
+              );
+            }
             const mine = m.senderRole === role;
             return (
               <div key={m.id} className={'flex ' + (mine ? 'justify-end' : 'justify-start')}>

@@ -35,6 +35,7 @@ import AppSupport from '@/pages/app/Support';
 import Profile from '@/pages/app/Profile';
 import AppSettings from '@/pages/app/Settings';
 import Marketplace from '@/pages/app/Marketplace';
+import ListingDetail from '@/pages/app/ListingDetail';
 import AppAnalytics from '@/pages/app/Analytics';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminUsers from '@/pages/admin/AdminUsers';
@@ -109,6 +110,7 @@ const AuthenticatedApp = () => {
           <Route path="/app/profile" element={<Profile />} />
           <Route path="/app/settings" element={<AppSettings />} />
           <Route path="/app/marketplace" element={<Marketplace />} />
+          <Route path="/app/marketplace/listing/:listingId" element={<ListingDetail />} />
           <Route path="/app/analytics" element={<AppAnalytics />} />
         </Route>
         <Route element={<AdminShell />}>

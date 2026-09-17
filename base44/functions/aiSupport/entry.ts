@@ -1,5 +1,4 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { secrets } from 'base44:runtime';
 
 const SYSTEM_PROMPT = `You are "Lemak AI Support", the friendly assistant for Lemak Connect — a Nigerian digital services platform.
 
@@ -29,7 +28,7 @@ STRICT RULES:
 - If asked something outside Lemak Connect's services, politely redirect.
 - For account-specific problems (missing money, wrong number topped up), give the support email lemakcompany26@gmail.com and phone 09022143559.`;
 
-// Lemak AI Support — OpenAI-backed chat with a strict, bounded system prompt.
+// Lemak AI Support — platform LLM integration with a strict, bounded system prompt.
 // The AI has no tools: it cannot touch wallets, transactions, or settings.
 export default async function(req: Request): Promise<Response> {
   try {
@@ -40,30 +39,24 @@ export default async function(req: Request): Promise<Response> {
     const body = await req.json();
     const messages = Array.isArray(body.messages) ? body.messages : [];
     const trimmed = messages.slice(-12).map(m => ({
-      role: m.role === 'assistant' ? 'assistant' : 'user',
+      role: m.role === 'assistant' ? 'Support Assistant' : 'Customer',
       content: String(m.content || '').slice(0, 2000)
     }));
     if (trimmed.length === 0) return Response.json({ error: 'Message required' }, { status: 400 });
 
-    const apiKey = secrets.get('OPENAI_API_KEY');
-    if (!apiKey) {
-      return Response.json({ reply: 'AI support is temporarily unavailable. Please email lemakcompany26@gmail.com or WhatsApp 09022143559 and our team will help you right away.' });
-    }
+    const transcript = trimmed.map(m => `${m.role}: ${m.content}`).join('\n\n');
+    const prompt = `${SYSTEM_PROMPT}
 
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...trimmed],
-        max_tokens: 600,
-        temperature: 0.4
-      })
-    });
-    const data = await res.json().catch(() => null);
-    const reply = data && data.choices && data.choices[0] && data.choices[0].message
-      ? data.choices[0].message.content
-      : 'Sorry, I could not process that. Please try again or contact our team at lemakcompany26@gmail.com / 09022143559.';
+Reply ONLY with your next support message to the customer — no prefix, no role label. Conversation so far:
+
+${transcript}
+
+Support Assistant:`;
+
+    const result = await base44.asServiceRole.integrations.Core.InvokeLLM({ prompt });
+    const text = typeof result === 'string' ? result : (result && (result.response || result.text || result.content));
+    const reply = (text && String(text).trim()) ||
+      'Sorry, I could not process that. Please try again or contact our team at lemakcompany26@gmail.com / 09022143559.';
 
     return Response.json({ reply });
   } catch (error) {

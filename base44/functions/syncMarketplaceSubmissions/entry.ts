@@ -1,46 +1,12 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { isAdminEmail, isStaffRole, getMarketplaceSettings, generateListingId, notifyAdmins } from '../../shared/lemak.ts';
+import { mapColumns, rowHash, parsePrice } from '../../shared/sheetFields.ts';
 
 // Secure server-side synchronization of marketplace seller submissions from the
 // Google Form response sheet. Never run from the browser; Google credentials
 // stay on the backend.
 
-// Candidates are matched as substrings of the normalized header, so numbered
-// question headers like "16.Full Name" or "3.Wattsapp/phone number" still map.
-const FIELD_KEYS = {
-  email: ['2emailaddress', 'emailaddress', 'email'],
-  collectedEmail: ['emailaddress'],
-  fullName: ['fullname'],
-  username: ['username'],
-  phone: ['wattsapp', 'whatsapp', 'phone'],
-  accountType: ['accounttype'],
-  category: ['servicecategory', 'category'],
-  serviceTitle: ['servicetitle'],
-  description: ['servicedescription', 'description'],
-  price: ['price'],
-  currency: ['currency'],
-  deliveryTime: ['deliverytime', 'delivery'],
-  portfolioUrl: ['portfolio'],
-  sellerTerms: ['sellerterms'],
-  verificationInfo: ['verification'],
-  timestamp: ['timestamp']
-};
 
-function parsePrice(raw) {
-  const n = parseFloat(String(raw || '').replace(/[^0-9.]/g, ''));
-  return isFinite(n) ? n : 0;
-}
-
-function normalizeHeader(h) {
-  return String(h || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function rowHash(values) {
-  const str = JSON.stringify(values);
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
-  return String(hash);
-}
 
 export default async function(req: Request): Promise<Response> {
   try {
@@ -91,14 +57,7 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ ok: true, imported: 0, updated: 0, skipped: 0 });
     }
 
-    const header = (rows[0] || []).map(normalizeHeader);
-    const colIndex = {};
-    for (const [field, candidates] of Object.entries(FIELD_KEYS)) {
-      for (const c of candidates) {
-        const idx = header.findIndex(h => h === c || h.includes(c));
-        if (idx !== -1) { colIndex[field] = idx; break; }
-      }
-    }
+    const colIndex = mapColumns(rows[0] || []);
     const get = (row, field) => (colIndex[field] !== undefined ? String(row[colIndex[field]] || '').trim() : '');
 
     let imported = 0, updated = 0, skipped = 0;

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Store, Loader2, ExternalLink } from 'lucide-react';
+import { Store, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { useApp } from '@/lib/AppContext';
 import ListingCard from '@/components/marketplace/ListingCard';
 import PurchaseDialog from '@/components/marketplace/PurchaseDialog';
 import SellerStatusCard from '@/components/marketplace/SellerStatusCard';
+import SellerApplicationForm from '@/components/marketplace/SellerApplicationForm';
 import OrderCard from '@/components/marketplace/OrderCard';
 import { formatNaira } from '@/lib/format';
 
@@ -21,6 +21,7 @@ export default function Marketplace() {
   const [applications, setApplications] = useState(null);
   const [orders, setOrders] = useState(null);
   const [settings, setSettings] = useState({});
+  const [tab, setTab] = useState('browse');
   const [buying, setBuying] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -92,7 +93,7 @@ export default function Marketplace() {
         )}
       </div>
 
-      <Tabs defaultValue="browse">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="bg-mk-card2 border border-mk-border h-auto flex-wrap">
           <TabsTrigger value="browse" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Browse</TabsTrigger>
           <TabsTrigger value="sell" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Sell</TabsTrigger>
@@ -116,19 +117,11 @@ export default function Marketplace() {
         </TabsContent>
 
         <TabsContent value="sell" className="mt-5">
-          <div className="rounded-2xl bg-mk-card border border-mk-border p-6 sm:p-10 text-center space-y-5 max-w-xl mx-auto">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-mk-blue/15 flex items-center justify-center">
-              <Store className="w-7 h-7 text-mk-blue" />
-            </div>
-            <h3 className="font-heading font-extrabold text-white text-lg">Sell your digital service on Lemak Connect</h3>
-            <p className="text-sm text-slate-400">
-              Apply with the seller form. Every submission is reviewed by our team — only approved listings become publicly available.
-            </p>
-            <Button asChild className="h-12 px-8 font-bold bg-mk-blue hover:bg-mk-blue/90 text-white">
-              <a href={sellUrl} target="_blank" rel="noreferrer">SELL NOW <ExternalLink className="w-4 h-4 ml-1.5" /></a>
-            </Button>
-            <p className="text-xs text-mk-brown-soft">Every order is protected by escrow and a fair platform commission.</p>
-          </div>
+          <SellerApplicationForm
+            profile={profile}
+            sellUrl={sellUrl}
+            onSubmitted={() => { load(); setTab('submissions'); }}
+          />
         </TabsContent>
 
         <TabsContent value="submissions" className="mt-5 space-y-3">

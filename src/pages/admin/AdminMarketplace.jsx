@@ -14,6 +14,7 @@ export default function AdminMarketplace() {
   const [sellers, setSellers] = useState(null);
   const [listings, setListings] = useState(null);
   const [orders, setOrders] = useState(null);
+  const [disputes, setDisputes] = useState(null);
   const [settings, setSettings] = useState(null);
   const [lastSync, setLastSync] = useState(undefined);
   const [syncing, setSyncing] = useState(false);
@@ -23,6 +24,7 @@ export default function AdminMarketplace() {
     base44.entities.MarketplaceSeller.list('-created_date', 200).then(setSellers).catch(() => setSellers([]));
     base44.entities.MarketplaceListing.list('-created_date', 200).then(setListings).catch(() => setListings([]));
     base44.entities.MarketplaceOrder.list('-created_date', 200).then(setOrders).catch(() => setOrders([]));
+    base44.entities.MarketplaceDispute.list('-created_date', 200).then(setDisputes).catch(() => setDisputes([]));
     base44.entities.AdminSetting.list('-created_date', 200)
       .then(rows => setSettings(Object.fromEntries((rows || []).map(r => [r.key, r.value]))))
       .catch(() => setSettings({}));
@@ -83,8 +85,10 @@ export default function AdminMarketplace() {
   };
 
   const refundOrder = (order) => act('refund_marketplace_order', order);
+  const resolveDispute = (dispute, decision) => act('resolve_dispute', dispute, { decision });
 
-  const loading = sellers === null || listings === null || orders === null || settings === null;
+  const openDisputes = (disputes || []).filter(d => ['open', 'under_review'].includes(d.status)).length;
+  const loading = sellers === null || listings === null || orders === null || disputes === null || settings === null;
   const completed = (orders || []).filter(o => o.status === 'completed');
   const stats = {
     pendingSellers: (sellers || []).filter(s => s.status === 'pending').length,
@@ -115,7 +119,7 @@ export default function AdminMarketplace() {
             <TabsTrigger value="overview" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Overview</TabsTrigger>
             <TabsTrigger value="listings" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Listings ({stats.pendingListings} pending)</TabsTrigger>
             <TabsTrigger value="sellers" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Sellers ({stats.pendingSellers} pending)</TabsTrigger>
-            <TabsTrigger value="orders" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Orders</TabsTrigger>
+            <TabsTrigger value="orders" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Orders{openDisputes > 0 && <span className="ml-1.5 min-w-5 h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold inline-flex items-center justify-center">{openDisputes}</span>}</TabsTrigger>
             <TabsTrigger value="charges" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Charges</TabsTrigger>
           </TabsList>
 
@@ -129,7 +133,7 @@ export default function AdminMarketplace() {
             <SellersPanel sellers={sellers} busyId={busyId} onAct={act} />
           </TabsContent>
           <TabsContent value="orders" className="mt-5">
-            <OrdersPanel orders={orders} busyId={busyId} onRefund={refundOrder} />
+            <OrdersPanel orders={orders} disputes={disputes} busyId={busyId} onRefund={refundOrder} onResolve={resolveDispute} />
           </TabsContent>
           <TabsContent value="charges" className="mt-5">
             <ChargesPanel settings={settings} saving={busyId !== null} onSave={saveCharges} onPreview={previewCharges} />

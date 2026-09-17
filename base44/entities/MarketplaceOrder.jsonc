@@ -66,6 +66,7 @@
         "paid",
         "in_progress",
         "delivered",
+        "disputed",
         "confirmed",
         "completed",
         "refunded",
@@ -78,6 +79,15 @@
       "format": "date-time"
     },
     "deliveredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "testingStartedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the buyer started testing the delivered account"
+    },
+    "disputedAt": {
       "type": "string",
       "format": "date-time"
     },

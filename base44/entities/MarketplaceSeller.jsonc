@@ -60,6 +60,21 @@
     "verificationInfo": {
       "type": "string"
     },
+    "payoutMethod": {
+      "type": "string",
+      "description": "How the seller receives payouts, e.g. Bank transfer"
+    },
+    "payoutBank": {
+      "type": "string",
+      "description": "Bank / payment provider name"
+    },
+    "payoutAccountName": {
+      "type": "string"
+    },
+    "payoutAccountNumber": {
+      "type": "string",
+      "description": "Account number / payout identifier. Sensitive: only ever shown masked (****1234) outside the seller's own payout settings"
+    },
     "status": {
       "type": "string",
       "enum": [

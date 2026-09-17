@@ -129,6 +129,117 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ ok: true, order, transactionId });
     }
 
+    // Buyer starts the testing period on a delivered order
+    if (action === 'start_test') {
+      const orders = await service.entities.MarketplaceOrder.filter({ id: body.orderId }, '-created_date', 1);
+      const order = orders && orders[0];
+      if (!order) return Response.json({ error: 'Order not found' }, { status: 404 });
+      if (order.buyerUserId !== user.id) {
+        return Response.json({ error: 'Only the buyer can start testing' }, { status: 403 });
+      }
+      if (order.status !== 'delivered') {
+        return Response.json({ error: `Testing can only start after delivery (status: ${order.status})` }, { status: 400 });
+      }
+      if (order.testingStartedAt) return Response.json({ ok: true, already: true });
+      const now = new Date().toISOString();
+      await service.entities.MarketplaceOrder.update(order.id, { testingStartedAt: now });
+      await service.entities.OrderMessage.create({
+        orderId: order.id, buyerUserId: order.buyerUserId, sellerUserId: order.sellerUserId || null,
+        senderRole: 'system', senderName: 'Lemak Connect',
+        content: `Your testing period has started.\n\nPlease test the account before confirming completion:\n· the account/page URL works\n· the account type matches the listing\n· the follower/subscriber count is reasonably consistent with the listing\n· agreed delivery requirements are satisfied\n\nIf anything differs, use Report Problem — funds stay in escrow until the dispute is resolved.`
+      });
+      if (order.sellerUserId) {
+        await notifyUser(service, {
+          userId: order.sellerUserId, type: 'marketplace',
+          title: 'Buyer testing started',
+          message: `The buyer started testing "${order.listingTitle}" (${order.transactionId}). Your payout is released once they confirm.`,
+          actionUrl: '/app/marketplace'
+        });
+      }
+      return Response.json({ ok: true });
+    }
+
+    // Buyer reports a problem — opens a dispute, escrow stays locked
+    if (action === 'report_problem') {
+      const REASONS = ['account_inaccessible', 'wrong_account', 'follower_count_differs', 'monetisation_differs', 'account_type_differs', 'seller_did_not_deliver', 'other'];
+      const REASON_LABELS = {
+        account_inaccessible: 'Account inaccessible',
+        wrong_account: 'Wrong account',
+        follower_count_differs: 'Follower count differs',
+        monetisation_differs: 'Monetisation differs',
+        account_type_differs: 'Account type differs',
+        seller_did_not_deliver: 'Seller did not deliver',
+        other: 'Other'
+      };
+      const reason = String(body.reason || '');
+      if (!REASONS.includes(reason)) return Response.json({ error: 'Select a valid reason' }, { status: 400 });
+      const details = String(body.details || '').slice(0, 500);
+      const orders = await service.entities.MarketplaceOrder.filter({ id: body.orderId }, '-created_date', 1);
+      const order = orders && orders[0];
+      if (!order) return Response.json({ error: 'Order not found' }, { status: 404 });
+      if (order.buyerUserId !== user.id) {
+        return Response.json({ error: 'Only the buyer can report a problem' }, { status: 403 });
+      }
+      if (order.status !== 'delivered') {
+        return Response.json({ error: `Problems can only be reported on delivered orders (status: ${order.status})` }, { status: 400 });
+      }
+      const existing = await service.entities.MarketplaceDispute.filter({ orderId: order.id }, '-created_date', 1);
+      if (existing && existing[0] && ['open', 'under_review'].includes(existing[0].status)) {
+        return Response.json({ error: 'A dispute is already open for this order' }, { status: 409 });
+      }
+      const now = new Date().toISOString();
+      const rand = Array.from(crypto.getRandomValues(new Uint8Array(3)), b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+      const d = new Date();
+      const disputeId = `DSP-${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}-${rand}`;
+      const dispute = await service.entities.MarketplaceDispute.create({
+        disputeId, orderId: order.id, transactionId: order.transactionId,
+        listingId: order.listingId, buyerUserId: order.buyerUserId, sellerUserId: order.sellerUserId || null,
+        reason, details, status: 'open'
+      });
+      await service.entities.MarketplaceOrder.update(order.id, { status: 'disputed', disputedAt: now });
+      await service.entities.OrderMessage.create({
+        orderId: order.id, buyerUserId: order.buyerUserId, sellerUserId: order.sellerUserId || null,
+        senderRole: 'system', senderName: 'Lemak Connect',
+        content: `Buyer reported an issue.\n\nReason: ${REASON_LABELS[reason]}\n${details ? `Details: ${details}\n` : ''}Dispute ID: ${disputeId}\n\nLemak Connect support has been notified and will review this order. Funds remain in escrow until the dispute is resolved.`
+      });
+      if (order.sellerUserId) {
+        await notifyUser(service, {
+          userId: order.sellerUserId, type: 'marketplace',
+          title: 'Order dispute opened',
+          message: `The buyer reported an issue with "${order.listingTitle}" (${order.transactionId}): ${REASON_LABELS[reason]}. Our team will review it.`,
+          actionUrl: '/app/marketplace'
+        });
+      }
+      await notifyAdmins(service, {
+        type: 'marketplace',
+        title: 'Marketplace dispute opened',
+        message: `Dispute ${disputeId}\nOrder: ${order.transactionId}\nListing: ${order.listingTitle}\nReason: ${REASON_LABELS[reason]}\nBuyer reported a problem after delivery. Escrow is locked pending review.`,
+        actionUrl: '/admin/marketplace'
+      });
+      return Response.json({ ok: true, disputeId });
+    }
+
+    // Seller payout settings — stored on the seller's own record, never in chat
+    if (action === 'save_payout_settings') {
+      const sellers = await service.entities.MarketplaceSeller.filter({ userId: user.id }, '-created_date', 5);
+      const seller = (sellers || [])[0];
+      if (!seller) return Response.json({ error: 'Seller record not found' }, { status: 404 });
+      const accountNumber = String(body.payoutAccountNumber || '').replace(/\s/g, '');
+      const method = String(body.payoutMethod || '').trim().slice(0, 40);
+      if (!method) return Response.json({ error: 'Choose a payout method' }, { status: 400 });
+      if (!/^\d{6,20}$/.test(accountNumber)) {
+        return Response.json({ error: 'Enter a valid account number (6-20 digits)' }, { status: 400 });
+      }
+      const patch: any = {
+        payoutMethod: method,
+        payoutAccountNumber: accountNumber
+      };
+      if (body.payoutBank !== undefined) patch.payoutBank = String(body.payoutBank || '').trim().slice(0, 60);
+      if (body.payoutAccountName !== undefined) patch.payoutAccountName = String(body.payoutAccountName || '').trim().slice(0, 80);
+      await service.entities.MarketplaceSeller.update(seller.id, patch);
+      return Response.json({ ok: true, masked: `****${accountNumber.slice(-4)}` });
+    }
+
     if (action === 'deliver' || action === 'confirm') {
       const orders = await service.entities.MarketplaceOrder.filter({ id: body.orderId }, '-created_date', 1);
       const order = orders && orders[0];

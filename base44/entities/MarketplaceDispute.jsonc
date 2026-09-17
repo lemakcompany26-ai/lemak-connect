@@ -1,0 +1,97 @@
+{
+  "name": "MarketplaceDispute",
+  "type": "object",
+  "properties": {
+    "disputeId": {
+      "type": "string",
+      "description": "Public dispute reference, format DSP-\u2026"
+    },
+    "orderId": {
+      "type": "string",
+      "description": "Reference to MarketplaceOrder"
+    },
+    "transactionId": {
+      "type": "string"
+    },
+    "listingId": {
+      "type": "string"
+    },
+    "buyerUserId": {
+      "type": "string"
+    },
+    "sellerUserId": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "account_inaccessible",
+        "wrong_account",
+        "follower_count_differs",
+        "monetisation_differs",
+        "account_type_differs",
+        "seller_did_not_deliver",
+        "other"
+      ]
+    },
+    "details": {
+      "type": "string",
+      "description": "Buyer's description of the problem"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "under_review",
+        "buyer_favoured",
+        "seller_favoured",
+        "refunded",
+        "resolved"
+      ],
+      "default": "open"
+    },
+    "adminDecision": {
+      "type": "string"
+    },
+    "adminNotes": {
+      "type": "string"
+    },
+    "decidedBy": {
+      "type": "string"
+    },
+    "decidedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resolvedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "orderId",
+    "buyerUserId",
+    "reason",
+    "status"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "$or": [
+        {
+          "data.buyerUserId": "{{user.id}}"
+        },
+        {
+          "data.sellerUserId": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}

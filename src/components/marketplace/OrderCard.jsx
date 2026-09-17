@@ -27,9 +27,22 @@ export default function OrderCard({ order, mode, busy, onAction, onChat }) {
           </Button>
         )}
         {isBuying && order.status === 'delivered' && (
-          <Button size="sm" className="h-9 ml-auto bg-mk-blue hover:bg-mk-blue/90 text-white font-bold" disabled={busy} onClick={() => onAction('confirm', order)}>
-            Confirm Delivery
-          </Button>
+          <>
+            {!order.testingStartedAt && (
+              <Button size="sm" variant="outline" className="h-9 border-mk-blue/40 text-mk-blue-soft hover:bg-mk-blue/10 font-semibold" disabled={busy} onClick={() => onAction('start_test', order)}>
+                Start Test
+              </Button>
+            )}
+            <Button size="sm" variant="outline" className="h-9 border-red-500/40 text-red-400 hover:bg-red-500/10 font-semibold" disabled={busy} onClick={() => onAction('report_problem', order)}>
+              Report Problem
+            </Button>
+            <Button size="sm" className="h-9 ml-auto bg-mk-blue hover:bg-mk-blue/90 text-white font-bold" disabled={busy} onClick={() => onAction('confirm', order)}>
+              Confirm Account
+            </Button>
+          </>
+        )}
+        {isBuying && order.status === 'disputed' && (
+          <span className="ml-auto text-[11px] text-red-400 font-semibold">Dispute open — Lemak Connect is reviewing</span>
         )}
         {!isBuying && ['in_progress', 'paid', 'pending'].includes(order.status) && (
           <Button size="sm" variant="outline" className="h-9 ml-auto border-mk-brown-soft/40 text-mk-brown-soft hover:bg-mk-brown/20 font-semibold" disabled={busy} onClick={() => onAction('deliver', order)}>

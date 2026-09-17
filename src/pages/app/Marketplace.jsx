@@ -9,6 +9,8 @@ import ListingCard from '@/components/marketplace/ListingCard';
 import ListingFilters from '@/components/marketplace/ListingFilters';
 import DemoListings from '@/components/marketplace/DemoListings';
 import DeliverDialog from '@/components/marketplace/DeliverDialog';
+import ReportProblemDialog from '@/components/marketplace/ReportProblemDialog';
+import PayoutSettingsCard from '@/components/marketplace/PayoutSettingsCard';
 import PurchaseDialog from '@/components/marketplace/PurchaseDialog';
 import { DEFAULT_PLATFORMS } from '@/components/marketplace/platforms';
 import SellerStatusCard from '@/components/marketplace/SellerStatusCard';
@@ -31,6 +33,7 @@ export default function Marketplace() {
   const [buying, setBuying] = useState(null);
   const [chatOrder, setChatOrder] = useState(null);
   const [delivering, setDelivering] = useState(null);
+  const [reporting, setReporting] = useState(null);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
@@ -52,6 +55,7 @@ export default function Marketplace() {
   const myApplications = (applications || []).filter(a => a.userId === myUserId);
   const myBuyingOrders = (orders || []).filter(o => o.buyerUserId === myUserId);
   const mySellingOrders = (orders || []).filter(o => o.sellerUserId === myUserId && o.buyerUserId !== myUserId);
+  const approvedSeller = (myApplications || []).find(a => a.status === 'approved');
 
   const adminPlatforms = (settings.marketplace_platforms || '').split(',').map(s => s.trim()).filter(Boolean);
   const filterPlatforms = adminPlatforms.length ? adminPlatforms : DEFAULT_PLATFORMS;
@@ -89,17 +93,51 @@ export default function Marketplace() {
 
   const orderAction = async (action, order) => {
     if (action === 'deliver') { setDelivering(order); return; }
+    if (action === 'report_problem') { setReporting(order); return; }
     setBusy(order.id);
     try {
       await base44.functions.invoke('marketplaceOrder', { action, orderId: order.id });
       toast({
-        title: action === 'confirm' ? 'Delivery confirmed ✅' : 'Marked as delivered',
-        description: action === 'confirm' ? 'The seller has been paid.' : 'The buyer can now confirm delivery to release your payout.'
+        title: action === 'confirm' ? 'Account confirmed ✅' : action === 'start_test' ? 'Testing started' : 'Marked as delivered',
+        description: action === 'confirm'
+          ? 'The seller has been paid.'
+          : action === 'start_test'
+            ? 'Test the account, then confirm to release the seller\'s payout.'
+            : 'The buyer can now test and confirm delivery to release your payout.'
       });
       load();
       refresh();
     } catch (err) {
       toast({ title: 'Action failed', description: (err.response && err.response.data && err.response.data.error) || err.message, variant: 'destructive' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const reportProblem = async (reason, details) => {
+    const order = reporting;
+    if (!order) return;
+    setBusy(order.id);
+    try {
+      await base44.functions.invoke('marketplaceOrder', { action: 'report_problem', orderId: order.id, reason, details });
+      toast({ title: 'Problem reported', description: 'A dispute was opened. Escrow is locked while our team reviews.' });
+      setReporting(null);
+      load();
+    } catch (err) {
+      toast({ title: 'Could not report problem', description: (err.response && err.response.data && err.response.data.error) || err.message, variant: 'destructive' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const savePayout = async (values) => {
+    setBusy('payout');
+    try {
+      await base44.functions.invoke('marketplaceOrder', { action: 'save_payout_settings', ...values });
+      toast({ title: 'Payout settings saved', description: 'Your payout details are stored securely on your seller record.' });
+      load();
+    } catch (err) {
+      toast({ title: 'Could not save payout settings', description: (err.response && err.response.data && err.response.data.error) || err.message, variant: 'destructive' });
     } finally {
       setBusy(null);
     }
@@ -188,7 +226,12 @@ export default function Marketplace() {
           )}
         </TabsContent>
 
-        <TabsContent value="sell" className="mt-5">
+        <TabsContent value="sell" className="mt-5 space-y-5">
+          {approvedSeller && (
+            <div className="max-w-2xl mx-auto">
+              <PayoutSettingsCard seller={approvedSeller} busy={busy === 'payout'} onSave={savePayout} />
+            </div>
+          )}
           <SellerApplicationForm
             profile={profile}
             sellUrl={sellUrl}
@@ -222,6 +265,7 @@ export default function Marketplace() {
 
       <PurchaseDialog listing={buying} busy={busy === true || busy === 'purchase'} onClose={() => setBuying(null)} onConfirm={purchase} />
       <DeliverDialog order={delivering} busy={!!delivering && busy === delivering.id} onClose={() => setDelivering(null)} onConfirm={deliverListing} />
+      <ReportProblemDialog order={reporting} busy={!!reporting && busy === reporting.id} onClose={() => setReporting(null)} onConfirm={reportProblem} />
       <OrderChatDialog order={chatOrder} onClose={() => setChatOrder(null)} />
     </div>
   );

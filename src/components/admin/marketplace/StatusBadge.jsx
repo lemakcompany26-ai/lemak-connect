@@ -10,6 +10,9 @@ const STYLES = {
   completed: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
   paid: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
   refunded: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+  disputed: 'bg-red-500/15 text-red-400 border-red-500/30',
+  open: 'bg-red-500/15 text-red-400 border-red-500/30',
+  under_review: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
   manual: 'bg-mk-brown/25 text-mk-brown-soft border-mk-brown-soft/40'
 };
 

@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { isAdminEmail, isStaffRole, notifyUser, creditWallet, computeMarketplaceFees } from '../../shared/lemak.ts';
+import { isAdminEmail, isStaffRole, notifyUser, notifyAdmins, creditWallet, computeMarketplaceFees, round2 } from '../../shared/lemak.ts';
 
 // Admin-only actions, each one audited. Roles are verified server-side
 // from the profile — never trusted from the frontend.
@@ -16,6 +16,7 @@ const ACTIONS = {
   save_marketplace_charges: 'charges',
   preview_marketplace_charges: 'charges',
   refund_marketplace_order: 'order',
+  resolve_dispute: 'dispute',
   update_user_status: 'profile',
   update_user_role: 'profile'
 };
@@ -211,6 +212,125 @@ export default async function(req: Request): Promise<Response> {
         await notifyUser(service, { userId: order.sellerUserId, type: 'marketplace', title: 'Marketplace order cancelled', message: `Order ${order.transactionId} was refunded to the buyer.`, actionUrl: '/app/marketplace' });
       }
       await audit('MarketplaceOrder', order.id, { refunded: order.amount, reason: (data && data.reason) || null });
+      return Response.json({ ok: true });
+    }
+
+    if (entityKind === 'dispute') {
+      const disputes = await service.entities.MarketplaceDispute.filter({ id: targetId }, '-created_date', 1);
+      const dispute = disputes && disputes[0];
+      if (!dispute) return Response.json({ error: 'Dispute not found' }, { status: 404 });
+      if (!['open', 'under_review'].includes(dispute.status)) {
+        return Response.json({ error: `Dispute is already ${dispute.status}` }, { status: 400 });
+      }
+      const orders = await service.entities.MarketplaceOrder.filter({ id: dispute.orderId }, '-created_date', 1);
+      const order = orders && orders[0];
+      if (!order) return Response.json({ error: 'Linked order not found' }, { status: 404 });
+      const decision = String((data || {}).decision || '');
+      const notes = String((data || {}).notes || '').slice(0, 500);
+      const now = new Date().toISOString();
+      const sysMsg = (content) => service.entities.OrderMessage.create({
+        orderId: order.id, buyerUserId: order.buyerUserId, sellerUserId: order.sellerUserId || null,
+        senderRole: 'system', senderName: 'Lemak Connect', content
+      }).catch(() => null);
+
+      if (decision === 'refund_buyer') {
+        await creditWallet(service, {
+          userId: order.buyerUserId, transactionId: order.transactionId, type: 'refund',
+          amount: order.amount, reference: order.transactionId,
+          description: `Marketplace dispute refund: ${order.listingTitle || ''}`,
+          idempotencyKey: `mkt-refund-${order.id}`
+        });
+        await service.entities.MarketplaceOrder.update(order.id, { status: 'refunded' });
+        if (order.transactionId) {
+          const txs = await service.entities.Transaction.filter({ transactionId: order.transactionId }, '-created_date', 1);
+          if (txs && txs[0]) await service.entities.Transaction.update(txs[0].id, { status: 'refunded' }).catch(() => null);
+        }
+        await service.entities.MarketplaceDispute.update(dispute.id, {
+          status: 'refunded', adminDecision: decision, adminNotes: notes || null,
+          decidedBy: user.email, decidedAt: now, resolvedAt: now
+        });
+        await sysMsg(`Admin decision: buyer favoured.\n\n${round2(order.amount)} has been refunded to the buyer's wallet and the order is closed.`);
+        await notifyUser(service, {
+          userId: order.buyerUserId, type: 'marketplace',
+          title: 'Dispute resolved — refund issued',
+          message: `Dispute ${dispute.disputeId || ''} on "${order.listingTitle}" was resolved in your favour. ${round2(order.amount)} has been refunded to your wallet.`,
+          actionUrl: '/app/wallet'
+        });
+        if (order.sellerUserId) {
+          await notifyUser(service, {
+            userId: order.sellerUserId, type: 'marketplace',
+            title: 'Dispute resolved — order refunded',
+            message: `Dispute on "${order.listingTitle}" (${order.transactionId}) was resolved in the buyer's favour. The escrow was refunded to the buyer.`,
+            actionUrl: '/app/marketplace'
+          });
+        }
+      } else if (decision === 'release_seller') {
+        if (order.sellerUserId) {
+          await creditWallet(service, {
+            userId: order.sellerUserId, transactionId: order.transactionId, type: 'deposit',
+            amount: order.sellerPayout, reference: order.transactionId,
+            description: `Marketplace dispute payout: ${order.listingTitle || ''}`,
+            idempotencyKey: `mkt-payout-${order.id}`
+          });
+          await service.entities.MarketplaceOrder.update(order.id, {
+            status: 'completed', confirmedAt: now, payoutAt: now, payoutStatus: 'paid'
+          });
+        } else {
+          await service.entities.MarketplaceOrder.update(order.id, {
+            status: 'completed', confirmedAt: now, payoutStatus: 'manual'
+          });
+        }
+        await service.entities.MarketplaceDispute.update(dispute.id, {
+          status: 'seller_favoured', adminDecision: decision, adminNotes: notes || null,
+          decidedBy: user.email, decidedAt: now, resolvedAt: now
+        });
+        await sysMsg(`Admin decision: seller favoured.\n\nThe order is complete and the seller's payout has been released.`);
+        await notifyUser(service, {
+          userId: order.buyerUserId, type: 'marketplace',
+          title: 'Dispute resolved',
+          message: `Dispute on "${order.listingTitle}" (${order.transactionId}) was resolved. The order is complete and the seller has been paid.`,
+          actionUrl: '/app/marketplace'
+        });
+        if (order.sellerUserId) {
+          await notifyUser(service, {
+            userId: order.sellerUserId, type: 'marketplace',
+            title: 'Dispute resolved — payout released 💰',
+            message: `Dispute on "${order.listingTitle}" was resolved in your favour. ${round2(order.sellerPayout)} has been paid to your wallet.`,
+            actionUrl: '/app/wallet'
+          });
+        } else {
+          await notifyAdmins(service, {
+            type: 'marketplace',
+            title: 'Manual seller payout required',
+            message: `Dispute ${dispute.disputeId} resolved in the seller's favour, but the seller has no Lemak account. Pay ${round2(order.sellerPayout)} manually.`,
+            actionUrl: '/admin/marketplace'
+          });
+        }
+      } else if (decision === 'resume_testing') {
+        await service.entities.MarketplaceOrder.update(order.id, { status: 'delivered' });
+        await service.entities.MarketplaceDispute.update(dispute.id, {
+          status: 'resolved', adminDecision: decision, adminNotes: notes || null,
+          decidedBy: user.email, decidedAt: now, resolvedAt: now
+        });
+        await sysMsg(`Admin reviewed the reported issue and re-opened the buyer testing period.\n\nThe buyer can continue testing and confirm, or report a problem again if the issue persists.`);
+        await notifyUser(service, {
+          userId: order.buyerUserId, type: 'marketplace',
+          title: 'Testing re-opened',
+          message: `Our team reviewed your report on "${order.listingTitle}". Testing has been re-opened — continue and confirm, or report a problem again if needed.`,
+          actionUrl: '/app/marketplace'
+        });
+        if (order.sellerUserId) {
+          await notifyUser(service, {
+            userId: order.sellerUserId, type: 'marketplace',
+            title: 'Buyer testing re-opened',
+            message: `The dispute on "${order.listingTitle}" (${order.transactionId}) was dismissed. The buyer's testing period has resumed.`,
+            actionUrl: '/app/marketplace'
+          });
+        }
+      } else {
+        return Response.json({ error: 'Invalid decision (refund_buyer | release_seller | resume_testing)' }, { status: 400 });
+      }
+      await audit('MarketplaceDispute', dispute.id, { decision, notes: notes || null, orderStatus: order.status });
       return Response.json({ ok: true });
     }
 

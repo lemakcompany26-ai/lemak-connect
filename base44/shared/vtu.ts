@@ -22,6 +22,12 @@ function providerBase(apiUrl) {
     .replace(/\/api$/, '');
 }
 
+// Bigisub identifies networks by numeric ID: 1=MTN, 2=GLO, 3=AIRTEL, 4=9MOBILE.
+function networkId(network) {
+  const map = { MTN: 1, GLO: 2, AIRTEL: 3, '9MOBILE': 4, ETISALAT: 4 };
+  return map[String(network || '').trim().toUpperCase()] || null;
+}
+
 async function vtuRequest(config, path, opts) {
   const method = (opts && opts.method) || 'GET';
   const body = opts && opts.body;
@@ -57,7 +63,8 @@ export function isProviderSuccess(response) {
 
 export function extractProviderReference(d) {
   if (!d) return null;
-  return d.reference || d.transaction_id || d.transactionId || d.order_id || d.orderId || d.trans_id || d.id || null;
+  return d.reference || d.transaction_id || d.transactionId || d.order_id || d.orderId || d.trans_id
+    || (d.data && (d.data.reference || d.data.transaction_id || d.data.id)) || d.id || null;
 }
 
 function extractErrorMessage(d, fallback) {
@@ -84,11 +91,10 @@ export async function fetchDataPlans(network) {
     err.statusCode = 503;
     throw err;
   }
-  const attempts = [
-    `/api/v2/data/plans?network=${encodeURIComponent(network)}`,
-    `/api/v2/data/plans?network=${encodeURIComponent(network)}`,
-    `/api/data/plans?network=${encodeURIComponent(network)}`
-  ];
+  const id = networkId(network);
+  const attempts = id
+    ? [`/api/v2/vtu/data/plans/?network=${id}`]
+    : ['/api/v2/vtu/data/plans/'];
   let lastResponse = null;
   for (const path of attempts) {
     try {
@@ -108,8 +114,14 @@ export async function fetchDataPlans(network) {
 export async function purchaseAirtimeViaProvider(opts) {
   const { network, phoneNumber, amount, reference } = opts;
   const config = getVtuConfig();
-  const payload = { network, phone_number: phoneNumber, amount, pin: config.pin, pin_code: config.pin, reference };
-  const attempts = ['/api/v2/airtime/purchase', '/api/v2/airtime/purchase/'];
+  const id = networkId(network);
+  if (!id) {
+    const err = new Error('Unsupported network. Please try again.');
+    err.statusCode = 400;
+    throw err;
+  }
+  const payload = { network: id, phone_number: phoneNumber, amount, pin: config.pin };
+  const attempts = ['/api/v2/vtu/airtime/purchase/'];
   let lastResponse = null;
   for (const path of attempts) {
     try {
@@ -125,8 +137,8 @@ export async function purchaseAirtimeViaProvider(opts) {
 export async function purchaseDataViaProvider(opts) {
   const { network, phoneNumber, planId, reference } = opts;
   const config = getVtuConfig();
-  const payload = { network, phone_number: phoneNumber, plan: planId, pin: config.pin, pin_code: config.pin, reference };
-  const attempts = ['/api/v2/data/purchase', '/api/v2/data/purchase/'];
+  const payload = { plan: planId, phone_number: phoneNumber, pin: config.pin };
+  const attempts = ['/api/v2/vtu/data/purchase/'];
   let lastResponse = null;
   for (const path of attempts) {
     try {

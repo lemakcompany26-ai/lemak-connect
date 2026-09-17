@@ -24,7 +24,11 @@ export default async function(req: Request): Promise<Response> {
       const pricing = await calculatePrice(service, 'data', providerCost);
       plans.push({
         id: String(raw.id || raw.plan_id || raw.planId || raw.code || ''),
-        name: String(raw.name || raw.plan_name || raw.planName || raw.title || 'Data Plan'),
+        name: [
+          raw.size ? `${raw.size}${raw.plan_volume ? String(raw.plan_volume).toUpperCase() : ''}` : '',
+          raw.plantype,
+          raw.name || raw.plan_name || raw.planName || raw.title
+        ].filter(Boolean).join(' ') || 'Data Plan',
         size: String(raw.size || raw.volume || raw.data_amount || raw.name || ''),
         validity: String(raw.validity || raw.duration || raw.expiry || ''),
         providerCost: pricing.providerCost,

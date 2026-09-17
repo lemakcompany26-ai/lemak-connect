@@ -30,6 +30,14 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ ok: true, messages, role: isBuyer ? 'buyer' : 'seller' });
     }
 
+    // Typing indicator: the other party sees a "typing…" bubble while the
+    // participant is writing, delivered via the order's realtime updates.
+    if (action === 'typing') {
+      const now = new Date().toISOString();
+      await service.entities.MarketplaceOrder.update(order.id, isBuyer ? { buyerTypingAt: now } : { sellerTypingAt: now });
+      return Response.json({ ok: true });
+    }
+
     if (action === 'send') {
       const content = String(body.content || '').trim().slice(0, 1000);
       if (!content) return Response.json({ error: 'Message cannot be empty' }, { status: 400 });

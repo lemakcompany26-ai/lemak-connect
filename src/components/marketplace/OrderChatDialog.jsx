@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, MessageCircle, Send } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,9 @@ import { Input } from '@/components/ui/input';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
 } from '@/components/ui/dialog';
+import TypingIndicator from '@/components/chat/TypingIndicator';
+
+const TYPING_FRESH_MS = 6000;
 
 // Private chat between the buyer and seller of a marketplace order.
 // Only the two participants can load or post messages (verified server-side).
@@ -14,6 +17,9 @@ export default function OrderChatDialog({ order, onClose }) {
   const [role, setRole] = useState('buyer');
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [typing, setTyping] = useState({ buyer: null, seller: null });
+  const [, setTick] = useState(0);
+  const lastTypingPing = useRef(0);
 
   const loadMessages = useCallback(async () => {
     if (!order) return;
@@ -22,6 +28,10 @@ export default function OrderChatDialog({ order, onClose }) {
       const d = res.data || res;
       setMessages(d.messages || []);
       setRole(d.role || 'buyer');
+      const last = (d.messages || [])[((d.messages || []).length) - 1];
+      if (last && last.senderRole !== 'system' && last.senderRole !== (d.role || 'buyer')) {
+        setTyping({ buyer: null, seller: null });
+      }
     } catch (e) {
       setMessages([]);
     }
@@ -31,13 +41,30 @@ export default function OrderChatDialog({ order, onClose }) {
     if (!order) return;
     setMessages(null);
     setDraft('');
+    setTyping({ buyer: order.buyerTypingAt || null, seller: order.sellerTypingAt || null });
     loadMessages();
     const unsubscribe = base44.entities.OrderMessage.subscribe((event) => {
       const d = event.data || {};
       if (d.orderId === order.id) loadMessages();
     });
-    return () => { unsubscribe(); };
+    const unsubscribeOrders = base44.entities.MarketplaceOrder.subscribe((event) => {
+      const d = event.data || {};
+      if (d.id === order.id) {
+        setTyping({ buyer: d.buyerTypingAt || null, seller: d.sellerTypingAt || null });
+      }
+    });
+    const ticker = setInterval(() => setTick(t => t + 1), 2000);
+    return () => { unsubscribe(); unsubscribeOrders(); clearInterval(ticker); };
   }, [order && order.id]);
+
+  // Ping "typing" while composing (throttled, fire-and-forget).
+  const onDraftChange = (value) => {
+    setDraft(value);
+    if (value && order && Date.now() - lastTypingPing.current > 2500) {
+      lastTypingPing.current = Date.now();
+      base44.functions.invoke('orderChat', { action: 'typing', orderId: order.id }).catch(() => {});
+    }
+  };
 
   const send = async () => {
     const content = draft.trim();
@@ -106,13 +133,20 @@ export default function OrderChatDialog({ order, onClose }) {
           })}
         </div>
 
+        <TypingIndicator
+          visible={(() => {
+            const otherTypingAt = role === 'buyer' ? typing.seller : typing.buyer;
+            return otherTypingAt && Date.now() - new Date(otherTypingAt).getTime() < TYPING_FRESH_MS;
+          })()}
+        />
+
         <form
           className="flex gap-2"
           onSubmit={(e) => { e.preventDefault(); send(); }}
         >
           <Input
             value={draft}
-            onChange={(e) => setDraft(e.target.value.slice(0, 1000))}
+            onChange={(e) => onDraftChange(e.target.value.slice(0, 1000))}
             placeholder="Type a message…"
             className="bg-mk-card2 border-mk-border text-slate-100 h-11"
           />

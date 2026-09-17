@@ -51,6 +51,16 @@
     "completedAt": {
       "type": "string",
       "format": "date-time"
+    },
+    "buyerTypingAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time the buyer was typing in the rental chat (typing indicator)"
+    },
+    "sellerTypingAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time the seller was typing in the rental chat (typing indicator)"
     }
   },
   "required": [

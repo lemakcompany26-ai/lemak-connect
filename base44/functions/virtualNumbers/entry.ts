@@ -233,6 +233,14 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ ok: true, message });
     }
 
+    // Typing indicator for the rental chat — see orderChat 'typing'.
+    if (action === 'typing') {
+      const rental = await loadRental(body.rentalId);
+      const now = new Date().toISOString();
+      await service.entities.NumberRental.update(rental.id, rental.buyerUserId === user.id ? { buyerTypingAt: now } : { sellerTypingAt: now });
+      return Response.json({ ok: true });
+    }
+
     if (action === 'complete') {
       const rental = await loadRental(body.rentalId);
       if (rental.buyerUserId !== user.id) {

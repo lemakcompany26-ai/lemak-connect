@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyRound, Loader2, MessageCircle, Send } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,9 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
 } from '@/components/ui/dialog';
+import TypingIndicator from '@/components/chat/TypingIndicator';
+
+const TYPING_FRESH_MS = 6000;
 
 // Private chat for a number rental. Sellers can flag a message as an OTP
 // delivery — once an OTP is sent, the rental can no longer be cancelled.
@@ -16,6 +19,9 @@ export default function RentalChatDialog({ rental, role, onClose }) {
   const [draft, setDraft] = useState('');
   const [isOtp, setIsOtp] = useState(false);
   const [sending, setSending] = useState(false);
+  const [typing, setTyping] = useState({ buyer: null, seller: null });
+  const [, setTick] = useState(0);
+  const lastTypingPing = useRef(0);
 
   const load = useCallback(async () => {
     if (!rental) return;
@@ -23,23 +29,44 @@ export default function RentalChatDialog({ rental, role, onClose }) {
       const res = await base44.functions.invoke('virtualNumbers', { action: 'messages', rentalId: rental.id });
       const d = res.data || res;
       setMessages(d.messages || []);
+      const last = (d.messages || [])[((d.messages || []).length) - 1];
+      if (last && last.senderRole !== role) {
+        setTyping({ buyer: null, seller: null });
+      }
     } catch (e) {
       setMessages([]);
     }
-  }, [rental && rental.id]);
+  }, [rental && rental.id, role]);
 
   useEffect(() => {
     if (!rental) return;
     setMessages(null);
     setDraft('');
     setIsOtp(false);
+    setTyping({ buyer: rental.buyerTypingAt || null, seller: rental.sellerTypingAt || null });
     load();
     const unsubscribe = base44.entities.RentalMessage.subscribe((event) => {
       const d = event.data || {};
       if (d.rentalId === rental.id) load();
     });
-    return () => { unsubscribe(); };
+    const unsubscribeRentals = base44.entities.NumberRental.subscribe((event) => {
+      const d = event.data || {};
+      if (d.id === rental.id) {
+        setTyping({ buyer: d.buyerTypingAt || null, seller: d.sellerTypingAt || null });
+      }
+    });
+    const ticker = setInterval(() => setTick(t => t + 1), 2000);
+    return () => { unsubscribe(); unsubscribeRentals(); clearInterval(ticker); };
   }, [rental && rental.id]);
+
+  // Ping "typing" while composing (throttled, fire-and-forget).
+  const onDraftChange = (value) => {
+    setDraft(value);
+    if (value && rental && Date.now() - lastTypingPing.current > 2500) {
+      lastTypingPing.current = Date.now();
+      base44.functions.invoke('virtualNumbers', { action: 'typing', rentalId: rental.id }).catch(() => {});
+    }
+  };
 
   const send = async () => {
     const content = draft.trim();
@@ -107,12 +134,19 @@ export default function RentalChatDialog({ rental, role, onClose }) {
           })}
         </div>
 
+        <TypingIndicator
+          visible={(() => {
+            const otherTypingAt = role === 'buyer' ? typing.seller : typing.buyer;
+            return otherTypingAt && Date.now() - new Date(otherTypingAt).getTime() < TYPING_FRESH_MS;
+          })()}
+        />
+
         {rental.status === 'active' && (
           <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); send(); }}>
             <div className="flex gap-2">
               <Input
                 value={draft}
-                onChange={(e) => setDraft(e.target.value.slice(0, 1000))}
+                onChange={(e) => onDraftChange(e.target.value.slice(0, 1000))}
                 placeholder={role === 'seller' ? 'Paste the OTP code…' : 'Type a message…'}
                 className="bg-mk-card2 border-mk-border text-slate-100 h-11"
               />

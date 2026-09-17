@@ -21,6 +21,7 @@ export default function VirtualNumbers() {
   const [tab, setTab] = useState('browse');
   const [busy, setBusy] = useState(false);
   const [chat, setChat] = useState(null); // { rental, role }
+  const [otpInfo, setOtpInfo] = useState(null); // { servers, serviceCount }
 
   const call = async (payload, okTitle, okDesc) => {
     setBusy(true);
@@ -57,6 +58,12 @@ export default function VirtualNumbers() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    base44.functions.invoke('otpServices', { action: 'list' })
+      .then(res => { const d = res.data || res; setOtpInfo({ servers: d.servers || [], serviceCount: d.serviceCount || 0 }); })
+      .catch(() => {});
+  }, []);
+
   const rent = async (listing) => {
     const d = await call(
       { action: 'rent', listingId: listing.id },
@@ -92,6 +99,20 @@ export default function VirtualNumbers() {
         <p className="text-sm text-slate-400 mt-1">
           Rent a number, receive your OTP in a private chat, and get auto-refunded if the window expires.
         </p>
+        {otpInfo && (
+          <div className="flex flex-wrap items-center gap-2 mt-3">
+            {otpInfo.serviceCount > 0 && (
+              <span className="inline-flex items-center rounded-full border border-mk-border bg-mk-card px-2.5 py-1 text-[10px] font-semibold text-slate-300">
+                {otpInfo.serviceCount} OTP services — email, SMS & all social media
+              </span>
+            )}
+            {(otpInfo.servers || []).map(s => (
+              <span key={s.id} className={'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold ' + (s.configured ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-mk-border bg-mk-card text-slate-500')}>
+                OTP {s.id.toUpperCase()}: {s.configured ? 'connected' : 'not set'}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>

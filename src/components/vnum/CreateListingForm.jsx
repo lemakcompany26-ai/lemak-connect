@@ -1,38 +1,49 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, PlusCircle } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 
-const OTP_SERVICES = ['WhatsApp', 'Telegram', 'Facebook', 'Instagram', 'TikTok', 'Twitter / X', 'Google', 'Binance', 'Other'];
 const RENTAL_WINDOWS = [10, 15, 30, 60, 120];
 
+// Full OTP catalogue (email, SMS, all social media) comes from the backend —
+// otpServices — so it stays consistent with the dual OTP server setup.
 export default function CreateListingForm({ onCreated }) {
   const { toast } = useToast();
+  const [catalogue, setCatalogue] = useState(null);
   const [service, setService] = useState('');
+  const [customService, setCustomService] = useState('');
   const [number, setNumber] = useState('');
   const [price, setPrice] = useState('');
   const [rentalMinutes, setRentalMinutes] = useState('15');
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    base44.functions.invoke('otpServices', { action: 'list' })
+      .then(res => { const d = res.data || res; setCatalogue(d.services || []); })
+      .catch(() => setCatalogue([]));
+  }, []);
+
+  const resolvedService = service === 'Other / custom' ? customService.trim() : service;
+
   const submit = async (e) => {
     e.preventDefault();
-    if (!service) return toast({ title: 'Choose a service', variant: 'destructive' });
+    if (!resolvedService) return toast({ title: 'Choose a service', variant: 'destructive' });
     setBusy(true);
     try {
       const res = await base44.functions.invoke('virtualNumbers', {
         action: 'create_listing',
-        service, number, price: Number(price), rentalMinutes: Number(rentalMinutes), description
+        service: resolvedService, number, price: Number(price), rentalMinutes: Number(rentalMinutes), description
       });
       const d = res.data || res;
       if (d.ok !== true) throw new Error(d.error || 'Could not list this number');
       toast({ title: 'Number listed 🎉', description: 'It is now live in Browse.' });
-      setService(''); setNumber(''); setPrice(''); setDescription('');
+      setService(''); setCustomService(''); setNumber(''); setPrice(''); setDescription('');
       if (onCreated) onCreated();
     } catch (err) {
       const d = err.response && err.response.data;
@@ -51,10 +62,19 @@ export default function CreateListingForm({ onCreated }) {
         <Label className="text-slate-200">Service</Label>
         <Select value={service} onValueChange={setService}>
           <SelectTrigger className="bg-mk-card2 border-mk-border text-slate-100 h-11"><SelectValue placeholder="What is this number for?" /></SelectTrigger>
-          <SelectContent>
-            {OTP_SERVICES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          <SelectContent className="max-h-72">
+            {catalogue === null && <div className="flex justify-center py-4"><Loader2 className="w-4 h-4 animate-spin text-mk-blue" /></div>}
+            {(catalogue || []).map(g => (
+              <SelectGroup key={g.category}>
+                <SelectLabel className="text-mk-blue-soft font-bold">{g.category}</SelectLabel>
+                {g.services.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectGroup>
+            ))}
           </SelectContent>
         </Select>
+        {service === 'Other / custom' && (
+          <Input value={customService} onChange={(e) => setCustomService(e.target.value.slice(0, 40))} placeholder="Type the exact service name…" className="bg-mk-card2 border-mk-border text-slate-100 h-11" />
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">

@@ -137,7 +137,14 @@ export async function purchaseAirtimeViaProvider(opts) {
 export async function purchaseDataViaProvider(opts) {
   const { network, phoneNumber, planId, reference } = opts;
   const config = getVtuConfig();
-  const payload = { plan: planId, phone_number: phoneNumber, pin: config.pin };
+  const id = networkId(network);
+  if (!id) {
+    const err = new Error('Unsupported network. Please try again.');
+    err.statusCode = 400;
+    throw err;
+  }
+  // The provider validates that the plan belongs to this network.
+  const payload = { network: id, plan: planId, phone_number: phoneNumber, pin: config.pin };
   const attempts = ['/api/v2/vtu/data/purchase/'];
   let lastResponse = null;
   for (const path of attempts) {

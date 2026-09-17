@@ -264,11 +264,13 @@ export async function listEmailProducts(server) {
   return Array.isArray(data) ? data : [];
 }
 
-export async function buyEmailOtp(server, domain, site) {
+export async function buyEmailOtp(server, productId) {
   if (isSmspool(server)) throw smspoolUnavailable('Email OTP is not available on this server.');
+  // The provider expects the product id (from /email/products) as the site;
+  // anything else is rejected with a server error.
   return await serverFetch(server, '/email/buy', {
     method: 'POST',
-    body: JSON.stringify({ domain, site })
+    body: JSON.stringify({ domain: productId, site: productId })
   });
 }
 

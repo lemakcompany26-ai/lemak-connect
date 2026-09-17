@@ -440,7 +440,7 @@ export default async function(req: Request): Promise<Response> {
           }
           if (paid > 0) providerCost = paid;
         } else {
-          const order = await buyEmailOtp(server, serviceName, 'lemak-connect');
+          const order = await buyEmailOtp(server, serviceName);
           handle = String((order && (order.email || order.address)) || '');
           providerOrderId = String((order && (order.id || order.emailId)) || '');
         }
@@ -519,8 +519,10 @@ export default async function(req: Request): Promise<Response> {
       }
 
       const d = data || {};
+      // Provider status markers (e.g. "WAITING") must never be treated as an OTP.
+      const NON_CODE_VALUES = ['RECEIVED', 'WAIT', 'WAITING', 'PENDING', 'CANCELLED', 'CANCELED', 'EXPIRED', 'NULL', 'NONE', ''];
       const code = d.sms_code || d.otp || d.email_code ||
-        (d.code && String(d.code) !== 'RECEIVED' && String(d.code) !== 'WAIT' && String(d.code) !== 'PENDING' ? d.code : null);
+        (d.code && !NON_CODE_VALUES.includes(String(d.code).toUpperCase()) ? d.code : null);
 
       if ((d.status === 'cancelled' || d.status === 'canceled') && !code) {
         const nowIso = new Date().toISOString();

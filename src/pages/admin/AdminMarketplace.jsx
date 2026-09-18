@@ -17,7 +17,9 @@ export default function AdminMarketplace() {
   const [disputes, setDisputes] = useState(null);
   const [settings, setSettings] = useState(null);
   const [lastSync, setLastSync] = useState(undefined);
+  const [lastOrdersSync, setLastOrdersSync] = useState(undefined);
   const [syncing, setSyncing] = useState(false);
+  const [syncingOrders, setSyncingOrders] = useState(false);
   const [busyId, setBusyId] = useState(null);
 
   const load = () => {
@@ -28,9 +30,13 @@ export default function AdminMarketplace() {
     base44.entities.AdminSetting.list('-created_date', 200)
       .then(rows => setSettings(Object.fromEntries((rows || []).map(r => [r.key, r.value]))))
       .catch(() => setSettings({}));
-    base44.entities.MarketplaceSyncLog.list('-created_date', 1)
-      .then(l => setLastSync(l && l[0] ? l[0] : null))
-      .catch(() => setLastSync(null));
+    base44.entities.MarketplaceSyncLog.list('-created_date', 30)
+      .then(rows => {
+        const logs = rows || [];
+        setLastSync(logs.find(l => !(l.details && l.details.kind === 'orders')) || null);
+        setLastOrdersSync(logs.find(l => l.details && l.details.kind === 'orders') || null);
+      })
+      .catch(() => { setLastSync(null); setLastOrdersSync(null); });
   };
   useEffect(() => { load(); }, []);
 
@@ -66,6 +72,26 @@ export default function AdminMarketplace() {
       toast({ title: 'Sync failed', description: err.message, variant: 'destructive' });
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const syncOrders = async () => {
+    setSyncingOrders(true);
+    try {
+      const res = await base44.functions.invoke('syncMarketplaceOrders', {});
+      const d = res.data || res;
+      if (d.requiresGoogleIntegration) {
+        toast({ title: 'Google integration required', description: d.message, variant: 'destructive' });
+      } else if (d.error) {
+        toast({ title: 'Order sync failed', description: d.error, variant: 'destructive' });
+      } else {
+        toast({ title: 'Orders synced', description: `${d.written} order(s) written to the Orders tab of your records sheet.` });
+      }
+      load();
+    } catch (err) {
+      toast({ title: 'Order sync failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setSyncingOrders(false);
     }
   };
 
@@ -124,7 +150,7 @@ export default function AdminMarketplace() {
           </TabsList>
 
           <TabsContent value="overview" className="mt-5">
-            <MarketplaceStats stats={stats} syncing={syncing} lastSync={lastSync} onSync={sync} />
+            <MarketplaceStats stats={stats} syncing={syncing} lastSync={lastSync} onSync={sync} syncingOrders={syncingOrders} lastOrdersSync={lastOrdersSync} onSyncOrders={syncOrders} />
           </TabsContent>
           <TabsContent value="listings" className="mt-5">
             <ListingsPanel listings={listings} sellers={sellers} busyId={busyId} onAct={act} />

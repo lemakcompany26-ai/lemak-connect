@@ -9,7 +9,12 @@ const DEMO_LISTINGS = [
   { key: 'tk', platform: 'TikTok', accountKind: 'Account', followers: '80,000 Followers', monetised: false, price: 95000 },
   { key: 'ig', platform: 'Instagram', accountKind: 'Account', followers: '12,500 Followers', monetised: true, price: 75000 },
   { key: 'x', platform: 'X / Twitter', accountKind: 'Account', followers: '40,000 Followers', monetised: false, price: 60000 },
-  { key: 'yt', platform: 'YouTube', accountKind: 'Channel', followers: '10,000 Subscribers', monetised: true, price: 200000 }
+  { key: 'yt', platform: 'YouTube', accountKind: 'Channel', followers: '10,000 Subscribers', monetised: true, price: 200000 },
+  { key: 'tg', platform: 'Telegram', accountKind: 'Channel', followers: '55,000 Subscribers', monetised: false, price: 85000 },
+  { key: 'sc', platform: 'Snapchat', accountKind: 'Account', followers: '18,000 Followers', monetised: false, price: 45000 },
+  { key: 'li', platform: 'LinkedIn', accountKind: 'Page', followers: '9,500 Followers', monetised: false, price: 120000 },
+  { key: 'rd', platform: 'Reddit', accountKind: 'Account', followers: '30,000 Karma', monetised: false, price: 35000 },
+  { key: 'tw', platform: 'Twitch', accountKind: 'Channel', followers: '6,500 Followers', monetised: true, price: 110000 }
 ];
 
 export default function DemoListings() {

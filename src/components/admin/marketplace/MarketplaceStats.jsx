@@ -14,7 +14,7 @@ const CARDS = [
   { key: 'platformFees', label: 'Platform Fees', icon: Percent, money: true }
 ];
 
-export default function MarketplaceStats({ stats, syncing, lastSync, onSync }) {
+export default function MarketplaceStats({ stats, syncing, lastSync, onSync, syncingOrders, lastOrdersSync, onSyncOrders }) {
   return (
     <div className="space-y-5">
       <div className="rounded-2xl bg-mk-card border border-mk-border p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -29,6 +29,21 @@ export default function MarketplaceStats({ stats, syncing, lastSync, onSync }) {
         <Button className="bg-mk-blue hover:bg-mk-blue/90 text-white font-semibold h-11 px-6" onClick={onSync} disabled={syncing}>
           {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
           {syncing ? 'Syncing…' : 'Sync Now'}
+        </Button>
+      </div>
+
+      <div className="rounded-2xl bg-mk-card border border-mk-border p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h3 className="font-heading font-bold text-white">Orders Sync to Google Sheets</h3>
+          <p className="text-xs text-slate-400 mt-1">
+            {lastOrdersSync
+              ? `Last sync: ${formatDate(lastOrdersSync.ranAt)} — ${(lastOrdersSync.details && lastOrdersSync.details.written) || 0} order(s) written to the Orders tab.`
+              : 'No orders sync has run yet. Every marketplace order is written to the "Orders" tab of your records sheet.'}
+          </p>
+        </div>
+        <Button className="bg-mk-blue hover:bg-mk-blue/90 text-white font-semibold h-11 px-6" onClick={onSyncOrders} disabled={syncingOrders}>
+          {syncingOrders ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+          {syncingOrders ? 'Syncing…' : 'Sync Orders'}
         </Button>
       </div>
 

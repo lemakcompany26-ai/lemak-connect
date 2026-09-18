@@ -69,7 +69,12 @@ export default function Register() {
         await base44.functions.invoke("onboardUser", pending);
         localStorage.removeItem("lemak_pending_onboarding");
       } catch (onboardErr) {
-        // retried automatically after login if it failed
+        // Recoverable — the account is verified. They'll be asked to confirm
+        // a few details after the redirect; tell them instead of failing silently.
+        toast({
+          title: "One more step after this",
+          description: "We'll ask you to confirm a few details to finish setting up your wallet.",
+        });
       }
       window.location.href = safeReturnTo();
     } catch (err) {

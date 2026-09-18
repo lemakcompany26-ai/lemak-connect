@@ -11,10 +11,14 @@ import Logo from '@/components/Logo';
 // Creates profile + wallet + notification preferences via the backend.
 export default function CompleteProfile() {
   const navigate = useNavigate();
-  const [fullName, setFullName] = useState('');
-  const [username, setUsername] = useState('');
-  const [phone, setPhone] = useState('');
-  const [promoCode, setPromoCode] = useState('');
+  // Prefill from a registration whose profile setup failed, so nothing is retyped.
+  const [pending] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('lemak_pending_onboarding') || '{}'); } catch (e) { return {}; }
+  });
+  const [fullName, setFullName] = useState(pending.fullName || '');
+  const [username, setUsername] = useState(pending.username || '');
+  const [phone, setPhone] = useState(pending.phone || '');
+  const [promoCode, setPromoCode] = useState(pending.promoCode || '');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -31,6 +35,7 @@ export default function CompleteProfile() {
         fullName: fullName.trim(), username: username.trim().toLowerCase(),
         phone: phone.trim(), promoCode: promoCode.trim()
       });
+      localStorage.removeItem('lemak_pending_onboarding');
       navigate('/app', { replace: true });
     } catch (err) {
       setError((err.response && err.response.data && err.response.data.error) || err.message || 'Could not complete your profile');

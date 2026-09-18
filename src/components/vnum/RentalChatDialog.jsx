@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { KeyRound, Loader2, MessageCircle, Send } from 'lucide-react';
+import { KeyRound, Loader2, MessageCircle, Send, ShieldCheck } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
 } from '@/components/ui/dialog';
 import TypingIndicator from '@/components/chat/TypingIndicator';
+import AdminChatSheet from '@/components/chat/AdminChatSheet';
 
 const TYPING_FRESH_MS = 6000;
 
@@ -21,6 +22,7 @@ export default function RentalChatDialog({ rental, role, onClose }) {
   const [sending, setSending] = useState(false);
   const [typing, setTyping] = useState({ buyer: null, seller: null });
   const [liveStatus, setLiveStatus] = useState(null);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [, setTick] = useState(0);
   const lastTypingPing = useRef(0);
 
@@ -114,6 +116,7 @@ export default function RentalChatDialog({ rental, role, onClose }) {
   const otpDelivered = (messages || []).some(m => m.isOtp);
 
   return (
+    <>
     <Dialog open={!!rental} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="bg-mk-card border-mk-border text-slate-100 max-w-lg">
         <DialogHeader>
@@ -191,7 +194,17 @@ export default function RentalChatDialog({ rental, role, onClose }) {
             )}
           </form>
         )}
+
+        <button
+          type="button"
+          onClick={() => setAdminOpen(true)}
+          className="flex items-center gap-1.5 mx-auto text-[11px] font-bold text-amber-400 hover:text-amber-300"
+        >
+          <ShieldCheck className="w-3.5 h-3.5" /> Chat with Admin
+        </button>
       </DialogContent>
     </Dialog>
+    <AdminChatSheet open={adminOpen} onClose={() => setAdminOpen(false)} context={rental.rentalRef ? `Order ${rental.rentalRef}` : ''} />
+    </>
   );
 }

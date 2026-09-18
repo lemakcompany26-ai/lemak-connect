@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Ban, CalendarClock, Check, Copy, Loader2, Timer } from 'lucide-react';
+import { ArrowLeft, Ban, CalendarClock, Check, Copy, Loader2, ShieldCheck, Timer } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -8,6 +8,7 @@ import { useApp } from '@/lib/AppContext';
 import { formatNaira } from '@/lib/format';
 import TypingIndicator from '@/components/chat/TypingIndicator';
 import OtpChatFeed from '@/components/vnum/OtpChatFeed';
+import AdminChatSheet from '@/components/chat/AdminChatSheet';
 
 const STATUS_LABELS = {
   active: 'Waiting for verification message…',
@@ -37,6 +38,7 @@ export default function VirtualNumberOrder() {
   const [busy, setBusy] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
 
   const load = useCallback(() => {
     base44.functions.invoke('virtualNumbers', { action: 'vn_order', orderId })
@@ -276,8 +278,18 @@ export default function VirtualNumberOrder() {
               </p>
             )
           )}
+
+          <Button
+            variant="outline"
+            className="w-full h-11 border-amber-400/40 text-amber-400 hover:bg-amber-400/10 hover:text-amber-300 font-semibold"
+            onClick={() => setAdminOpen(true)}
+          >
+            <ShieldCheck className="w-4 h-4 mr-1.5" /> Chat with Admin
+          </Button>
         </div>
       </div>
+
+      <AdminChatSheet open={adminOpen} onClose={() => setAdminOpen(false)} context={`Order ${order.rentalRef}`} />
     </div>
   );
 }

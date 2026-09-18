@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { secrets } from 'base44:runtime';
 import { generateTransactionId, creditWallet, notifyUser, round2 } from '../../shared/lemak.ts';
+import { sendTransactionalSms } from '../../shared/sms.ts';
 
 // Paystack webhook. No user auth — authenticity is verified with the
 // PAYSTACK_WEBHOOK_SECRET HMAC-SHA512 signature, then the payment is
@@ -66,6 +67,10 @@ export default async function(req: Request): Promise<Response> {
       title: 'Wallet funded successfully',
       message: `₦${nairaAmount.toLocaleString()} was added to your wallet. Reference: ${reference}`,
       actionUrl: '/app/wallet'
+    });
+    await sendTransactionalSms(service, {
+      smsType: 'WALLET_FUNDING_SUCCESS', userId: payment.userId, transactionId,
+      data: { amount: nairaAmount, transactionId, balance: null }
     });
 
     return Response.json({ received: true });

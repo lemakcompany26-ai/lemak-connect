@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { generateTransactionId, calculatePrice, validatePromo, redeemPromo, debitWallet, creditWallet, notifyUser, sendUserEmail, emailTemplate, round2 } from '../../shared/lemak.ts';
 import { getVtuConfig, isProviderSuccess, extractProviderReference, fetchCablePlans, purchaseCableViaProvider, BETTING_PROVIDERS, fundBettingViaProvider, fetchRechargePinPlans, purchaseRechargePinViaProvider } from '../../shared/vtu.ts';
 import { assertPinForPurchase } from '../../shared/security.ts';
+import { sendTransactionalSms } from '../../shared/sms.ts';
 
 // Purchases for Cable TV, Betting and ePIN. Same flow as airtime/data:
 // authenticate -> validate -> price (backend, provider catalogue re-verified)
@@ -204,6 +205,14 @@ export default async function(req: Request): Promise<Response> {
            <p><b>Item:</b> ${itemLabel}<br/><b>Recipient:</b> ${recipient}<br/>
            <b>Amount:</b> ₦${payable.toLocaleString()}<br/><b>Reference:</b> ${transactionId}</p>
            ${action === 'epin' && transaction.metadata && transaction.metadata.epin ? `<p><b>Your ePIN details:</b><br/>${Object.entries(transaction.metadata.epin).map(([k, v]) => `${k}: ${v}`).join('<br/>')}</p>` : ''}`)
+      });
+      await sendTransactionalSms(service, {
+        smsType: 'TRANSACTION_SUCCESS', userId: user.id,
+        phone: (profile && profile.phone) || null, transactionId,
+        data: {
+          service: itemLabel, amount: payable,
+          recipient: action === 'epin' ? null : recipient, transactionId
+        }
       });
       return Response.json({ transaction, wallet: debit.wallet });
     }

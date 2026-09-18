@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { secrets } from 'base44:runtime';
 import { generateTransactionId, creditWallet, notifyUser, round2 } from '../../shared/lemak.ts';
 import { sendTransactionalEmail } from '../../shared/emails.ts';
+import { sendTransactionalSms } from '../../shared/sms.ts';
 
 // Verifies a Paystack payment server-side and credits the wallet exactly once.
 // The frontend's claim of success is never trusted — the Paystack verify API
@@ -74,6 +75,13 @@ export default async function(req: Request): Promise<Response> {
       data: {
         amount: nairaAmount, transactionId, reference,
         status: 'Successful', date: new Date().toISOString(),
+        balance: credited && credited.wallet ? credited.wallet.balance : null
+      }
+    });
+    await sendTransactionalSms(service, {
+      smsType: 'WALLET_FUNDING_SUCCESS', userId: user.id, transactionId,
+      data: {
+        amount: nairaAmount, transactionId,
         balance: credited && credited.wallet ? credited.wallet.balance : null
       }
     });

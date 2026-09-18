@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { generateTransactionId, calculatePrice, validatePromo, redeemPromo, debitWallet, creditWallet, notifyUser, round2 } from '../../shared/lemak.ts';
 import { sendTransactionalEmail } from '../../shared/emails.ts';
+import { sendTransactionalSms } from '../../shared/sms.ts';
 import { getVtuConfig, purchaseAirtimeViaProvider, isProviderSuccess, extractProviderReference } from '../../shared/vtu.ts';
 import { assertPinForPurchase } from '../../shared/security.ts';
 
@@ -135,6 +136,11 @@ export default async function(req: Request): Promise<Response> {
           amount: payable, transactionId, status: 'Successful',
           date: new Date().toISOString(), providerReference
         }
+      });
+      await sendTransactionalSms(service, {
+        smsType: 'TRANSACTION_SUCCESS', userId: user.id,
+        phone: (profile && profile.phone) || null, transactionId,
+        data: { service: `Airtime (${network})`, amount: payable, recipient: phoneNumber, transactionId }
       });
       return Response.json({ transaction, wallet: debit.wallet });
     }

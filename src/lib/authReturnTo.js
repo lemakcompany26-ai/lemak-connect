@@ -22,6 +22,11 @@ export function safeReturnTo() {
     }
     const path = url.pathname + url.search;
     if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) return "/app";
+    // A signed-in user must never be sent back to the marketing landing page
+    // or to another auth screen — always land them on their dashboard.
+    if (path === "/" || ["/login", "/register", "/forgot-password", "/reset-password"].includes(url.pathname)) {
+      return "/app";
+    }
     return path;
   } catch {
     return "/app";

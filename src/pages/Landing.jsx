@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import PublicNavbar from '@/components/public/PublicNavbar';
 import PublicFooter from '@/components/public/PublicFooter';
 import HeroSection from '@/components/landing/HeroSection';
@@ -12,17 +11,9 @@ import WhySection from '@/components/landing/WhySection';
 // Public marketing page. Signed-in users opening the app here are routed
 // straight to their dashboard instead of seeing the landing page again.
 export default function Landing() {
-  const [authState, setAuthState] = useState('public');
+  const { isAuthenticated, authChecked } = useAuth();
 
-  useEffect(() => {
-    let mounted = true;
-    base44.auth.isAuthenticated()
-      .then((authed) => { if (mounted && authed) setAuthState('authed'); })
-      .catch(() => { /* stay public */ });
-    return () => { mounted = false; };
-  }, []);
-
-  if (authState === 'authed') return <Navigate to="/app" replace />;
+  if (authChecked && isAuthenticated) return <Navigate to="/app" replace />;
 
   return (
     <div className="min-h-screen bg-background">

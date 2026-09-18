@@ -29,9 +29,12 @@ export default async function(req: Request): Promise<Response> {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     const service = base44.asServiceRole;
 
-    const url = new URL(req.url);
-    const rpID = url.hostname;
-    const origin = url.origin;
+    // The WebAuthn ceremony runs on whatever page the user's browser is on,
+    // which can differ from the host serving this function (builder preview
+    // domains, custom domains). Trust the browser's own Origin header first.
+    const originHeader = req.headers.get('origin');
+    const origin = originHeader || new URL(req.url).origin;
+    const rpID = new URL(origin).hostname;
 
     const body = await req.json().catch(() => ({}));
     const action = String(body.action || '');
@@ -61,12 +64,22 @@ export default async function(req: Request): Promise<Response> {
           userVerification: 'required'
         }
       });
+      const challenge = toBase64url(options.challenge);
       await service.entities.BiometricChallenge.deleteMany({ userId: user.id, type: 'register' });
       await service.entities.BiometricChallenge.create({
-        userId: user.id, type: 'register', value: options.challenge,
+        userId: user.id, type: 'register', value: challenge,
         expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS).toISOString()
       });
-      return Response.json({ options });
+      // JSON cannot carry raw byte arrays — the browser would receive a broken
+      // object and the ceremony would fail. Serialize challenge and user id
+      // as base64url strings, exactly what the client-side helpers expect.
+      return Response.json({
+        options: {
+          ...options,
+          challenge,
+          user: { ...options.user, id: toBase64url(options.user.id) }
+        }
+      });
     }
 
     if (action === 'register_complete') {
@@ -123,12 +136,13 @@ export default async function(req: Request): Promise<Response> {
         userVerification: 'required',
         allowCredentials: [{ id: credential.credentialId }]
       });
+      const challenge = toBase64url(options.challenge);
       await service.entities.BiometricChallenge.deleteMany({ userId: user.id, type: 'assert' });
       await service.entities.BiometricChallenge.create({
-        userId: user.id, type: 'assert', value: options.challenge,
+        userId: user.id, type: 'assert', value: challenge,
         expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS).toISOString()
       });
-      return Response.json({ options });
+      return Response.json({ options: { ...options, challenge } });
     }
 
     if (action === 'assert_complete') {

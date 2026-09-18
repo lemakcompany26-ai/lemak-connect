@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, Bell } from 'lucide-react';
+import { LogOut, Bell } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useApp } from '@/lib/AppContext';
 import { AppProvider } from '@/lib/AppContext';
 import { formatNairaShort } from '@/lib/format';
 import Logo from '@/components/Logo';
 import { APP_NAV, SERVICE_NAV, ACCOUNT_NAV, NavItem } from '@/components/app/NavItems';
+import BottomNav from '@/components/app/BottomNav';
 
 function Sidebar({ onNavigate }) {
   const { logout } = useAuth();
@@ -37,7 +38,6 @@ function ShellInner() {
   const { refresh } = useApp();
   const navigate = useNavigate();
   const [checked, setChecked] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { wallet, profile } = useApp();
 
   useEffect(() => {
@@ -71,20 +71,8 @@ function ShellInner() {
       <aside className="hidden lg:block fixed inset-y-0 left-0 w-64 z-40">
         <Sidebar />
       </aside>
-      {sidebarOpen && (
-        <>
-          <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setSidebarOpen(false)} />
-          <aside className="lg:hidden fixed inset-y-0 left-0 w-64 z-50 animate-slide-in">
-            <Sidebar onNavigate={() => setSidebarOpen(false)} />
-          </aside>
-        </>
-      )}
-
       <div className="lg:pl-64 flex flex-col min-h-screen">
-        <header className="sticky top-0 z-30 h-14 border-b border-border bg-background/80 backdrop-blur flex items-center gap-3 px-4">
-          <button className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-muted" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Menu">
-            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+        <header className="sticky top-0 z-30 min-h-14 border-b border-border bg-background/80 backdrop-blur flex items-center gap-3 px-4 safe-top">
           <div className="lg:hidden"><Logo /></div>
           <div className="flex-1" />
           <button
@@ -101,10 +89,11 @@ function ShellInner() {
             {(profile && profile.fullName ? profile.fullName[0] : '?').toUpperCase()}
           </div>
         </header>
-        <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-6">
+        <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-6 pb-24 lg:pb-6">
           <Outlet />
         </main>
       </div>
+      <BottomNav />
     </div>
   );
 }

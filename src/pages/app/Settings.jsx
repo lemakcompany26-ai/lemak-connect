@@ -8,6 +8,7 @@ import { useApp } from '@/lib/AppContext';
 import { useAuth } from '@/lib/AuthContext';
 import SecurityPinCard from '@/components/app/SecurityPinCard';
 import BiometricCard from '@/components/app/BiometricCard';
+import DeleteAccountCard from '@/components/app/DeleteAccountCard';
 
 const PREF_ROWS = [
   ['transactionAlerts', 'Transactions', 'Receipts, success and refund alerts'],
@@ -80,6 +81,8 @@ export default function Settings() {
           <LogOut className="w-4 h-4 mr-2" /> Sign out
         </Button>
       </div>
+
+      <DeleteAccountCard />
     </div>
   );
 }

@@ -5,8 +5,28 @@ import * as SelectPrimitive from "@radix-ui/react-select"
 import { Check, ChevronDown, ChevronUp } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { Drawer, DrawerContent } from "@/components/ui/drawer"
+import { useIsMobile } from "@/hooks/use-mobile"
 
-const Select = SelectPrimitive.Root
+// On desktop screens the Select behaves exactly as before (Radix popover).
+// On mobile screens it automatically presents the options as a vaul bottom
+// sheet instead of a dropdown — call sites need no changes.
+const Select = ({ children, value, defaultValue, onValueChange, ...props }) => {
+  const isMobile = useIsMobile()
+  if (!isMobile) {
+    return (
+      <SelectPrimitive.Root value={value} defaultValue={defaultValue} onValueChange={onValueChange} {...props}>
+        {children}
+      </SelectPrimitive.Root>
+    )
+  }
+  return (
+    <MobileSelect value={value} defaultValue={defaultValue} onValueChange={onValueChange}>
+      {children}
+    </MobileSelect>
+  )
+}
+Select.displayName = "Select"
 
 const SelectGroup = SelectPrimitive.Group
 
@@ -106,6 +126,101 @@ const SelectSeparator = React.forwardRef(({ className, ...props }, ref) => (
     {...props} />
 ))
 SelectSeparator.displayName = SelectPrimitive.Separator.displayName
+
+// --- Mobile bottom-sheet select (vaul) --------------------------------------
+// Reads the SelectTrigger (label/placeholder) and SelectItem (values/labels)
+// from the regular call-site children, so any existing <Select> renders as a
+// bottom sheet on mobile without any call-site change.
+
+function collectSelectItems(children) {
+  return React.Children.toArray(children).flatMap((child) => {
+    if (!React.isValidElement(child)) return []
+    if (child.type === SelectItem) return [child]
+    const nested = child.props && child.props.children
+    return nested ? collectSelectItems(nested) : []
+  })
+}
+
+function findSelectTrigger(children) {
+  for (const child of React.Children.toArray(children)) {
+    if (!React.isValidElement(child)) continue
+    if (child.type === SelectTrigger) return child
+    const nested = child.props && child.props.children
+    if (nested) {
+      const found = findSelectTrigger(nested)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+function MobileSelect({ value, defaultValue, onValueChange, children }) {
+  const [open, setOpen] = React.useState(false)
+  const [internal, setInternal] = React.useState(defaultValue)
+  const current = value !== undefined ? value : internal
+
+  const items = collectSelectItems(children)
+  const trigger = findSelectTrigger(children)
+
+  let placeholder = "Select an option"
+  if (trigger) {
+    const valueEl = React.Children.toArray(trigger.props.children).find(
+      (c) => React.isValidElement(c) && c.type === SelectValue
+    )
+    if (valueEl && valueEl.props.placeholder) placeholder = valueEl.props.placeholder
+  }
+
+  const selectedItem = items.find((i) => String(i.props.value) === String(current))
+  const label = selectedItem ? selectedItem.props.children : placeholder
+
+  const select = (v) => {
+    setInternal(v)
+    if (onValueChange) onValueChange(v)
+    setOpen(false)
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={cn(
+          "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+          trigger && trigger.props.className
+        )}
+      >
+        <span className={cn("truncate", !selectedItem && "text-muted-foreground")}>{label}</span>
+        <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+      </button>
+      <Drawer open={open} onOpenChange={setOpen} shouldScaleBackground={false}>
+        <DrawerContent className="max-h-[75vh]">
+          <div className="px-2 pb-4 overflow-y-auto scrollbar-thin">
+            {items.map((item) => {
+              const disabled = !!item.props.disabled
+              const selected = String(item.props.value) === String(current)
+              return (
+                <button
+                  key={item.props.value}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => select(item.props.value)}
+                  className={cn(
+                    "w-full flex items-center justify-between rounded-lg px-4 py-3.5 text-sm text-left",
+                    selected ? "bg-primary/10 font-semibold text-primary" : "hover:bg-muted",
+                    disabled && "opacity-50 pointer-events-none"
+                  )}
+                >
+                  <span className="truncate">{item.props.children}</span>
+                  {selected && <Check className="h-4 w-4 shrink-0 ml-2" />}
+                </button>
+              )
+            })}
+          </div>
+        </DrawerContent>
+      </Drawer>
+    </>
+  )
+}
 
 export {
   Select,

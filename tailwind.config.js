@@ -64,12 +64,14 @@ module.exports = {
   			'accordion-up': { from: { height: 'var(--radix-accordion-content-height)' }, to: { height: '0' } },
   			'fade-in': { from: { opacity: 0, transform: 'translateY(8px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
   			'slide-in': { from: { transform: 'translateX(-100%)' }, to: { transform: 'translateX(0)' } },
+  			'pop-bounce': { '0%, 100%': { transform: 'translateY(0) scale(1)' }, '50%': { transform: 'translateY(-20px) scale(1.06)' } },
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out',
   			'fade-in': 'fade-in 0.4s ease-out',
   			'slide-in': 'slide-in 0.3s ease-out',
+  			'pop-bounce': 'pop-bounce 1.5s ease-in-out infinite',
   		}
   	}
   },

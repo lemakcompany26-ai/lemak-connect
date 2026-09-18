@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, Bell } from 'lucide-react';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { LogOut, Bell, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useApp } from '@/lib/AppContext';
 import { AppProvider } from '@/lib/AppContext';
@@ -8,6 +8,25 @@ import { formatNairaShort } from '@/lib/format';
 import Logo from '@/components/Logo';
 import { APP_NAV, SERVICE_NAV, ACCOUNT_NAV, NavItem } from '@/components/app/NavItems';
 import BottomNav from '@/components/app/BottomNav';
+
+// Mobile sub-page header: bottom-nav tabs keep the plain logo; any nested
+// sub-route gets a back arrow + page name so users are never trapped.
+const BOTTOM_NAV_ROUTES = ['/app', '/app/services', '/app/wallet', '/app/transactions', '/app/profile'];
+const ROUTE_TITLES = Object.fromEntries(
+  [...APP_NAV, ...SERVICE_NAV, ...ACCOUNT_NAV].map(i => [i.to, i.label])
+);
+const DYNAMIC_TITLES = [
+  ['/app/marketplace/listing/', 'Listing Details'],
+  ['/app/virtual-numbers/order/', 'Virtual Number Order']
+];
+
+function getMobileSubPageTitle(pathname) {
+  for (const [prefix, title] of DYNAMIC_TITLES) {
+    if (pathname.startsWith(prefix)) return title;
+  }
+  if (BOTTOM_NAV_ROUTES.includes(pathname)) return '';
+  return ROUTE_TITLES[pathname] || '';
+}
 
 function Sidebar({ onNavigate }) {
   const { logout } = useAuth();
@@ -39,6 +58,8 @@ function ShellInner() {
   const navigate = useNavigate();
   const [checked, setChecked] = useState(false);
   const { wallet, profile } = useApp();
+  const location = useLocation();
+  const mobileTitle = getMobileSubPageTitle(location.pathname);
 
   useEffect(() => {
     let mounted = true;
@@ -73,7 +94,22 @@ function ShellInner() {
       </aside>
       <div className="lg:pl-64 flex flex-col min-h-screen">
         <header className="sticky top-0 z-30 min-h-14 border-b border-border bg-background/80 backdrop-blur flex items-center gap-3 px-4 safe-top">
-          <div className="lg:hidden"><Logo /></div>
+          <div className="lg:hidden flex items-center gap-1.5 min-w-0">
+            {mobileTitle ? (
+              <>
+                <button
+                  onClick={() => (window.history.state && window.history.state.idx > 0 ? navigate(-1) : navigate('/app'))}
+                  aria-label="Go back"
+                  className="p-1.5 -ml-1.5 rounded-lg hover:bg-muted shrink-0"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <span className="text-sm font-bold truncate">{mobileTitle}</span>
+              </>
+            ) : (
+              <Logo />
+            )}
+          </div>
           <div className="flex-1" />
           <button
             onClick={() => navigate('/app/wallet')}

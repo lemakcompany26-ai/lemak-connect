@@ -106,6 +106,13 @@
       min-width: 44px;
     }
   }
+  /* Prevent long-press text highlights on interactive elements:
+     buttons, links, badges (role-based), custom tabs and clickable list cards */
+  button, a, [role="button"], [role="menuitem"], [role="tab"], [role="tablist"],
+  [role="option"], [role="switch"], [role="checkbox"], [role="radio"], .cursor-pointer {
+    -webkit-user-select: none;
+    user-select: none;
+  }
 }
 
 @layer utilities {

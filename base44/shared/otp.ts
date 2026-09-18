@@ -122,6 +122,61 @@ const SMSPOOL_COUNTRY = 'US';
 const SMSPOOL_USD_NGN = 1600;
 let smspoolServicesCache = null;
 
+// SMSPool serves most ISO country short codes; these are the most requested.
+// Fleexa exposes its own live country list via /sms4/countries.
+const SMSPOOL_COUNTRIES = [
+  { code: 'US', name: 'United States' },
+  { code: 'NG', name: 'Nigeria' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'PL', name: 'Poland' },
+  { code: 'PT', name: 'Portugal' },
+  { code: 'RO', name: 'Romania' },
+  { code: 'RU', name: 'Russia' },
+  { code: 'UA', name: 'Ukraine' },
+  { code: 'TR', name: 'Turkey' },
+  { code: 'EG', name: 'Egypt' },
+  { code: 'ZA', name: 'South Africa' },
+  { code: 'GH', name: 'Ghana' },
+  { code: 'KE', name: 'Kenya' },
+  { code: 'IN', name: 'India' },
+  { code: 'ID', name: 'Indonesia' },
+  { code: 'PH', name: 'Philippines' },
+  { code: 'VN', name: 'Vietnam' },
+  { code: 'TH', name: 'Thailand' },
+  { code: 'MY', name: 'Malaysia' },
+  { code: 'PK', name: 'Pakistan' },
+  { code: 'BD', name: 'Bangladesh' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'MX', name: 'Mexico' },
+  { code: 'AE', name: 'United Arab Emirates' },
+  { code: 'SA', name: 'Saudi Arabia' },
+  { code: 'IL', name: 'Israel' },
+  { code: 'CN', name: 'China' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'HK', name: 'Hong Kong' },
+  { code: 'SE', name: 'Sweden' },
+  { code: 'CH', name: 'Switzerland' }
+];
+
+// Countries a provider serves, as { code, name } pairs.
+export async function listSmsCountries(server) {
+  if (isSmspool(server)) return SMSPOOL_COUNTRIES;
+  const data = await serverFetch(server, '/sms4/countries');
+  return (Array.isArray(data) ? data : [])
+    .map(c => ({
+      code: String((c && (c.id || c.code)) || '').toUpperCase(),
+      name: (c && c.name) || String((c && (c.id || c.code)) || '')
+    }))
+    .filter(c => c.code);
+}
+
 function isSmspool(server) {
   return String((server && server.id) || '').toLowerCase() === 'b';
 }
@@ -196,26 +251,26 @@ export async function listSmsServices(server) {
   return Array.isArray(data) ? data : [];
 }
 
-export async function getSmsPrice(server, serviceName) {
+export async function getSmsPrice(server, serviceName, country) {
   if (isSmspool(server)) {
     const exactName = await smspoolExactName(server, serviceName);
     if (!exactName) throw smspoolUnavailable('That service is not available on this server.');
     const data = await smspoolPost(server, '/request/price', {
-      service: exactName.name, country: SMSPOOL_COUNTRY
+      service: exactName.name, country: (country || SMSPOOL_COUNTRY).toUpperCase()
     });
     const usd = Number(data.price) || 0;
     if (!usd) throw smspoolUnavailable('No price available for this service right now.');
-    return { price_ngn: usd * SMSPOOL_USD_NGN };
+    return { price_ngn: usd * SMSPOOL_USD_NGN, success_rate: data.success_rate || null };
   }
   return await serverFetch(server, '/sms4/prices?serviceName=' + encodeURIComponent(serviceName));
 }
 
-export async function buySmsNumber(server, serviceName) {
+export async function buySmsNumber(server, serviceName, country) {
   if (isSmspool(server)) {
     const exactName = await smspoolExactName(server, serviceName);
     if (!exactName) throw smspoolUnavailable('That service is not available on this server.');
     const data = await smspoolPost(server, '/purchase/sms', {
-      service: exactName.name, country: SMSPOOL_COUNTRY
+      service: exactName.name, country: (country || SMSPOOL_COUNTRY).toUpperCase()
     });
     return {
       number: data.number, phone: data.number,

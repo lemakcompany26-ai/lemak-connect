@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, AtSign, Phone, Gift, Loader2, Zap } from 'lucide-react';
+import { User, AtSign, Phone, Loader2, Zap } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Logo from '@/components/Logo';
+import SignupPromoInput from '@/components/app/SignupPromoInput';
 
 // Shown when an authenticated user has no profile yet (e.g. Google sign-up).
 // Creates profile + wallet + notification preferences via the backend.
@@ -78,10 +79,7 @@ export default function CompleteProfile() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="promoCode">Promo Code <span className="text-muted-foreground font-normal">(optional)</span></Label>
-            <div className="relative">
-              <Gift className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input id="promoCode" value={promoCode} onChange={e => setPromoCode(e.target.value)} className="pl-10 h-12" placeholder="e.g. WELCOME10" />
-            </div>
+            <SignupPromoInput value={promoCode} onChange={setPromoCode} />
           </div>
           <Button type="submit" className="w-full h-12 font-semibold" disabled={loading}>
             {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating your wallet…</> : <><Zap className="w-4 h-4 mr-2" /> Finish setup</>}

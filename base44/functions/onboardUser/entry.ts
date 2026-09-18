@@ -22,6 +22,16 @@ export default async function(req: Request): Promise<Response> {
     const phone = String(body.phone || '').trim();
     const promoCode = String(body.promoCode || '').trim().toUpperCase();
 
+    // Server-side promo verification: only live, active codes are accepted.
+    if (promoCode) {
+      const promos = await service.entities.PromoCode.filter({ code: promoCode }, '-created_date', 10);
+      const promo = promos && promos[0];
+      const promoInvalid = () => Response.json({ error: 'That promo code is not valid or active. Please clear it and try again.' }, { status: 400 });
+      if (!promo || !promo.isActive) return promoInvalid();
+      if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) return promoInvalid();
+      if (promo.totalUsageLimit != null && (promo.totalUsageCount || 0) >= Number(promo.totalUsageLimit)) return promoInvalid();
+    }
+
     if (!fullName) return Response.json({ error: 'Full name is required' }, { status: 400 });
     if (!username || username.length < 3) return Response.json({ error: 'Username must be at least 3 characters' }, { status: 400 });
 

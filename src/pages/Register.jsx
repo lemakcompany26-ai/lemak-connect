@@ -4,12 +4,13 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserPlus, Mail, Lock, Loader2, User, AtSign, Phone, Gift } from "lucide-react";
+import { UserPlus, Mail, Lock, Loader2, User, AtSign, Phone } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { toast } from "@/components/ui/use-toast";
 import { safeReturnTo } from "@/lib/authReturnTo";
+import SignupPromoInput from "@/components/app/SignupPromoInput";
 
 export default function Register() {
   const [fullName, setFullName] = useState("");
@@ -249,17 +250,7 @@ export default function Register() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="promoCode">Promo Code <span className="text-muted-foreground font-normal">(optional)</span></Label>
-          <div className="relative">
-            <Gift className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            <Input
-              id="promoCode"
-              type="text"
-              placeholder="e.g. WELCOME10"
-              value={promoCode}
-              onChange={(e) => setPromoCode(e.target.value)}
-              className="pl-10 h-12"
-            />
-          </div>
+          <SignupPromoInput value={promoCode} onChange={setPromoCode} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>

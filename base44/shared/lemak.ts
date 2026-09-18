@@ -325,3 +325,48 @@ export function emailTemplate(title, bodyHtml) {
     </div>
   </div></body></html>`;
 }
+
+// Credit the signup promo bonus (PromoCode.signupBonus) to a user's wallet
+// once, after their first real funding. Called from the funding webhook and
+// the verify endpoint — idempotent per user+code and recorded as a
+// PromoRedemption so the bonus can never be paid twice.
+export async function applySignupPromoBonus(service, userId) {
+  try {
+    const profiles = await service.entities.UserProfile.filter({ userId }, '-created_date', 1);
+    const profile = profiles && profiles[0];
+    if (!profile || !profile.referredByPromoCode) return { credited: false };
+    const code = String(profile.referredByPromoCode).trim().toUpperCase();
+    const promos = await service.entities.PromoCode.filter({ code }, '-created_date', 10);
+    const promo = promos && promos[0];
+    if (!promo || !promo.isActive) return { credited: false };
+    if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) return { credited: false };
+    if (promo.totalUsageLimit != null && (promo.totalUsageCount || 0) >= Number(promo.totalUsageLimit)) {
+      return { credited: false };
+    }
+    const bonus = round2(Number(promo.signupBonus) || 0);
+    if (bonus <= 0) return { credited: false };
+    const redemptions = await service.entities.PromoRedemption.filter({ userId }, '-created_date', 100);
+    if (redemptions && redemptions.some(r => r.promoCodeId === promo.id)) return { credited: false };
+    const credited = await creditWallet(service, {
+      userId, transactionId: null, type: 'promo', amount: bonus,
+      reference: code, description: `Welcome bonus — promo code ${code}`,
+      idempotencyKey: `signup-bonus-${userId}-${promo.id}`
+    });
+    if (credited.duplicated) return { credited: false };
+    await service.entities.PromoRedemption.create({
+      promoCodeId: promo.id, promoCode: code, userId,
+      transactionId: credited.ledger ? credited.ledger.transactionId : null,
+      discountApplied: 0, redeemedAt: new Date().toISOString()
+    });
+    await service.entities.PromoCode.update(promo.id, { totalUsageCount: (promo.totalUsageCount || 0) + 1 });
+    await notifyUser(service, {
+      userId, type: 'wallet',
+      title: 'Welcome bonus received 🎁',
+      message: `₦${bonus.toLocaleString()} welcome bonus from promo code ${code} was added to your wallet.`,
+      actionUrl: '/app/wallet'
+    });
+    return { credited: true, bonus, code };
+  } catch (e) {
+    return { credited: false };
+  }
+}

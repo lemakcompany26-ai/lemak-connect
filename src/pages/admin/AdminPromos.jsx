@@ -15,7 +15,7 @@ const SERVICE_SLUGS = ['airtime', 'data', 'electricity', 'cable', 'betting', 'ed
 function PromoForm({ onSaved }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ code: '', description: '', discountType: 'percentage', discountValue: '', minimumTransaction: '0', maximumDiscount: '', expiresAt: '', totalUsageLimit: '', perUserLimit: '1', restrictedToService: 'any', newUsersOnly: false });
+  const [form, setForm] = useState({ code: '', description: '', discountType: 'percentage', discountValue: '', signupBonus: '', minimumTransaction: '0', maximumDiscount: '', expiresAt: '', totalUsageLimit: '', perUserLimit: '1', restrictedToService: 'any', newUsersOnly: false });
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -28,6 +28,7 @@ function PromoForm({ onSaved }) {
         description: form.description || null,
         discountType: form.discountType,
         discountValue: Number(form.discountValue) || 0,
+        signupBonus: form.signupBonus === '' ? 0 : Number(form.signupBonus) || 0,
         minimumTransaction: Number(form.minimumTransaction) || 0,
         maximumDiscount: form.maximumDiscount === '' ? null : Number(form.maximumDiscount),
         expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
@@ -71,6 +72,7 @@ function PromoForm({ onSaved }) {
             <div className="space-y-2"><Label>Minimum Transaction (₦)</Label><Input type="number" value={form.minimumTransaction} onChange={e => set('minimumTransaction', e.target.value)} /></div>
             <div className="space-y-2"><Label>Max Discount (₦, for %)</Label><Input type="number" value={form.maximumDiscount} onChange={e => set('maximumDiscount', e.target.value)} placeholder="No cap" /></div>
             <div className="space-y-2"><Label>Per-User Limit</Label><Input type="number" value={form.perUserLimit} onChange={e => set('perUserLimit', e.target.value)} /></div>
+            <div className="space-y-2"><Label>Signup Bonus (₦)</Label><Input type="number" value={form.signupBonus} onChange={e => set('signupBonus', e.target.value)} placeholder="0 — none" /></div>
             <div className="space-y-2"><Label>Total Usage Limit</Label><Input type="number" value={form.totalUsageLimit} onChange={e => set('totalUsageLimit', e.target.value)} placeholder="Unlimited" /></div>
             <div className="space-y-2"><Label>Expires</Label><Input type="date" value={form.expiresAt} onChange={e => set('expiresAt', e.target.value)} /></div>
           </div>
@@ -86,7 +88,7 @@ function PromoForm({ onSaved }) {
             <Label className="text-sm">New users only</Label>
             <Switch checked={form.newUsersOnly} onCheckedChange={v => set('newUsersOnly', v)} />
           </div>
-          <Button type="submit" className="w-full h-11 font-semibold" disabled={saving || !form.code || !form.discountValue}>
+          <Button type="submit" className="w-full h-11 font-semibold" disabled={saving || !form.code || (!form.discountValue && !form.signupBonus)}>
             {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 'Create Promo'}
           </Button>
         </form>
@@ -144,6 +146,7 @@ export default function AdminPromos() {
                 <span className="text-xs font-semibold">
                   {p.discountType === 'percentage' ? `${p.discountValue}% off` : `${formatNaira(p.discountValue)} off`}
                 </span>
+                {p.signupBonus ? <span className="text-[10px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">{formatNaira(p.signupBonus)} signup bonus</span> : null}
                 {p.restrictedToService && <span className="text-[10px] font-bold uppercase bg-muted px-2 py-0.5 rounded-full">{p.restrictedToService}</span>}
                 {p.newUsersOnly && <span className="text-[10px] font-bold uppercase bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full">New users</span>}
               </div>

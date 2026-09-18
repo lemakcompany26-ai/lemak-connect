@@ -20,6 +20,11 @@
       "type": "number",
       "description": "Percentage (0-100) or fixed amount in NGN"
     },
+    "signupBonus": {
+      "type": "number",
+      "default": 0,
+      "description": "Wallet bonus (NGN) credited to a new user after their first real funding. 0 for normal discount codes"
+    },
     "minimumTransaction": {
       "type": "number",
       "default": 0

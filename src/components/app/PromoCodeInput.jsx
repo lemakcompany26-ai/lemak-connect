@@ -49,7 +49,9 @@ export default function PromoCodeInput({ serviceSlug, providerCost, onValidated 
       {state === 'valid' && (
         <div className="flex items-center gap-2 text-sm font-medium text-emerald-600">
           <CheckCircle2 className="w-4 h-4" />
-          Promo applied — you save {formatNaira(result.discount)}
+          {result.signupBonus
+            ? 'Active welcome-bonus code — no discount on this purchase'
+            : `Promo applied — you save ${formatNaira(result.discount)}`}
         </div>
       )}
       {state === 'invalid' && (

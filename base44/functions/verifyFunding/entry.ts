@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { secrets } from 'base44:runtime';
-import { generateTransactionId, creditWallet, notifyUser, round2 } from '../../shared/lemak.ts';
+import { generateTransactionId, creditWallet, notifyUser, round2, applySignupPromoBonus } from '../../shared/lemak.ts';
 import { sendTransactionalEmail } from '../../shared/emails.ts';
 import { sendTransactionalSms } from '../../shared/sms.ts';
 
@@ -85,6 +85,9 @@ export default async function(req: Request): Promise<Response> {
         balance: credited && credited.wallet ? credited.wallet.balance : null
       }
     });
+    // ₦1,000 welcome bonus for new users who signed up with a live promo
+    // code — credited once, right after their first real funding.
+    await applySignupPromoBonus(service, user.id);
 
     return Response.json({ credited: true, amount: nairaAmount, reference });
   } catch (error) {

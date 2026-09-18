@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Check, Copy, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// Yellow-themed verification feed. OTP messages arrive as large amber
-// bubbles with a one-tap copy; system messages stay subtle on the left.
-export default function OtpChatFeed({ messages, emptyHint }) {
+// Yellow-themed verification feed. The buyer's own presence — the purchased
+// number/email address, their messages and their OTP codes — arrives as
+// large amber bubbles on the right with one-tap copy; system messages stay
+// subtle on the left.
+export default function OtpChatFeed({ messages, emptyHint, highlight }) {
   const [copied, setCopied] = useState(null);
 
   const copy = (id, text) => {
@@ -15,29 +17,60 @@ export default function OtpChatFeed({ messages, emptyHint }) {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin space-y-3 px-4 py-4">
-      {messages.length === 0 && (
+      {messages.length === 0 && !(highlight && highlight.value) && (
         <div className="h-full flex items-center justify-center text-xs text-slate-500 text-center px-6">
           {emptyHint}
         </div>
       )}
+
+      {/* The purchased number / email address — the buyer's identity in the chat */}
+      {highlight && highlight.value && (
+        <div className="flex justify-end">
+          <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-amber-400 text-slate-900 border border-amber-300 px-4 py-3">
+            <div className="text-[10px] font-extrabold uppercase tracking-wide text-slate-700">
+              {highlight.label}
+            </div>
+            <div className="text-base font-extrabold font-mono break-all select-all mt-1">{highlight.value}</div>
+            <Button
+              size="sm"
+              className="h-8 mt-2 rounded-full px-3 bg-slate-900 text-amber-400 hover:bg-slate-800"
+              onClick={() => copy('handle', highlight.value)}
+            >
+              {copied === 'handle'
+                ? <><Check className="w-3.5 h-3.5 mr-1" /> Copied</>
+                : <><Copy className="w-3.5 h-3.5 mr-1" /> Copy</>}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {messages.map(m => {
-        if (m.isOtp) {
+        // Buyer-side bubbles: OTP codes and the buyer's own messages.
+        if (m.isOtp || m.senderRole === 'buyer') {
           return (
             <div key={m.id} className="flex justify-end">
               <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-amber-400 text-slate-900 border border-amber-300 px-4 py-3">
                 <div className="text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1 text-slate-700">
-                  <KeyRound className="w-3 h-3" /> Verification message
+                  {m.isOtp
+                    ? <><KeyRound className="w-3 h-3" /> Verification message</>
+                    : (m.senderName || 'You')}
                 </div>
-                <div className="text-lg font-extrabold font-mono tracking-widest break-all mt-1 select-all">{m.content}</div>
-                <Button
-                  size="sm"
-                  className="h-8 mt-2 rounded-full px-3 bg-slate-900 text-amber-400 hover:bg-slate-800"
-                  onClick={() => copy(m.id, m.content)}
-                >
-                  {copied === m.id
-                    ? <><Check className="w-3.5 h-3.5 mr-1" /> Copied</>
-                    : <><Copy className="w-3.5 h-3.5 mr-1" /> Copy OTP</>}
-                </Button>
+                <div className={m.isOtp
+                  ? 'text-lg font-extrabold font-mono tracking-widest break-all mt-1 select-all'
+                  : 'text-sm font-semibold break-words mt-1'}>
+                  {m.content}
+                </div>
+                {m.isOtp && (
+                  <Button
+                    size="sm"
+                    className="h-8 mt-2 rounded-full px-3 bg-slate-900 text-amber-400 hover:bg-slate-800"
+                    onClick={() => copy(m.id, m.content)}
+                  >
+                    {copied === m.id
+                      ? <><Check className="w-3.5 h-3.5 mr-1" /> Copied</>
+                      : <><Copy className="w-3.5 h-3.5 mr-1" /> Copy OTP</>}
+                  </Button>
+                )}
               </div>
             </div>
           );

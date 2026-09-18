@@ -329,6 +329,18 @@ export default async function(req: Request): Promise<Response> {
     // markups ever leave the backend.
     // One fee-rule read per request, reused for every price computed below —
     // avoids hammering the database with repeated pricing lookups.
+    // Real per-month rent cost. The provider's areas endpoint quotes a unit
+    // price far below what a rental actually charges, so rentals are priced
+    // from the admin-configured real provider cost (floor); the app charges
+    // are then added on top by the fee rules, exactly like every service.
+    const getRentFloor = async () => {
+      try {
+        const rows = await service.entities.AdminSetting.filter({ key: 'vn_rent_cost_ngn_per_month' }, '-created_date', 1);
+        const v = rows && rows[0] ? Number(rows[0].value) : NaN;
+        return isFinite(v) && v > 0 ? v : 7400;
+      } catch (e) { return 7400; }
+    };
+
     const makePricer = async () => {
       const rules = await service.entities.FeeRule.filter({ isActive: true }, '-priority', 100);
       const rule = (rules || []).find(r => r.scope === 'service' && r.serviceSlug === 'virtual_number') ||
@@ -398,10 +410,10 @@ export default async function(req: Request): Promise<Response> {
           rentServices = [...new Set((rApps || [])
             .map(a => String(a.serviceName || a.id || a.name || '').toLowerCase())
             .filter(Boolean))].sort();
+          const rentFloor = await getRentFloor();
           const areaResults = [];
           for (const a of rAreas || []) {
-            const unit = Number(a.unit_price_ngn) || 0;
-            if (!unit) continue;
+            const unit = Math.max(Number(a.unit_price_ngn) || 0, rentFloor);
             const durations = [];
             for (const m of [1, 3, 12]) {
               const pricing = pricer(unit * m);
@@ -829,12 +841,12 @@ export default async function(req: Request): Promise<Response> {
         listRentServices(server).catch(() => []),
         listRentAreas(server).catch(() => [])
       ]);
+      const rentFloor = await getRentFloor();
       const areaResults = [];
       for (const a of areas || []) {
-        const unit = Number(a.unit_price_ngn) || 0;
+        const unit = Math.max(Number(a.unit_price_ngn) || 0, rentFloor);
         const durations = [];
         for (const m of [1, 3, 12]) {
-          if (!unit) continue;
           const pricing = await calculatePrice(service, 'virtual_number', unit * m);
           durations.push({ months: m, customerPrice: pricing.customerPrice });
         }
@@ -931,7 +943,7 @@ export default async function(req: Request): Promise<Response> {
             if (server.provider === 'smspool') continue;
             const areas = await listRentAreas(server).catch(() => []);
             const area = (areas || []).find(a => String(a.area_code || a.id || '').toUpperCase() === countryCode) || (areas || [])[0];
-            const unit = area ? Number(area.unit_price_ngn) || 0 : 0;
+            const unit = area ? Math.max(Number(area.unit_price_ngn) || 0, await getRentFloor()) : 0;
             if (unit > 0) {
               chosen = server;
               providerCost = unit * months;
@@ -1021,8 +1033,14 @@ export default async function(req: Request): Promise<Response> {
       const d = data || {};
       // Provider status markers (e.g. "WAITING") must never be treated as an OTP.
       const NON_CODE_VALUES = ['RECEIVED', 'WAIT', 'WAITING', 'PENDING', 'CANCELLED', 'CANCELED', 'EXPIRED', 'NULL', 'NONE', ''];
-      const code = d.sms_code || d.otp || d.email_code ||
-        (d.code && !NON_CODE_VALUES.includes(String(d.code).toUpperCase()) ? d.code : null);
+      const pickCode = v => {
+        const s = v == null ? '' : String(v).trim();
+        if (!s) return null;
+        const up = s.toUpperCase();
+        return NON_CODE_VALUES.includes(up) || up === 'TRUE' || up === 'FALSE' ? null : s;
+      };
+      const code = pickCode(d.sms_code) || pickCode(d.otp) || pickCode(d.email_code) ||
+        pickCode(d.sms) || pickCode(d.code_received) || pickCode(d.code);
 
       if ((d.status === 'cancelled' || d.status === 'canceled') && !code) {
         const nowIso = new Date().toISOString();

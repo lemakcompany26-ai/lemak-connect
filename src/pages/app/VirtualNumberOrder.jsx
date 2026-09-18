@@ -217,7 +217,14 @@ export default function VirtualNumberOrder() {
         </div>
 
         {/* Message feed */}
-        <OtpChatFeed messages={messages} emptyHint={emptyHint} />
+        <OtpChatFeed
+          messages={messages}
+          emptyHint={emptyHint}
+          highlight={order.handle ? {
+            label: isEmail ? 'Your temporary email address' : isRent ? 'Your rented number' : 'Your number',
+            value: order.handle
+          } : null}
+        />
 
         {/* Footer */}
         <div className="border-t border-mk-border px-4 py-3 space-y-2.5 sheet-safe-bottom">

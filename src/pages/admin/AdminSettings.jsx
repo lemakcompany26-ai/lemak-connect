@@ -30,6 +30,7 @@ const DEFAULT_SETTINGS = [
     label: 'Google Sheet — BUY NOW catalogue',
     category: 'google_links'
   },
+  { key: 'vn_rent_cost_ngn_per_month', value: '7400', label: 'Virtual Numbers — real provider rent cost (₦ per month)', category: 'general' },
   { key: 'support_email', value: 'lemakcompany26@gmail.com', label: 'Support email', category: 'general' },
   { key: 'support_phone', value: '09022143559', label: 'Support phone / WhatsApp', category: 'general' }
 ];

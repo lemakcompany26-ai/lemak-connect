@@ -56,6 +56,7 @@ const AdminMarketplace = lazy(() => import('@/pages/admin/AdminMarketplace'));
 const AdminVirtualNumbers = lazy(() => import('@/pages/admin/AdminVirtualNumbers'));
 const AdminSettings = lazy(() => import('@/pages/admin/AdminSettings'));
 const AdminSystemHealth = lazy(() => import('@/pages/admin/AdminSystemHealth'));
+const AdminProfitCalculator = lazy(() => import('@/pages/admin/AdminProfitCalculator'));
 
 const RouteFallback = () => (
   <div className="fixed inset-0 flex items-center justify-center">
@@ -142,6 +143,7 @@ const AuthenticatedApp = () => {
           <Route path="/admin/virtual-numbers" element={<AdminVirtualNumbers />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
           <Route path="/admin/system-health" element={<AdminSystemHealth />} />
+          <Route path="/admin/profit-calculator" element={<AdminProfitCalculator />} />
         </Route>
       </Route>
 

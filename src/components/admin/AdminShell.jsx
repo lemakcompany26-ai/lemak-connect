@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, ReceiptText, BadgePercent, Ticket, Store, Settings, Activity, ShieldCheck, Phone } from 'lucide-react';
+import { LayoutDashboard, Users, ReceiptText, BadgePercent, Ticket, Store, Settings, Activity, ShieldCheck, Phone, Calculator } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import Logo from '@/components/Logo';
@@ -17,6 +17,7 @@ const NAV = [
   { to: '/admin/promos', label: 'Promo Codes', icon: Ticket },
   { to: '/admin/marketplace', label: 'Marketplace', icon: Store },
   { to: '/admin/virtual-numbers', label: 'Virtual Numbers', icon: Phone },
+  { to: '/admin/profit-calculator', label: 'Profit Calculator', icon: Calculator },
   { to: '/admin/settings', label: 'Settings', icon: Settings },
   { to: '/admin/system-health', label: 'System Health', icon: Activity }
 ];

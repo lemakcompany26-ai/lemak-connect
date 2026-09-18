@@ -1,13 +1,13 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, LayoutGrid, Store, Wallet, UserCircle } from 'lucide-react';
+import { LayoutDashboard, LayoutGrid, Wallet, ReceiptText, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const TABS = [
   { to: '/app', label: 'Home', icon: LayoutDashboard },
   { to: '/app/services', label: 'Services', icon: LayoutGrid },
-  { to: '/app/marketplace', label: 'Market', icon: Store },
+  { to: '/app/transactions', label: 'Transactions', icon: ReceiptText },
   { to: '/app/wallet', label: 'Wallet', icon: Wallet },
-  { to: '/app/settings', label: 'Account', icon: UserCircle }
+  { to: '/app/profile', label: 'Profile', icon: UserCircle }
 ];
 
 // Mobile-only bottom navigation. Replaces the slide-in side menu on phones;

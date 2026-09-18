@@ -7,7 +7,8 @@ import { sendTransactionalEmail } from '../../shared/emails.ts';
 import {
   getOtpServers, getOtpServer, otpServerStatus, listSmsServices, listSmsCountries, getSmsPrice,
   buySmsNumber, checkSmsRequest, cancelSmsRequest, listEmailProducts,
-  buyEmailOtp, checkEmailOtp, cancelEmailOtp
+  buyEmailOtp, checkEmailOtp, cancelEmailOtp,
+  listRentAreas, listRentServices, buyRentNumber, listRentSms
 } from '../../shared/otp.ts';
 
 // Virtual number rental market + unified live OTP service.
@@ -191,9 +192,13 @@ export default async function(req: Request): Promise<Response> {
         const rows = await service.entities.VirtualNumberListing.filter({ id }, '-created_date', 1);
         if (rows && rows[0]) numbers[id] = rows[0].number;
       }
+      // Internal provider fields are stripped; isLive marks provider orders.
       return Response.json({
         ok: true,
-        rentals: (rentals || []).map(r => ({ ...r, number: r.deliveredHandle || numbers[r.listingId] || null }))
+        rentals: (rentals || []).map(r => {
+          const { provider, serverId, providerOrderId, ...safe } = r;
+          return { ...safe, isLive: !!r.provider, number: r.deliveredHandle || numbers[r.listingId] || null };
+        })
       });
     }
 
@@ -381,7 +386,7 @@ export default async function(req: Request): Promise<Response> {
 
     // Create a live provider order — shared by the unified buy flow and the
     // legacy per-server rent action. Provider details stay strictly internal.
-    const createLiveOrder = async ({ server, product, serviceName, providerCostInput, customerPrice, country }) => {
+    const createLiveOrder = async ({ server, product, serviceName, providerCostInput, customerPrice, country, months = 1, autoRenew = false }) => {
       let providerCost = providerCostInput;
       const transactionId = generateTransactionId();
       let debit;
@@ -402,6 +407,7 @@ export default async function(req: Request): Promise<Response> {
       let handle = '';
       let providerOrderId = '';
       let providerExpiresIn = 0;
+      let rentExpiresAt = '';
       try {
         if (product === 'sms') {
           const order = await buySmsNumber(server, serviceName, country && country.code);
@@ -421,10 +427,17 @@ export default async function(req: Request): Promise<Response> {
             return { ok: false, error: 'The price just changed. Please try again — you were refunded.', status: 409 };
           }
           if (paid > 0) providerCost = paid;
-        } else {
+        } else if (product === 'email') {
           const order = await buyEmailOtp(server, serviceName);
           handle = String((order && (order.email || order.address)) || '');
           providerOrderId = String((order && (order.id || order.emailId)) || '');
+        } else {
+          // Long-term rented number (1-12 months, pre-paid, not cancellable)
+          const order = await buyRentNumber(server, serviceName, months);
+          handle = String((order && order.number) || '');
+          providerOrderId = String((order && order.order_id) || '');
+          rentExpiresAt = String((order && order.expire_at) || '');
+          if (order && order.cost_ngn > 0) providerCost = order.cost_ngn;
         }
       } catch (e) {
         await creditWallet(service, {
@@ -452,12 +465,15 @@ export default async function(req: Request): Promise<Response> {
         ? (providerExpiresIn > 0 ? Math.min(7, Math.max(1, Math.ceil(providerExpiresIn / 60))) : 7)
         : 60;
       const nowIso = new Date().toISOString();
-      const expiresAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+      const expiresAt = product === 'rent'
+        ? (rentExpiresAt || new Date(Date.now() + months * 30 * 24 * 60 * 60 * 1000).toISOString())
+        : new Date(Date.now() + minutes * 60 * 1000).toISOString();
       const rental = await service.entities.NumberRental.create({
         rentalRef: makeRef('VN'), transactionId,
         listingId: `PROVIDER-${server.id.toUpperCase()}`,
         buyerUserId: user.id, sellerUserId: 'system',
-        service: product === 'sms' ? `${serviceName} (live number)` : `${serviceName} (email OTP)`,
+        ...(product === 'rent' ? { duration: String(months), autoRenew } : {}),
+        service: product === 'sms' ? `${serviceName} (live number)` : product === 'email' ? `${serviceName} (email OTP)` : `${serviceName} (rented number)`,
         country: (country && country.name) || (server.id === 'b' ? 'United States' : null),
         amount: customerPrice, sellerPayout: 0, commission: 0,
         product, provider: (server.provider || (server.id === 'b' ? 'smspool' : 'fleexa')), serverId: server.id,
@@ -467,7 +483,7 @@ export default async function(req: Request): Promise<Response> {
       });
       await service.entities.Transaction.create({
         transactionId, userId: user.id, type: 'virtual_number',
-        service: `Virtual ${product === 'sms' ? 'Number' : 'Email OTP'} — ${serviceName}`,
+        service: product === 'sms' ? `Virtual Number — ${serviceName}` : product === 'email' ? `Email OTP — ${serviceName}` : `Rented Number — ${serviceName} (${months} month${months > 1 ? 's' : ''})`,
         provider: (server.provider || (server.id === 'b' ? 'smspool' : 'fleexa')), amount: customerPrice,
         fee: customerPrice - providerCost, providerCost, customerPrice,
         status: 'processing', recipient: handle,
@@ -481,7 +497,9 @@ export default async function(req: Request): Promise<Response> {
         senderRole: 'system', senderName: 'Lemak Connect',
         content: product === 'sms'
           ? `Your live ${serviceName} number is ${handle}. Use it now — your verification message will appear here automatically within ${minutes} minutes.`
-          : `Your temporary email address is ${handle}. Use it to receive your verification code — it will appear here automatically.`
+          : product === 'email'
+            ? `Your temporary email address is ${handle}. Use it to receive your verification code — it will appear here automatically.`
+            : `Your dedicated ${serviceName} number is ${handle}. It is yours for ${months} month${months > 1 ? 's' : ''} — every SMS it receives appears here automatically.`
       });
       return { ok: true, rental, handle, wallet: debit.wallet };
     };
@@ -548,6 +566,7 @@ export default async function(req: Request): Promise<Response> {
           service: rental.service, country: rental.country || '',
           product: rental.product || null, handle: rental.deliveredHandle || null,
           amount: rental.amount, status: rental.status,
+          duration: rental.duration || null, autoRenew: !!rental.autoRenew,
           otpReceived: !!rental.otpReceived,
           refundStatus: rental.refundStatus || null, refundAmount: rental.refundAmount || 0,
           expiresAt: rental.expiresAt, createdAt: rental.created_date
@@ -606,8 +625,8 @@ export default async function(req: Request): Promise<Response> {
       for (const s of getOtpServers()) {
         const entry = {
           id: s.id,
-          label: s.label,
-          providerName: s.provider === 'smspool' ? 'SMSPool' : 'Fleexa',
+          label: `Server ${s.id.toUpperCase()}`,
+          supportsRent: s.provider !== 'smspool',
           configured: Boolean(s.url && s.key),
           online: false,
           smsStock: 0,
@@ -637,6 +656,41 @@ export default async function(req: Request): Promise<Response> {
         servers.push(entry);
       }
       return Response.json({ ok: true, servers });
+    }
+
+    // Rent Number catalogue for one server: rentable apps and areas with
+    // duration pricing. Customers only ever see our final price.
+    if (action === 'rent_options') {
+      const server = getOtpServer(body.serverId);
+      if (!server || !server.url || !server.key) return Response.json({ error: 'Choose an available server' }, { status: 400 });
+      if (server.provider === 'smspool') {
+        return Response.json({ error: 'Long-term rentals are not available on this server.' }, { status: 400 });
+      }
+      const [apps, areas] = await Promise.all([
+        listRentServices(server).catch(() => []),
+        listRentAreas(server).catch(() => [])
+      ]);
+      const areaResults = [];
+      for (const a of areas || []) {
+        const unit = Number(a.unit_price_ngn) || 0;
+        const durations = [];
+        for (const m of [1, 3, 12]) {
+          if (!unit) continue;
+          const pricing = await calculatePrice(service, 'virtual_number', unit * m);
+          durations.push({ months: m, customerPrice: pricing.customerPrice });
+        }
+        areaResults.push({
+          code: String(a.area_code || a.id || '').toUpperCase(),
+          name: a.name || a.area_title || a.full_name || 'United States',
+          minMonth: Number(a.min_month) || 1,
+          durations
+        });
+      }
+      return Response.json({
+        ok: true,
+        apps: [...new Set((apps || []).map(a => String(a.serviceName || a.id || a.name || '').toLowerCase()).filter(Boolean))].sort(),
+        areas: areaResults
+      });
     }
 
     if (action === 'provider_price') {
@@ -672,10 +726,12 @@ export default async function(req: Request): Promise<Response> {
       if (!server || !server.url || !server.key) {
         return Response.json({ error: 'Choose an available server' }, { status: 400 });
       }
-      const product = body.product === 'email' ? 'email' : 'sms';
+      const product = ['email', 'rent'].includes(body.product) ? body.product : 'sms';
       let serviceName = '';
       let providerCost = 0;
       let country = null;
+      let months = 1;
+      let autoRenew = false;
 
       if (product === 'sms') {
         serviceName = String(body.serviceName || '').trim().toLowerCase().slice(0, 40);
@@ -690,18 +746,36 @@ export default async function(req: Request): Promise<Response> {
         const price = await getSmsPrice(server, serviceName, code);
         providerCost = Number(price.price_ngn) || 0;
         if (!providerCost) return Response.json({ error: 'This service is not available right now' }, { status: 502 });
-      } else {
+      } else if (product === 'email') {
         serviceName = String(body.domain || '').trim().slice(0, 80);
         const products = await listEmailProducts(server);
         const match = (products || []).find(p => p.id === serviceName);
         if (!match) return Response.json({ error: 'That email domain is not available' }, { status: 400 });
         providerCost = Number(match.price_ngn) || 0;
         if (!providerCost) return Response.json({ error: 'This email domain is not available right now' }, { status: 502 });
+      } else {
+        // Long-term rented number (1-12 months, pre-paid, not cancellable)
+        if (server.provider === 'smspool') {
+          return Response.json({ error: 'Long-term rentals are not available on this server.' }, { status: 400 });
+        }
+        serviceName = String(body.serviceName || '').trim().slice(0, 40);
+        if (!serviceName) return Response.json({ error: 'Choose the service you need the number for' }, { status: 400 });
+        months = Math.min(12, Math.max(1, Math.floor(Number(body.months) || 1)));
+        autoRenew = !!body.autoRenew;
+        const code = String(body.country || 'US').trim().toUpperCase().slice(0, 2);
+        const areas = await listRentAreas(server).catch(() => []);
+        const area = (areas || []).find(a => String(a.area_code || a.id || '').toUpperCase() === code) || (areas || [])[0];
+        if (!area) return Response.json({ error: 'Rentals are not available right now' }, { status: 502 });
+        country = { code: String(area.area_code || area.id || code).toUpperCase(), name: area.name || area.area_title || 'United States' };
+        const unit = Number(area.unit_price_ngn) || 0;
+        if (!unit) return Response.json({ error: 'Rental pricing is not available right now' }, { status: 502 });
+        providerCost = unit * months;
       }
       const pricing = await calculatePrice(service, 'virtual_number', providerCost);
       const result = await createLiveOrder({
         server, product, serviceName, country,
-        providerCostInput: providerCost, customerPrice: pricing.customerPrice
+        providerCostInput: providerCost, customerPrice: pricing.customerPrice,
+        months, autoRenew
       });
       if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
       return Response.json({ ok: true, rental: result.rental, handle: result.handle, wallet: result.wallet });
@@ -714,6 +788,38 @@ export default async function(req: Request): Promise<Response> {
       }
       const server = getOtpServer(rental.serverId);
       if (!server) return Response.json({ error: 'Order server not found' }, { status: 400 });
+
+      // Rented numbers: every SMS the dedicated number receives is posted to
+      // the private chat. The rental stays active for its full period.
+      if (rental.product === 'rent') {
+        const items = await listRentSms(server, rental.providerOrderId);
+        const existing = await service.entities.RentalMessage.filter({ rentalId: rental.id }, 'created_date', 200);
+        const seen = new Set((existing || []).map(m => m.content));
+        let added = 0;
+        for (const item of items || []) {
+          const text = String(item.sms_text || item.text || item.message || item.sms || item.code || '').trim();
+          if (!text || seen.has(text)) continue;
+          await service.entities.RentalMessage.create({
+            rentalId: rental.id, buyerUserId: rental.buyerUserId,
+            senderRole: 'system', senderName: 'Lemak Connect',
+            content: text.slice(0, 500), isOtp: true
+          });
+          seen.add(text);
+          added++;
+        }
+        if (added > 0 && !rental.otpReceived) {
+          await service.entities.NumberRental.update(rental.id, {
+            otpReceived: true, otpReceivedAt: new Date().toISOString()
+          }).catch(() => null);
+          await notifyUser(service, {
+            userId: rental.buyerUserId, type: 'virtual_number',
+            title: 'New message on your rented number 🔑',
+            message: `A message arrived on your rented number (${rental.rentalRef}) — open your order screen to view it.`,
+            actionUrl: '/app/virtual-numbers/order/' + rental.id
+          });
+        }
+        return Response.json({ ok: true, status: added > 0 ? 'completed' : 'waiting', otp: added > 0 });
+      }
 
       let data = null;
       try {
@@ -803,6 +909,9 @@ export default async function(req: Request): Promise<Response> {
       }
       if (rental.status !== 'active') {
         return Response.json({ error: `Order already ${rental.status}` }, { status: 400 });
+      }
+      if (rental.product === 'rent') {
+        return Response.json({ error: 'Long-term rentals cannot be cancelled once purchased.' }, { status: 400 });
       }
       const otps = await service.entities.RentalMessage.filter({ rentalId: rental.id, isOtp: true }, '-created_date', 1);
       if (otps && otps[0]) {

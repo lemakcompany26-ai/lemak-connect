@@ -41,9 +41,19 @@
       "type": "string",
       "enum": [
         "sms",
-        "email"
+        "email",
+        "rent"
       ],
-      "description": "Live provider rentals only: SMS number or temporary email OTP address"
+      "description": "Live provider rentals only: one-time SMS number, temporary email OTP address, or long-term rented number"
+    },
+    "duration": {
+      "type": "string",
+      "description": "Long-term rentals only: purchased length in months, e.g. '1', '3', '12'"
+    },
+    "autoRenew": {
+      "type": "boolean",
+      "default": false,
+      "description": "Long-term rentals only: buyer opted to extend the rental when the period ends"
     },
     "provider": {
       "type": "string",

@@ -47,7 +47,7 @@ export default function RentalChatDialog({ rental, role, onClose }) {
     setTyping({ buyer: rental.buyerTypingAt || null, seller: rental.sellerTypingAt || null });
     setLiveStatus(rental.status);
     load();
-    if (rental.provider && rental.status === 'active') {
+    if (rental.isLive && rental.status === 'active') {
       base44.functions.invoke('virtualNumbers', { action: 'provider_check', rentalId: rental.id }).catch(() => {});
     }
     const unsubscribe = base44.entities.RentalMessage.subscribe((event) => {
@@ -133,8 +133,8 @@ export default function RentalChatDialog({ rental, role, onClose }) {
             <div className="h-full flex items-center justify-center text-xs text-slate-500 text-center px-4">
               {role === 'seller'
                 ? 'The buyer is waiting — paste the OTP code as soon as it arrives.'
-                : rental.provider
-                  ? 'Your OTP is being fetched from the provider — it will appear here automatically.'
+                : rental.isLive
+                  ? 'Your OTP is on its way — it will appear here automatically.'
                   : 'Waiting for the seller to send your OTP. You can also ask questions here.'}
             </div>
           )}
@@ -162,7 +162,7 @@ export default function RentalChatDialog({ rental, role, onClose }) {
 
         <TypingIndicator
           visible={(() => {
-            if (role === 'buyer' && rental.provider && status === 'active' && !otpDelivered) return true;
+            if (role === 'buyer' && rental.isLive && status === 'active' && !otpDelivered) return true;
             const otherTypingAt = role === 'buyer' ? typing.seller : typing.buyer;
             return Boolean(otherTypingAt && Date.now() - new Date(otherTypingAt).getTime() < TYPING_FRESH_MS);
           })()}

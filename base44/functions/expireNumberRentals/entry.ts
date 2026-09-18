@@ -15,9 +15,22 @@ export default async function(req: Request): Promise<Response> {
     const expired = (rentals || []).filter(r => r.expiresAt && new Date(r.expiresAt) <= now);
 
     let refunded = 0;
+    let ended = 0;
     const failures = [];
     for (const rental of expired) {
       try {
+        if (rental.product === 'rent') {
+          // Long-term rentals are pre-paid for the full period — no refund.
+          await service.entities.NumberRental.update(rental.id, { status: 'expired' });
+          await notifyUser(service, {
+            userId: rental.buyerUserId, type: 'virtual_number',
+            title: 'Rental period ended',
+            message: `Your rented number (${rental.rentalRef}) has reached the end of its period. Rent a new number any time from Virtual Numbers.`,
+            actionUrl: '/app/virtual-numbers'
+          });
+          ended++;
+          continue;
+        }
         if (rental.provider && rental.serverId) {
           const server = getOtpServer(rental.serverId);
           if (server) {
@@ -79,7 +92,7 @@ export default async function(req: Request): Promise<Response> {
     }
 
     return Response.json({
-      ok: true, checked: (rentals || []).length, expired: expired.length, refunded, failures
+      ok: true, checked: (rentals || []).length, expired: expired.length, refunded, ended, failures
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

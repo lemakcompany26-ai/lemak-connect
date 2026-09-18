@@ -341,3 +341,70 @@ export async function cancelEmailOtp(server, emailId) {
     body: JSON.stringify({ requestId: emailId })
   });
 }
+
+// ---------- Long-term number rentals (Rent Number service) ----------
+// Only the Fleexa-compatible server offers long-term rentals; the secondary
+// server does not, so all rent requests there fail with a customer-safe
+// message. Endpoints (monthly numbers, 1-12 months):
+//   GET  /rent/sms4/apps               — rentable services
+//   GET  /rent/sms4/areas              — rentable areas with monthly unit pricing
+//   POST /rent/sms4/buy                — rent a number (appName + time in months)
+//   GET  /rent/sms4/sms?rentalId=...   — messages received on a rented number
+// Rentals cannot be cancelled once purchased.
+
+function rentUnavailable() {
+  const err = new Error('Long-term rentals are not available on this server.');
+  err.statusCode = 400;
+  return err;
+}
+
+export function supportsRentals(server) {
+  return !isSmspool(server);
+}
+
+export async function listRentServices(server) {
+  if (!supportsRentals(server)) throw rentUnavailable();
+  const data = await serverFetch(server, '/rent/sms4/apps');
+  return Array.isArray(data) ? data : [];
+}
+
+export async function listRentAreas(server) {
+  if (!supportsRentals(server)) throw rentUnavailable();
+  const data = await serverFetch(server, '/rent/sms4/areas');
+  return Array.isArray(data) ? data : [];
+}
+
+// The rent-buy response carries the charged cost at the top level (outside
+// `data`), so this uses a full-payload fetch instead of the trimmed helper.
+export async function buyRentNumber(server, appName, months) {
+  if (!supportsRentals(server)) throw rentUnavailable();
+  if (!server || !server.url || !server.key) {
+    const err = new Error('This OTP server is not configured.');
+    err.statusCode = 503;
+    throw err;
+  }
+  const res = await fetch(server.url.replace(/\/+$/, '') + '/rent/sms4/buy', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${server.key}`
+    },
+    body: JSON.stringify({ appName, time: String(months) })
+  });
+  let payload = null;
+  try { payload = await res.json(); } catch (e) { payload = null; }
+  if (!res.ok || (payload && payload.success === false)) throw providerError(payload, res.status);
+  const data = (payload && payload.data !== undefined) ? payload.data : payload;
+  return {
+    number: String((data && (data.number || data.phone)) || ''),
+    expire_at: String((data && data.expire_at) || ''),
+    order_id: String((data && (data.rental_id || data.order_id || data.id)) || ''),
+    cost_ngn: Number((payload && payload.cost_ngn) || (data && (data.cost_ngn || data.amount_paid))) || 0
+  };
+}
+
+export async function listRentSms(server, rentalId) {
+  if (!supportsRentals(server)) throw rentUnavailable();
+  const data = await serverFetch(server, '/rent/sms4/sms?rentalId=' + encodeURIComponent(String(rentalId)));
+  return Array.isArray(data) ? data : ((data && (data.messages || data.sms)) || []);
+}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Ban, Loader2, MessageSquare, Phone, Timer } from 'lucide-react';
+import { ArrowLeft, Ban, CalendarClock, Loader2, MessageSquare, Phone, Timer } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -68,7 +68,14 @@ export default function VirtualNumberOrder() {
   const mm = String(Math.floor(remaining / 60000)).padStart(2, '0');
   const ss = String(Math.floor((remaining % 60000) / 1000)).padStart(2, '0');
   const isActive = order && order.status === 'active';
-  const canCancel = isActive && !order.otpReceived;
+  const isRent = order && order.product === 'rent';
+  const canCancel = isActive && !order.otpReceived && !isRent;
+  const statusLabel = isRent && isActive
+    ? `Active — yours for ${order.duration || '1'} month${(order.duration || '1') !== '1' ? 's' : ''}`
+    : (STATUS_LABELS[order.status] || order.status);
+  const expiryDate = order && order.expiresAt
+    ? new Date(order.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+    : '';
 
   const cancelRequest = async () => {
     setBusy(true);
@@ -122,12 +129,20 @@ export default function VirtualNumberOrder() {
             </h1>
             <p className="text-xs text-slate-400 mt-1 font-mono">{order.rentalRef}</p>
           </div>
-          {isActive && (
+          {isActive && !isRent && (
             <div className={'shrink-0 rounded-xl border px-3 py-2 text-center ' + (remaining > 0 ? 'border-mk-blue/40 bg-mk-blue/10' : 'border-destructive/40 bg-destructive/10')}>
               <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-300 uppercase tracking-wide">
                 <Timer className="w-3 h-3 text-mk-blue" /> Time remaining
               </div>
               <div className="text-lg font-extrabold text-white font-mono tabular-nums">{mm}:{ss}</div>
+            </div>
+          )}
+          {isActive && isRent && (
+            <div className="shrink-0 rounded-xl border border-mk-blue/40 bg-mk-blue/10 px-3 py-2 text-center">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-300 uppercase tracking-wide">
+                <CalendarClock className="w-3 h-3 text-mk-blue" /> Rented until
+              </div>
+              <div className="text-sm font-extrabold text-white mt-0.5">{expiryDate}</div>
             </div>
           )}
         </div>
@@ -148,7 +163,7 @@ export default function VirtualNumberOrder() {
           <div className="rounded-xl bg-mk-card border border-mk-border px-3.5 py-3">
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Status</div>
             <div className={'text-sm font-bold mt-1 ' + (order.status === 'completed' ? 'text-emerald-400' : order.status === 'active' ? 'text-mk-blue' : 'text-slate-300')}>
-              {STATUS_LABELS[order.status] || order.status}
+              {statusLabel}
             </div>
           </div>
         </div>
@@ -157,14 +172,19 @@ export default function VirtualNumberOrder() {
         {order.handle && (
           <div className="rounded-2xl border border-mk-blue/40 bg-mk-blue/10 p-4 text-center">
             <div className="text-[10px] font-bold text-slate-300 uppercase tracking-wide">
-              {order.product === 'email' ? 'Your temporary email address' : 'Your number'}
+              {order.product === 'email' ? 'Your temporary email address' : isRent ? 'Your rented number' : 'Your number'}
             </div>
             <div className="text-xl font-extrabold text-white font-mono mt-1 break-all">{order.handle}</div>
           </div>
         )}
 
         {/* Cancel & refund */}
-        {isActive && (
+        {isActive && isRent && (
+          <p className="text-[11px] text-slate-500 text-center">
+            Long-term rentals cannot be cancelled once purchased.
+          </p>
+        )}
+        {isActive && !isRent && (
           confirmCancel ? (
             <div className="rounded-2xl border border-mk-border bg-mk-card p-4 space-y-3">
               <p className="text-sm text-slate-200">
@@ -223,7 +243,9 @@ export default function VirtualNumberOrder() {
           ))}
         </div>
         {isActive && !order.otpReceived && (
-          <p className="text-[11px] text-slate-500 animate-pulse">Waiting for verification message…</p>
+          isRent
+            ? <p className="text-[11px] text-mk-blue-soft">Your rented number is live — every SMS it receives appears below automatically.</p>
+            : <p className="text-[11px] text-slate-500 animate-pulse">Waiting for verification message…</p>
         )}
       </div>
     </div>

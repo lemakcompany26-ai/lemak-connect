@@ -10,7 +10,7 @@ import ListingCard from '@/components/vnum/ListingCard';
 import RentalCard from '@/components/vnum/RentalCard';
 import RentalChatDialog from '@/components/vnum/RentalChatDialog';
 import CreateListingForm from '@/components/vnum/CreateListingForm';
-import ProviderBrowse from '@/components/vnum/ProviderBrowse';
+import OtpFlow from '@/components/vnum/OtpFlow';
 import { formatNaira } from '@/lib/format';
 
 export default function VirtualNumbers() {
@@ -74,7 +74,7 @@ export default function VirtualNumbers() {
   };
 
   const cancel = async (rental) => {
-    if (rental.provider) {
+    if (rental.isLive) {
       await call({ action: 'provider_cancel', rentalId: rental.id }, 'Rental cancelled', 'You were refunded in full.');
     } else {
       await call({ action: 'cancel', rentalId: rental.id }, 'Rental cancelled', 'You were refunded in full.');
@@ -94,7 +94,7 @@ export default function VirtualNumbers() {
   // open. When it arrives it lands in the rental chat + a notification.
   useEffect(() => {
     const activeProvider = (myRentals || [])
-      .filter(r => r.provider && r.status === 'active')
+      .filter(r => r.isLive && r.status === 'active')
       .slice(0, 3);
     if (!activeProvider.length) return;
     const timer = setInterval(async () => {
@@ -124,11 +124,11 @@ export default function VirtualNumbers() {
           <Phone className="w-6 h-6 text-mk-blue" /> Virtual Numbers
         </h1>
         <p className="text-sm text-slate-400 mt-1">
-          Rent a number, receive your OTP in a private chat, and get auto-refunded if the window expires.
+          SMS OTP, Email OTP or a long-term rented number — everything is delivered in your private chat.
         </p>
         <div className="mt-3">
           <span className="inline-flex items-center rounded-full border border-mk-border bg-mk-card px-2.5 py-1 text-[10px] font-semibold text-slate-300">
-            Live numbers & temporary email addresses — OTP delivered privately
+            Live numbers, temporary emails & long-term rentals — delivered privately
           </span>
         </div>
       </div>
@@ -143,7 +143,7 @@ export default function VirtualNumbers() {
         </TabsList>
 
         <TabsContent value="browse" className="mt-5 space-y-5">
-          <ProviderBrowse
+          <OtpFlow
             onRented={(rental) => navigate('/app/virtual-numbers/order/' + rental.id)}
           />
 
@@ -168,7 +168,7 @@ export default function VirtualNumbers() {
             {myRentals === null && <div className="py-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-mk-blue" /></div>}
             {myRentals && myRentals.length === 0 && <div className="text-xs text-slate-500 py-2">You haven't rented any numbers yet.</div>}
             {myRentals && myRentals.map(r => (
-              <RentalCard key={r.id} rental={r} role="buyer" busy={busy} onComplete={complete} onCancel={cancel} onChat={(rental) => rental.provider ? navigate('/app/virtual-numbers/order/' + rental.id) : setChat({ rental, role: 'buyer' })} />
+              <RentalCard key={r.id} rental={r} role="buyer" busy={busy} onComplete={complete} onCancel={cancel} onChat={(rental) => rental.isLive ? navigate('/app/virtual-numbers/order/' + rental.id) : setChat({ rental, role: 'buyer' })} />
             ))}
           </div>
           <div className="space-y-3">

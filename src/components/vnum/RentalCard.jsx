@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Clock, MessageCircle, Timer, XCircle } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Clock, MessageCircle, Timer, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatNaira } from '@/lib/format';
 
@@ -18,9 +18,13 @@ export default function RentalCard({ rental, role, busy, onComplete, onCancel, o
   }, []);
 
   const isBuyer = role === 'buyer';
+  const isRent = rental.product === 'rent';
   const remaining = rental.expiresAt ? Math.max(0, new Date(rental.expiresAt).getTime() - now) : 0;
   const mm = String(Math.floor(remaining / 60000)).padStart(2, '0');
   const ss = String(Math.floor((remaining % 60000) / 1000)).padStart(2, '0');
+  const expiryDate = rental.expiresAt
+    ? new Date(rental.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+    : '';
 
   return (
     <div className="rounded-2xl bg-mk-card border border-mk-border p-4">
@@ -44,17 +48,21 @@ export default function RentalCard({ rental, role, busy, onComplete, onCancel, o
         </div>
       )}
 
-      {rental.status === 'active' && (
+      {rental.status === 'active' && (isRent ? (
+        <div className="mt-3 flex items-center gap-2 text-xs font-bold text-mk-blue-soft">
+          <CalendarClock className="w-4 h-4" /> Rented until {expiryDate}
+        </div>
+      ) : (
         <div className="mt-3 flex items-center gap-2 text-xs font-bold text-mk-blue-soft">
           <Timer className="w-4 h-4" /> {mm}:{ss} remaining
         </div>
-      )}
+      ))}
 
       <div className="mt-3 flex items-center gap-2 flex-wrap">
         <Button size="sm" variant="ghost" className="h-9 text-slate-300 hover:text-white font-semibold" disabled={busy} onClick={() => onChat(rental)}>
           <MessageCircle className="w-3.5 h-3.5 mr-1" /> Chat / OTP
         </Button>
-        {isBuyer && rental.status === 'active' && !rental.provider && (
+        {isBuyer && rental.status === 'active' && !rental.isLive && (
           <>
             <Button size="sm" className="h-9 ml-auto bg-mk-blue hover:bg-mk-blue/90 text-white font-bold" disabled={busy} onClick={() => onComplete(rental)}>
               <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Mark received
@@ -64,7 +72,7 @@ export default function RentalCard({ rental, role, busy, onComplete, onCancel, o
             </Button>
           </>
         )}
-        {isBuyer && rental.status === 'active' && rental.provider && (
+        {isBuyer && rental.status === 'active' && rental.isLive && !isRent && (
           <>
             <span className="ml-auto text-[11px] text-mk-blue-soft flex items-center gap-1">
               <Clock className="w-3.5 h-3.5" /> Waiting for your OTP…
@@ -73,6 +81,11 @@ export default function RentalCard({ rental, role, busy, onComplete, onCancel, o
               <XCircle className="w-3.5 h-3.5 mr-1" /> Cancel
             </Button>
           </>
+        )}
+        {isBuyer && rental.status === 'active' && rental.isLive && isRent && (
+          <span className="ml-auto text-[11px] text-mk-blue-soft flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5" /> Rented · active for {rental.duration || '1'} month{(rental.duration || '1') !== '1' ? 's' : ''}
+          </span>
         )}
         {!isBuyer && rental.status === 'active' && (
           <span className="ml-auto text-[11px] text-slate-500 flex items-center gap-1">

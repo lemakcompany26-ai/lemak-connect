@@ -1,8 +1,25 @@
+import { useEffect } from 'react';
 import { CheckCircle2, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { firePurchaseConversion } from '@/lib/ads';
+
+// Transaction references already counted this session — guards against
+// remounts double-firing the purchase conversion.
+const firedRefs = new Set();
 
 // Shared purchase success screen with the transaction reference.
 export default function PurchaseSuccess({ title, subtitle, transaction, onReset, resetLabel = 'Buy again', children }) {
+  // Google Ads PURCHASE conversion — fires once per transaction reference.
+  useEffect(() => {
+    const ref = transaction && transaction.transactionId;
+    if (!ref || firedRefs.has(ref)) return;
+    firedRefs.add(ref);
+    firePurchaseConversion({
+      value: transaction.customerPrice != null ? transaction.customerPrice : transaction.amount,
+      transactionId: ref,
+    });
+  }, [transaction]);
+
   return (
     <div className="max-w-md mx-auto text-center py-8 animate-fade-in">
       <div className="w-16 h-16 mx-auto rounded-full bg-emerald-100 flex items-center justify-center">

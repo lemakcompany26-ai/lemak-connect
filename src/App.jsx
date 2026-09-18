@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { GADS_CONVERSION_ID } from '@/lib/ads';
 import AppShell from '@/components/app/AppShell';
 import AdminShell from '@/components/admin/AdminShell';
 
@@ -66,7 +67,40 @@ const RouteFallback = () => (
 );
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
+
+  // Google Ads SIGNUP conversion: Base44 signups finish off the app's own
+  // pages and land back authenticated, so fire on the first authenticated
+  // render — once, and only for brand-new accounts.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !user || !user.id) return;
+    // brand-new signup, not a returning login: created_date within the
+    // delayed OTP/resend window (Google/social signups are near-instant)
+    const createdDate = String(user.created_date || '');
+    const createdDateUtc = /(?:Z|[+-]\d{2}:?\d{2})$/.test(createdDate)
+      ? createdDate
+      : createdDate + 'Z';
+    const createdAtMs = Date.parse(createdDateUtc);
+    const isNewSignup = Number.isFinite(createdAtMs) &&
+      Date.now() - createdAtMs < 24 * 60 * 60 * 1000;
+    const key = '_aw_signup_fired_AW-18458743728/q8gECLiox_scELCn6OFE_' + user.id;
+    if (!isNewSignup || localStorage.getItem(key)) return;
+    // gtag may not exist yet (the bootstrap effect in App runs later), so
+    // retry briefly rather than skipping for good
+    let tries = 0;
+    const fire = () => {
+      if (!window.gtag) { if (tries++ < 20) setTimeout(fire, 250); return; }
+      // re-check inside the callback: a remount can start a second retry
+      // loop that also passed the guard before gtag existed
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, '1');
+      window.gtag('event', 'conversion', {
+        send_to: 'AW-18458743728/q8gECLiox_scELCn6OFE',
+        transaction_id: user.id,
+      });
+    };
+    fire();
+  }, [user]);
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -157,6 +191,40 @@ const AuthenticatedApp = () => {
 
 
 function App() {
+  // Google Ads gtag bootstrap — loaded once, shared by all conversions.
+  // No page views are sent; only conversion events fire.
+  useEffect(() => {
+    if (typeof window === 'undefined' || window.__gads_loaded) return;
+    window.__gads_loaded = true;
+    window.dataLayer = window.dataLayer || [];
+    const inIframe = (() => { try { return window.self !== window.top; } catch { return true; } })();
+    window.gtag = function gtag() {
+      window.dataLayer.push(arguments);
+      if (inIframe) {
+        try {
+          const args = Array.prototype.slice.call(arguments);
+          const cmd = args[0];
+          window.parent.postMessage({
+            type: 'base44_gtag_event',
+            event: {
+              source: 'gtag',
+              timestamp: new Date().toLocaleTimeString(),
+              command: cmd,
+              params: args.slice(1),
+              type: cmd === 'event' ? (args[1] || 'event') : cmd,
+            },
+          }, '*');
+        } catch (_e) { /* relay must not break gtag */ }
+      }
+    };
+    const s = document.createElement('script');
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GADS_CONVERSION_ID;
+    s.async = true;
+    document.head.appendChild(s);
+    window.gtag('js', new Date());
+    window.gtag('config', GADS_CONVERSION_ID, { send_page_view: false });
+  }, []);
+
   // System dark mode: follow the device preference and keep the app in sync.
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');

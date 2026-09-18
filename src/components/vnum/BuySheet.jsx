@@ -5,6 +5,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } f
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { formatNaira } from '@/lib/format';
+import { firePurchaseConversion } from '@/lib/ads';
 
 // Confirm-and-buy drawer for SMS numbers and email OTP addresses. The final
 // price is re-quoted from the backend right before purchase, and the server
@@ -41,6 +42,7 @@ export default function BuySheet({ open, onOpen, product, service, country, coun
         : { action: 'provider_rent', product: 'email', domain: service });
       const d = res.data || res;
       const charged = d.rental ? Number(d.rental.amount) : null;
+      firePurchaseConversion({ value: charged, transactionId: d.rental ? d.rental.id : null });
       const displayed = quote && quote.customerPrice;
       if (displayed && charged && charged !== Number(displayed)) {
         toast({ title: 'Price updated', description: 'The final price just changed — please review the new price on your order.' });

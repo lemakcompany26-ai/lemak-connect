@@ -9,6 +9,7 @@ import { useApp } from '@/lib/AppContext';
 import { useToast } from '@/components/ui/use-toast';
 import { formatNaira, formatNairaShort, formatDate } from '@/lib/format';
 import PullToRefresh from '@/components/app/PullToRefresh';
+import { firePurchaseConversion } from '@/lib/ads';
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000, 10000, 20000];
 
@@ -42,6 +43,7 @@ export default function Wallet() {
         const d = res.data || res;
         if (d.credited) {
           await refresh();
+          firePurchaseConversion({ value: d.amount, transactionId: reference });
           toast({ title: 'Wallet funded!', description: `${formatNairaShort(d.amount)} was added to your wallet.` });
         } else {
           toast({ title: 'Payment not completed', description: 'If you were charged, it will reflect automatically once confirmed.', variant: 'destructive' });

@@ -18,6 +18,7 @@ import SellerApplicationForm from '@/components/marketplace/SellerApplicationFor
 import OrderCard from '@/components/marketplace/OrderCard';
 import OrderChatDialog from '@/components/marketplace/OrderChatDialog';
 import { formatNaira } from '@/lib/format';
+import { firePurchaseConversion } from '@/lib/ads';
 
 const DEFAULT_SELL_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScImMvathwSUGku7WKY_R4E9eo2Ps9k23Fs8qWpU0GmneNAIQ/viewform?usp=headers';
 const EMPTY_FILTERS = { search: '', platform: '', accountKind: '', monetised: '', minFollowers: '', maxFollowers: '', minPrice: '', maxPrice: '', sort: '' };
@@ -79,7 +80,8 @@ export default function Marketplace() {
     if (!buying) return;
     setBusy(true);
     try {
-      await base44.functions.invoke('marketplaceOrder', { action: 'purchase', listingId: buying.id });
+      const res = await base44.functions.invoke('marketplaceOrder', { action: 'purchase', listingId: buying.id });
+      firePurchaseConversion({ value: buying.price, transactionId: (res.data || res).transactionId });
       toast({ title: 'Order placed 🎉', description: 'Your payment is held in escrow until you confirm delivery.' });
       setBuying(null);
       load();

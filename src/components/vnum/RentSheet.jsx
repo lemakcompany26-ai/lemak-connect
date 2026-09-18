@@ -4,6 +4,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } f
 import { useToast } from '@/components/ui/use-toast';
 import ServiceList from '@/components/vnum/ServiceList';
 import RentDurationPicker from '@/components/vnum/RentDurationPicker';
+import { firePurchaseConversion } from '@/lib/ads';
 
 const flag = code => code.replace(/./g, ch => String.fromCodePoint(0x1F1E6 + ch.charCodeAt(0) - 65));
 const RENT_POPULAR = ['whatsapp', 'telegram', 'facebook', 'instagram', 'tiktok', 'google', 'amazon', 'openai'];
@@ -39,6 +40,7 @@ export default function RentSheet({ open, onOpen, service, rentServices, rentAre
         serviceName: svc, country: areaCode, months, autoRenew
       });
       const d = res.data || res;
+      firePurchaseConversion({ value: d.rental ? d.rental.amount : null, transactionId: d.rental ? d.rental.id : null });
       toast({ title: 'Number rented 🎉', description: 'Opening your number screen — every SMS it receives appears there automatically.' });
       if (onDone && d.rental) onDone({ id: d.rental.id });
     } catch (e) {

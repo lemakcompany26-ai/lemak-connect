@@ -10,7 +10,7 @@ import ListingCard from '@/components/vnum/ListingCard';
 import RentalCard from '@/components/vnum/RentalCard';
 import RentalChatDialog from '@/components/vnum/RentalChatDialog';
 import CreateListingForm from '@/components/vnum/CreateListingForm';
-import UnifiedCatalogue from '@/components/vnum/UnifiedCatalogue';
+import ProviderBrowse from '@/components/vnum/ProviderBrowse';
 import { formatNaira } from '@/lib/format';
 
 export default function VirtualNumbers() {
@@ -143,8 +143,8 @@ export default function VirtualNumbers() {
         </TabsList>
 
         <TabsContent value="browse" className="mt-5 space-y-5">
-          <UnifiedCatalogue
-            onBought={(orderId) => navigate('/app/virtual-numbers/order/' + orderId)}
+          <ProviderBrowse
+            onRented={(rental) => navigate('/app/virtual-numbers/order/' + rental.id)}
           />
 
           <div className="space-y-3">

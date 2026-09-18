@@ -5,7 +5,7 @@ import {
 } from '../../shared/lemak.ts';
 import { sendTransactionalEmail } from '../../shared/emails.ts';
 import {
-  getOtpServers, getOtpServer, otpServerStatus, listSmsServices, getSmsPrice,
+  getOtpServers, getOtpServer, otpServerStatus, listSmsServices, listSmsCountries, getSmsPrice,
   buySmsNumber, checkSmsRequest, cancelSmsRequest, listEmailProducts,
   buyEmailOtp, checkEmailOtp, cancelEmailOtp
 } from '../../shared/otp.ts';
@@ -381,7 +381,7 @@ export default async function(req: Request): Promise<Response> {
 
     // Create a live provider order — shared by the unified buy flow and the
     // legacy per-server rent action. Provider details stay strictly internal.
-    const createLiveOrder = async ({ server, product, serviceName, providerCostInput, customerPrice }) => {
+    const createLiveOrder = async ({ server, product, serviceName, providerCostInput, customerPrice, country }) => {
       let providerCost = providerCostInput;
       const transactionId = generateTransactionId();
       let debit;
@@ -404,7 +404,7 @@ export default async function(req: Request): Promise<Response> {
       let providerExpiresIn = 0;
       try {
         if (product === 'sms') {
-          const order = await buySmsNumber(server, serviceName);
+          const order = await buySmsNumber(server, serviceName, country && country.code);
           handle = String((order && (order.phone || order.number)) || '');
           providerExpiresIn = Number(order && order.expires_in) || 0;
           providerOrderId = String((order && (order.id || order.activation_id || order.requestId)) || '');
@@ -458,7 +458,7 @@ export default async function(req: Request): Promise<Response> {
         listingId: `PROVIDER-${server.id.toUpperCase()}`,
         buyerUserId: user.id, sellerUserId: 'system',
         service: product === 'sms' ? `${serviceName} (live number)` : `${serviceName} (email OTP)`,
-        country: server.id === 'b' ? 'United States' : null,
+        country: (country && country.name) || (server.id === 'b' ? 'United States' : null),
         amount: customerPrice, sellerPayout: 0, commission: 0,
         product, provider: (server.provider || (server.id === 'b' ? 'smspool' : 'fleexa')), serverId: server.id,
         providerOrderId, deliveredHandle: handle,
@@ -607,11 +607,13 @@ export default async function(req: Request): Promise<Response> {
         const entry = {
           id: s.id,
           label: s.label,
+          providerName: s.provider === 'smspool' ? 'SMSPool' : 'Fleexa',
           configured: Boolean(s.url && s.key),
           online: false,
           smsStock: 0,
           smsServices: [],
-          emailProducts: []
+          emailProducts: [],
+          countries: []
         };
         if (entry.configured) {
           try {
@@ -619,14 +621,17 @@ export default async function(req: Request): Promise<Response> {
             entry.online = true;
             try {
               const apps = await listSmsServices(s);
-              const inStock = (apps || []).filter(a => a.quantity === null || Number(a.quantity) > 0);
-              entry.smsStock = inStock.length;
-              entry.smsServices = inStock.slice(0, 150).map(a => ({ id: a.id, quantity: Number(a.quantity) }));
+              entry.smsStock = (apps || []).filter(a => a.quantity === null || Number(a.quantity) > 0).length;
+              entry.smsServices = (apps || []).slice(0, 200).map(a => ({ id: a.id, quantity: a.quantity === null ? null : Number(a.quantity) }));
             } catch (e) { /* stock list unavailable on this server */ }
             try {
               const products = await listEmailProducts(s);
               entry.emailProducts = (products || []).slice(0, 60).map(p => ({ id: p.id, price: Number(p.price_ngn) || 0 }));
             } catch (e) { /* email list unavailable on this server */ }
+            try {
+              const countries = await listSmsCountries(s);
+              entry.countries = (countries || []).map(c => ({ code: c.code, name: c.name }));
+            } catch (e) { /* country list unavailable on this server */ }
           } catch (e) { /* server offline */ }
         }
         servers.push(entry);
@@ -641,11 +646,16 @@ export default async function(req: Request): Promise<Response> {
       if (product === 'sms') {
         const serviceName = String(body.serviceName || '').trim().toLowerCase().slice(0, 40);
         if (!serviceName) return Response.json({ error: 'Choose a service first' }, { status: 400 });
-        const price = await getSmsPrice(server, serviceName);
+        const country = String(body.country || 'US').trim().toUpperCase().slice(0, 2);
+        const supported = await listSmsCountries(server).catch(() => []);
+        if (supported.length && !supported.some(c => c.code === country)) {
+          return Response.json({ ok: true, available: false });
+        }
+        const price = await getSmsPrice(server, serviceName, country);
         const providerPrice = Number(price.price_ngn) || 0;
         if (!providerPrice) return Response.json({ error: 'No price available for this service right now' }, { status: 502 });
         const pricing = await calculatePrice(service, 'virtual_number', providerPrice);
-        return Response.json({ ok: true, customerPrice: pricing.customerPrice });
+        return Response.json({ ok: true, customerPrice: pricing.customerPrice, successRate: price.success_rate || null });
       }
       const domain = String(body.domain || '').trim().slice(0, 80);
       const products = await listEmailProducts(server);
@@ -665,11 +675,19 @@ export default async function(req: Request): Promise<Response> {
       const product = body.product === 'email' ? 'email' : 'sms';
       let serviceName = '';
       let providerCost = 0;
+      let country = null;
 
       if (product === 'sms') {
         serviceName = String(body.serviceName || '').trim().toLowerCase().slice(0, 40);
         if (!serviceName) return Response.json({ error: 'Choose the service you need the number for' }, { status: 400 });
-        const price = await getSmsPrice(server, serviceName);
+        const code = String(body.country || 'US').trim().toUpperCase().slice(0, 2);
+        const supported = await listSmsCountries(server).catch(() => []);
+        const match = supported.find(c => c.code === code);
+        if (supported.length && !match) {
+          return Response.json({ error: 'That country is not available on this provider' }, { status: 400 });
+        }
+        country = { code, name: match ? match.name : code };
+        const price = await getSmsPrice(server, serviceName, code);
         providerCost = Number(price.price_ngn) || 0;
         if (!providerCost) return Response.json({ error: 'This service is not available right now' }, { status: 502 });
       } else {
@@ -682,7 +700,7 @@ export default async function(req: Request): Promise<Response> {
       }
       const pricing = await calculatePrice(service, 'virtual_number', providerCost);
       const result = await createLiveOrder({
-        server, product, serviceName,
+        server, product, serviceName, country,
         providerCostInput: providerCost, customerPrice: pricing.customerPrice
       });
       if (!result.ok) return Response.json({ error: result.error }, { status: result.status });

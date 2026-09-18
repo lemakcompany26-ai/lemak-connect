@@ -44,6 +44,11 @@
     "systemAlerts": {
       "type": "boolean",
       "default": true
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional free-form notes, up to 1000 characters"
     }
   },
   "required": [

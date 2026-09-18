@@ -33,6 +33,11 @@
     "assignedTo": {
       "type": "string",
       "description": "Admin user id for human support"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional free-form notes, up to 1000 characters"
     }
   },
   "required": [

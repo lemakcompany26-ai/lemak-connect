@@ -120,6 +120,11 @@
       "type": "string",
       "format": "date-time",
       "description": "Last time the seller was typing in the rental chat (typing indicator). For live provider rentals, refreshed while the OTP is being fetched"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional free-form notes, up to 1000 characters"
     }
   },
   "required": [

@@ -51,6 +51,11 @@
       "type": "number",
       "default": 0,
       "description": "Higher priority rules override lower ones"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional free-form notes, up to 1000 characters"
     }
   },
   "required": [

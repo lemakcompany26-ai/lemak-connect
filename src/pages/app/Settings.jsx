@@ -77,7 +77,7 @@ export default function Settings() {
         <p className="mt-2 text-xs text-muted-foreground">
           Your wallet is protected by server-side security. Only you can access your data, and every naira movement is permanently logged.
         </p>
-        <Button variant="outline" className="mt-4 w-full h-11 font-semibold" onClick={() => logout()}>
+        <Button variant="outline" className="mt-4 w-full h-11 font-semibold" onClick={() => logout('/login')}>
           <LogOut className="w-4 h-4 mr-2" /> Sign out
         </Button>
       </div>

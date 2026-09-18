@@ -26,7 +26,7 @@ function Sidebar({ onNavigate }) {
         </div>
       </nav>
       <div className="p-3 border-t border-white/10">
-        <button onClick={() => logout()} className="w-full flex items-center gap-3 rounded-xl px-3.5 h-11 text-sm text-white/80 hover:bg-white/10">
+        <button onClick={() => logout('/login')} className="w-full flex items-center gap-3 rounded-xl px-3.5 h-11 text-sm text-white/80 hover:bg-white/10">
           <LogOut className="w-5 h-5" /> Sign out
         </button>
       </div>

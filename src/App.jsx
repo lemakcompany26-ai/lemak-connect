@@ -1,57 +1,67 @@
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
-import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
-// Add page imports here
-import Landing from '@/pages/Landing';
-import ServicesPage from '@/pages/ServicesPage';
-import HowItWorks from '@/pages/HowItWorks';
-import MarketplacePublic from '@/pages/MarketplacePublic';
-import SupportPage from '@/pages/SupportPage';
-import Terms from '@/pages/Terms';
-import Privacy from '@/pages/Privacy';
-import Login from '@/pages/Login';
-import Register from '@/pages/Register';
-import ForgotPassword from '@/pages/ForgotPassword';
-import ResetPassword from '@/pages/ResetPassword';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AppShell from '@/components/app/AppShell';
 import AdminShell from '@/components/admin/AdminShell';
-import CompleteProfile from '@/pages/app/CompleteProfile';
-import Dashboard from '@/pages/app/Dashboard';
-import AppServices from '@/pages/app/Services';
-import Airtime from '@/pages/app/Airtime';
-import Data from '@/pages/app/Data';
-import Cable from '@/pages/app/Cable';
-import Betting from '@/pages/app/Betting';
-import Epin from '@/pages/app/Epin';
-import SocialGrowth from '@/pages/app/SocialGrowth';
-import ServiceSoon from '@/pages/app/ServiceSoon';
-import VirtualNumbers from '@/pages/app/VirtualNumbers';
-import VirtualNumberOrder from '@/pages/app/VirtualNumberOrder';
-import WalletPage from '@/pages/app/Wallet';
-import Transactions from '@/pages/app/Transactions';
-import Notifications from '@/pages/app/Notifications';
-import AppSupport from '@/pages/app/Support';
-import Profile from '@/pages/app/Profile';
-import AppSettings from '@/pages/app/Settings';
-import Marketplace from '@/pages/app/Marketplace';
-import ListingDetail from '@/pages/app/ListingDetail';
-import AppAnalytics from '@/pages/app/Analytics';
-import AdminDashboard from '@/pages/admin/AdminDashboard';
-import AdminUsers from '@/pages/admin/AdminUsers';
-import AdminTransactions from '@/pages/admin/AdminTransactions';
-import AdminPricing from '@/pages/admin/AdminPricing';
-import AdminPromos from '@/pages/admin/AdminPromos';
-import AdminMarketplace from '@/pages/admin/AdminMarketplace';
-import AdminVirtualNumbers from '@/pages/admin/AdminVirtualNumbers';
-import AdminSettings from '@/pages/admin/AdminSettings';
-import AdminSystemHealth from '@/pages/admin/AdminSystemHealth';
+
+// Pages are lazy-loaded (React.lazy + Suspense) so each route ships as its
+// own chunk — faster startup inside mobile WebViews. Layout/auth wrappers
+// stay eager so the shell paints instantly.
+// Add page lazy imports here
+const PageNotFound = lazy(() => import('./lib/PageNotFound'));
+const Landing = lazy(() => import('@/pages/Landing'));
+const ServicesPage = lazy(() => import('@/pages/ServicesPage'));
+const HowItWorks = lazy(() => import('@/pages/HowItWorks'));
+const MarketplacePublic = lazy(() => import('@/pages/MarketplacePublic'));
+const SupportPage = lazy(() => import('@/pages/SupportPage'));
+const Terms = lazy(() => import('@/pages/Terms'));
+const Privacy = lazy(() => import('@/pages/Privacy'));
+const Login = lazy(() => import('@/pages/Login'));
+const Register = lazy(() => import('@/pages/Register'));
+const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
+const CompleteProfile = lazy(() => import('@/pages/app/CompleteProfile'));
+const Dashboard = lazy(() => import('@/pages/app/Dashboard'));
+const AppServices = lazy(() => import('@/pages/app/Services'));
+const Airtime = lazy(() => import('@/pages/app/Airtime'));
+const Data = lazy(() => import('@/pages/app/Data'));
+const Cable = lazy(() => import('@/pages/app/Cable'));
+const Betting = lazy(() => import('@/pages/app/Betting'));
+const Epin = lazy(() => import('@/pages/app/Epin'));
+const SocialGrowth = lazy(() => import('@/pages/app/SocialGrowth'));
+const ServiceSoon = lazy(() => import('@/pages/app/ServiceSoon'));
+const VirtualNumbers = lazy(() => import('@/pages/app/VirtualNumbers'));
+const VirtualNumberOrder = lazy(() => import('@/pages/app/VirtualNumberOrder'));
+const WalletPage = lazy(() => import('@/pages/app/Wallet'));
+const Transactions = lazy(() => import('@/pages/app/Transactions'));
+const Notifications = lazy(() => import('@/pages/app/Notifications'));
+const AppSupport = lazy(() => import('@/pages/app/Support'));
+const Profile = lazy(() => import('@/pages/app/Profile'));
+const AppSettings = lazy(() => import('@/pages/app/Settings'));
+const Marketplace = lazy(() => import('@/pages/app/Marketplace'));
+const ListingDetail = lazy(() => import('@/pages/app/ListingDetail'));
+const AppAnalytics = lazy(() => import('@/pages/app/Analytics'));
+const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'));
+const AdminUsers = lazy(() => import('@/pages/admin/AdminUsers'));
+const AdminTransactions = lazy(() => import('@/pages/admin/AdminTransactions'));
+const AdminPricing = lazy(() => import('@/pages/admin/AdminPricing'));
+const AdminPromos = lazy(() => import('@/pages/admin/AdminPromos'));
+const AdminMarketplace = lazy(() => import('@/pages/admin/AdminMarketplace'));
+const AdminVirtualNumbers = lazy(() => import('@/pages/admin/AdminVirtualNumbers'));
+const AdminSettings = lazy(() => import('@/pages/admin/AdminSettings'));
+const AdminSystemHealth = lazy(() => import('@/pages/admin/AdminSystemHealth'));
+
+const RouteFallback = () => (
+  <div className="fixed inset-0 flex items-center justify-center">
+    <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+  </div>
+);
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -78,6 +88,7 @@ const AuthenticatedApp = () => {
 
   // Render the main app
   return (
+    <Suspense fallback={<RouteFallback />}>
     <Routes>
       {/* Public routes */}
       <Route path="/" element={<Landing />} />
@@ -136,6 +147,7 @@ const AuthenticatedApp = () => {
 
       <Route path="*" element={<PageNotFound />} />
     </Routes>
+    </Suspense>
   );
 };
 

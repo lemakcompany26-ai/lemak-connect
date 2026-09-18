@@ -7,7 +7,7 @@ import { AppProvider } from '@/lib/AppContext';
 import { formatNairaShort } from '@/lib/format';
 import Logo from '@/components/Logo';
 import { APP_NAV, SERVICE_NAV, ACCOUNT_NAV, NavItem } from '@/components/app/NavItems';
-import BottomNav from '@/components/app/BottomNav';
+import BottomNav, { getTabRootForPath } from '@/components/app/BottomNav';
 
 // Mobile sub-page header: bottom-nav tabs keep the plain logo; any nested
 // sub-route gets a back arrow + page name so users are never trapped.
@@ -60,6 +60,15 @@ function ShellInner() {
   const { wallet, profile } = useApp();
   const location = useLocation();
   const mobileTitle = getMobileSubPageTitle(location.pathname);
+
+  // Per-tab path memory: the deepest path visited inside each bottom-nav
+  // tab is stored, so switching tabs returns you where you left off.
+  const [tabPaths, setTabPaths] = useState({});
+  useEffect(() => {
+    const root = getTabRootForPath(location.pathname);
+    if (!root) return;
+    setTabPaths(prev => (prev[root] === location.pathname ? prev : { ...prev, [root]: location.pathname }));
+  }, [location.pathname]);
 
   useEffect(() => {
     let mounted = true;
@@ -129,7 +138,7 @@ function ShellInner() {
           <Outlet />
         </main>
       </div>
-      <BottomNav />
+      <BottomNav tabPaths={tabPaths} />
     </div>
   );
 }

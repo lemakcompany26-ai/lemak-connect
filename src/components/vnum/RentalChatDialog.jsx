@@ -77,17 +77,32 @@ export default function RentalChatDialog({ rental, role, onClose }) {
   const send = async () => {
     const content = draft.trim();
     if (!content || !rental || sending) return;
+    // Optimistic: the message appears instantly and is confirmed (or rolled
+    // back) once the server responds.
+    const optimisticId = `tmp-${Date.now()}`;
+    const isOtpFlag = role === 'seller' ? isOtp : false;
+    setMessages(prev => (prev || []).concat({
+      id: optimisticId,
+      senderRole: role,
+      senderName: 'You',
+      content,
+      isOtp: isOtpFlag,
+      created_date: new Date().toISOString(),
+      _pending: true
+    }));
+    setDraft('');
+    setIsOtp(false);
     setSending(true);
     try {
       await base44.functions.invoke('virtualNumbers', {
-        action: 'send_message', rentalId: rental.id, content, isOtp: role === 'seller' ? isOtp : false
+        action: 'send_message', rentalId: rental.id, content, isOtp: isOtpFlag
       });
-      setDraft('');
-      setIsOtp(false);
       await load();
     } catch (e) {
       const d = e.response && e.response.data;
-      if (d && d.error) setDraft(content);
+      setMessages(prev => (prev || []).filter(m => m.id !== optimisticId));
+      setDraft(content);
+      if (role === 'seller' && isOtpFlag) setIsOtp(true);
     } finally {
       setSending(false);
     }
@@ -126,7 +141,7 @@ export default function RentalChatDialog({ rental, role, onClose }) {
           {messages && messages.map(m => {
             const mine = m.senderRole === role;
             return (
-              <div key={m.id} className={'flex ' + (mine ? 'justify-end' : 'justify-start')}>
+              <div key={m.id} className={'flex ' + (mine ? 'justify-end' : 'justify-start') + (m._pending ? ' opacity-60' : '')}>
                 <div className={'max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ' + (m.isOtp
                   ? 'bg-mk-brown text-white border border-mk-brown-soft/30 rounded-br-sm'
                   : mine ? 'bg-mk-blue text-white rounded-br-sm' : 'bg-mk-card2 text-slate-200 rounded-bl-sm')}>

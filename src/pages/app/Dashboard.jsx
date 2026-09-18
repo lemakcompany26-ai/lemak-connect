@@ -6,6 +6,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatNaira, formatDate, TRANSACTION_STATUS_STYLES } from '@/lib/format';
+import PullToRefresh from '@/components/app/PullToRefresh';
 
 const QUICK_ACTIONS = [
   { to: '/app/airtime', label: 'Airtime', icon: Smartphone },
@@ -21,14 +22,17 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState(null);
   const [notifications, setNotifications] = useState(null);
 
-  useEffect(() => {
+  const loadDashboard = () => {
     base44.entities.Transaction.list('-created_date', 5).then(setTransactions).catch(() => setTransactions([]));
     base44.entities.Notification.list('-created_date', 5).then(setNotifications).catch(() => setNotifications([]));
-  }, []);
+  };
+
+  useEffect(() => { loadDashboard(); }, []);
 
   const firstName = profile && profile.fullName ? profile.fullName.split(' ')[0] : 'there';
 
   return (
+    <PullToRefresh onRefresh={loadDashboard}>
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-extrabold">Welcome back, {firstName} 👋</h1>
@@ -107,5 +111,6 @@ export default function Dashboard() {
         </Card>
       </div>
     </div>
+    </PullToRefresh>
   );
 }

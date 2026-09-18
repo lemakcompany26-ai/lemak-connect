@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatNaira, formatDate, TRANSACTION_STATUS_STYLES } from '@/lib/format';
+import PullToRefresh from '@/components/app/PullToRefresh';
 
 const FILTERS = ['all', 'successful', 'pending', 'failed'];
 
@@ -12,9 +13,11 @@ export default function Transactions() {
   const [filter, setFilter] = useState('all');
   const [selected, setSelected] = useState(null);
 
-  useEffect(() => {
+  const loadTransactions = () => {
     base44.entities.Transaction.list('-created_date', 100).then(setTransactions).catch(() => setTransactions([]));
-  }, []);
+  };
+
+  useEffect(() => { loadTransactions(); }, []);
 
   const filtered = (transactions || []).filter(t => {
     if (filter === 'all') return true;
@@ -24,6 +27,7 @@ export default function Transactions() {
   });
 
   return (
+    <PullToRefresh onRefresh={loadTransactions}>
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <div>
@@ -104,5 +108,6 @@ export default function Transactions() {
         </DialogContent>
       </Dialog>
     </div>
+    </PullToRefresh>
   );
 }

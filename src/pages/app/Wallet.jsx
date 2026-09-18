@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useApp } from '@/lib/AppContext';
 import { useToast } from '@/components/ui/use-toast';
 import { formatNaira, formatNairaShort, formatDate } from '@/lib/format';
+import PullToRefresh from '@/components/app/PullToRefresh';
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000, 10000, 20000];
 
@@ -21,9 +22,14 @@ export default function Wallet() {
   const [ledger, setLedger] = useState(null);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    base44.entities.WalletLedger.list('-created_date', 20).then(setLedger).catch(() => setLedger([]));
-  }, [wallet && wallet.balance]);
+  const loadLedger = () => base44.entities.WalletLedger.list('-created_date', 20).then(setLedger).catch(() => setLedger([]));
+
+  useEffect(() => { loadLedger(); }, [wallet && wallet.balance]);
+
+  // Pull-to-refresh: reload the activity ledger and refresh wallet data
+  const handleRefresh = async () => {
+    await Promise.all([refresh(), loadLedger()]);
+  };
 
   // Returning from Paystack — verify server-side before trusting anything
   useEffect(() => {
@@ -68,6 +74,7 @@ export default function Wallet() {
   };
 
   return (
+    <PullToRefresh onRefresh={handleRefresh}>
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-extrabold flex items-center gap-2.5"><WalletIcon className="w-6 h-6 text-primary" /> Wallet</h1>
@@ -140,5 +147,6 @@ export default function Wallet() {
         </div>
       )}
     </div>
+    </PullToRefresh>
   );
 }

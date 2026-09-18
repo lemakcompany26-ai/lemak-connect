@@ -1,4 +1,4 @@
-import { secrets } from 'base44:runtime';
+import { secrets, waitUntil } from 'base44:runtime';
 
 // Admin bootstrap emails — these get super_admin on profile creation.
 const ADMIN_EMAILS = ['lemakcompany26@gmail.com', 'dammyqueen107@gmail.com'];
@@ -175,7 +175,16 @@ export async function redeemPromo(service, promo, userId, transactionId, discoun
   } catch (e) { /* non-fatal */ }
 }
 
-// In-app notification. Non-fatal.
+// Which preference flag gates push delivery per notification type.
+const PUSH_PREF_FLAG = {
+  transaction: 'transactionAlerts', wallet: 'walletAlerts', payment: 'paymentAlerts',
+  marketplace: 'marketplaceAlerts', virtual_number: 'virtualNumberAlerts', smm: 'smmAlerts',
+  security: 'securityAlerts', system: 'systemAlerts', promotional: 'promotionalAlerts'
+};
+
+// In-app notification + native mobile push (delivered once the app has a
+// native iOS/Android build with push credentials). Push runs after the
+// response and never blocks the main transaction flow; failures are silent.
 export async function notifyUser(service, opts) {
   const { userId, type, title, message, actionUrl } = opts;
   try {
@@ -184,6 +193,24 @@ export async function notifyUser(service, opts) {
       actionUrl: actionUrl || null, isRead: false, sentEmail: false
     });
   } catch (e) { /* non-fatal */ }
+  try {
+    let allowed = true;
+    const flag = PUSH_PREF_FLAG[type];
+    if (flag) {
+      const prefs = await service.entities.NotificationPreference.filter({ userId }, '-created_date', 1);
+      if (prefs && prefs[0] && prefs[0][flag] === false) allowed = false;
+    }
+    if (allowed) {
+      waitUntil(
+        service.integrations.Core.SendPushNotification({
+          user_id: userId,
+          title: String(title || '').slice(0, 100),
+          content: String(message || '').slice(0, 240),
+          ...(actionUrl ? { action_url: actionUrl } : {})
+        }).catch(() => { /* no native build / no device registered — silent */ })
+      );
+    }
+  } catch (e) { /* push never blocks the main flow */ }
 }
 
 // Transactional email via Resend. Non-fatal, logs status by returning sent flag.

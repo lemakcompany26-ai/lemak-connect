@@ -8,6 +8,7 @@ import { formatNairaShort } from '@/lib/format';
 import Logo from '@/components/Logo';
 import { APP_NAV, SERVICE_NAV, ACCOUNT_NAV, NavItem } from '@/components/app/NavItems';
 import BottomNav, { getTabRootForPath } from '@/components/app/BottomNav';
+import BiometricLock, { appLockEnabled } from '@/components/app/BiometricLock';
 
 // Mobile sub-page header: bottom-nav tabs keep the plain logo; any nested
 // sub-route gets a back arrow + page name so users are never trapped.
@@ -57,6 +58,7 @@ function ShellInner() {
   const { refresh } = useApp();
   const navigate = useNavigate();
   const [checked, setChecked] = useState(false);
+  const [locked, setLocked] = useState(appLockEnabled());
   const { wallet, profile } = useApp();
   const location = useLocation();
   const mobileTitle = getMobileSubPageTitle(location.pathname);
@@ -94,6 +96,11 @@ function ShellInner() {
         <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
       </div>
     );
+  }
+
+  // Biometric app lock — fingerprint / Face ID before anything renders.
+  if (locked) {
+    return <BiometricLock onUnlocked={() => setLocked(false)} />;
   }
 
   return (

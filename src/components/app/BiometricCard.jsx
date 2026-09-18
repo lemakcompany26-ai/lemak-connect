@@ -4,12 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Fingerprint, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { createPlatformCredential, platformAuthenticatorAvailable } from '@/lib/webauthn';
+import { Switch } from '@/components/ui/switch';
+import { APP_LOCK_KEY } from '@/components/app/BiometricLock';
 
 // Settings card for registering/removing this device's fingerprint or
 // Face ID as an unlock method for PIN-protected purchases.
 export default function BiometricCard() {
   const { toast } = useToast();
-  const [status, setStatus] = useState(null); // { supported, registered, deviceLabel, lastUsedAt }
+  const [status, setStatus] = useState(null); // { supported, registered, deviceLabel, lastUsedAt, appLock }
   const [busy, setBusy] = useState(false);
 
   const loadStatus = useCallback(async () => {
@@ -24,7 +26,9 @@ export default function BiometricCard() {
       deviceLabel = d.deviceLabel || null;
       lastUsedAt = d.lastUsedAt || null;
     } catch (e) { /* non-fatal */ }
-    setStatus({ supported, registered, deviceLabel, lastUsedAt });
+    let lockOn = false;
+    try { lockOn = localStorage.getItem(APP_LOCK_KEY) === '1'; } catch (e) { /* ignore */ }
+    setStatus({ supported, registered, deviceLabel, lastUsedAt, appLock: lockOn });
   }, []);
 
   useEffect(() => { loadStatus(); }, [loadStatus]);
@@ -106,6 +110,20 @@ export default function BiometricCard() {
                 {status.lastUsedAt ? ' · last used ' + new Date(status.lastUsedAt).toLocaleDateString() : ''}
               </div>
             </div>
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">Lock the app on open</div>
+              <div className="text-xs text-muted-foreground">Ask for fingerprint / Face ID whenever the app starts</div>
+            </div>
+            <Switch
+              checked={!!status.appLock}
+              onCheckedChange={on => {
+                try { localStorage.setItem(APP_LOCK_KEY, on ? '1' : '0'); } catch (e) { /* ignore */ }
+                setStatus(s => ({ ...s, appLock: on }));
+                toast({ title: on ? 'App lock enabled' : 'App lock disabled' });
+              }}
+            />
           </div>
           <Button variant="outline" className="w-full h-11 font-semibold" disabled={busy} onClick={remove}>
             {busy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}

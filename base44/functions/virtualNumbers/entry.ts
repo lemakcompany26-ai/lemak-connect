@@ -323,6 +323,164 @@ export default async function(req: Request): Promise<Response> {
 
     // ---------- Unified live Virtual Numbers (providers fully hidden) ----------
 
+    // Unified customer catalogue: ONE normalized list across every configured
+    // server — services, real availability, countries, email products and
+    // rental options with final prices. No server/provider details, costs or
+    // markups ever leave the backend.
+    // One fee-rule read per request, reused for every price computed below —
+    // avoids hammering the database with repeated pricing lookups.
+    const makePricer = async () => {
+      const rules = await service.entities.FeeRule.filter({ isActive: true }, '-priority', 100);
+      const rule = (rules || []).find(r => r.scope === 'service' && r.serviceSlug === 'virtual_number') ||
+        (rules || []).find(r => r.scope === 'global') || null;
+      return (costInput) => {
+        const cost = Math.round(Number(costInput) * 100) / 100;
+        if (!rule) return { customerPrice: cost };
+        const providerCharge = Number(rule.providerCharge) || 0;
+        const fixedFee = Number(rule.fixedFee) || 0;
+        const pctFee = (cost * (Number(rule.percentageFee) || 0)) / 100;
+        const markup = (cost * (Number(rule.adminMarkup) || 0)) / 100;
+        let fee = providerCharge + fixedFee + pctFee + markup;
+        if (rule.minimumFee != null) fee = Math.max(fee, Number(rule.minimumFee));
+        if (rule.maximumFee != null) fee = Math.min(fee, Number(rule.maximumFee));
+        fee = Math.round(fee * 100) / 100;
+        return { customerPrice: Math.round((cost + fee) * 100) / 100 };
+      };
+    };
+
+    if (action === 'catalog') {
+      const pricer = await makePricer();
+      const PREFERRED = ['NG', 'US', 'GB', 'CA', 'DE', 'FR', 'IN', 'ZA', 'GH', 'KE'];
+      const countries = [];
+      const seenCountries = new Set();
+      const smsMap = new Map();
+      const emailProducts = [];
+      let rentAreas = [];
+      let rentServices = [];
+      let online = 0;
+      for (const server of getOtpServers()) {
+        if (!server.url || !server.key) continue;
+        try { await otpServerStatus(server); } catch (e) { continue; }
+        online++;
+        const [apps, cts, products] = await Promise.all([
+          listSmsServices(server).catch(() => []),
+          listSmsCountries(server).catch(() => []),
+          listEmailProducts(server).catch(() => [])
+        ]);
+        for (const c of cts || []) {
+          if (c.code && !seenCountries.has(c.code)) {
+            seenCountries.add(c.code);
+            countries.push({ code: c.code, name: c.name });
+          }
+        }
+        for (const a of apps || []) {
+          const id = String(a.id || '').toLowerCase();
+          if (!id) continue;
+          const qty = (a.quantity === null || a.quantity === undefined) ? null : Number(a.quantity);
+          if (qty === 0) continue; // confirmed out of stock on this server
+          const prev = smsMap.get(id) || { available: 0, onDemand: false };
+          if (qty === null) prev.onDemand = true;
+          else prev.available += qty;
+          smsMap.set(id, prev);
+        }
+        for (const p of products || []) {
+          const id = String(p.id || '');
+          const cost = Number(p.price_ngn) || 0;
+          if (!id || !cost || emailProducts.some(e => e.id === id)) continue;
+          const pricing = pricer(cost);
+          emailProducts.push({ id, customerPrice: pricing.customerPrice });
+        }
+        if (server.provider !== 'smspool') {
+          const [rApps, rAreas] = await Promise.all([
+            listRentServices(server).catch(() => []),
+            listRentAreas(server).catch(() => [])
+          ]);
+          rentServices = [...new Set((rApps || [])
+            .map(a => String(a.serviceName || a.id || a.name || '').toLowerCase())
+            .filter(Boolean))].sort();
+          const areaResults = [];
+          for (const a of rAreas || []) {
+            const unit = Number(a.unit_price_ngn) || 0;
+            if (!unit) continue;
+            const durations = [];
+            for (const m of [1, 3, 12]) {
+              const pricing = pricer(unit * m);
+              durations.push({ months: m, customerPrice: pricing.customerPrice });
+            }
+            areaResults.push({
+              code: String(a.area_code || a.id || '').toUpperCase(),
+              name: a.name || a.area_title || a.full_name || 'United States',
+              minMonth: Number(a.min_month) || 1,
+              durations
+            });
+          }
+          rentAreas = areaResults;
+        }
+      }
+      countries.sort((a, b) => {
+        const ia = PREFERRED.indexOf(a.code);
+        const ib = PREFERRED.indexOf(b.code);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.name.localeCompare(b.name);
+      });
+      return Response.json({
+        ok: true,
+        available: online > 0,
+        countries,
+        smsServices: [...smsMap.entries()]
+          .map(([id, v]) => ({ id, available: v.onDemand ? null : v.available }))
+          .sort((a, b) => a.id.localeCompare(b.id)),
+        emailProducts,
+        rentServices,
+        rentAreas
+      });
+    }
+
+    // Batched final-price quotes for SMS services. The backend picks the
+    // eligible server invisibly; the response carries only availability and
+    // the final customer price — never costs, markups or server details.
+    if (action === 'quote') {
+      const country = String(body.country || 'NG').trim().toUpperCase().slice(0, 2);
+      const services = [...new Set(
+        (Array.isArray(body.services) ? body.services : [body.service])
+          .map(s => String(s || '').trim().toLowerCase().slice(0, 40))
+          .filter(Boolean)
+      )].slice(0, 12);
+      if (!services.length) return Response.json({ error: 'Choose a service first' }, { status: 400 });
+      const pricer = await makePricer();
+      const serverLists = new Map();
+      const loadServerLists = async (server) => {
+        if (serverLists.has(server.id)) return serverLists.get(server.id);
+        const [apps, cts] = await Promise.all([
+          listSmsServices(server).catch(() => []),
+          listSmsCountries(server).catch(() => [])
+        ]);
+        const entry = { apps: apps || [], countries: cts || [] };
+        serverLists.set(server.id, entry);
+        return entry;
+      };
+      const prices = {};
+      for (const name of services) {
+        prices[name] = { available: false, customerPrice: null };
+        for (const server of getOtpServers()) {
+          if (!server.url || !server.key) continue;
+          try {
+            const lists = await loadServerLists(server);
+            if (lists.countries.length && !lists.countries.some(c => c.code === country)) continue;
+            const svc = lists.apps.find(a => String(a.id).toLowerCase() === name);
+            if (svc && Number(svc.quantity) === 0) continue; // out of stock here
+            const price = await getSmsPrice(server, name, country);
+            const p = Number(price && price.price_ngn) || 0;
+            if (p > 0) {
+              const pricing = pricer(p);
+              prices[name] = { available: true, customerPrice: pricing.customerPrice };
+              break;
+            }
+          } catch (e) { /* try the next server */ }
+        }
+      }
+      return Response.json({ ok: true, country, prices });
+    }
+
     // Unified catalogue: only services genuinely available from a configured
     // provider are listed. No provider names, no server ids, no fake data.
     if (action === 'unified_catalogue') {
@@ -446,7 +604,8 @@ export default async function(req: Request): Promise<Response> {
           description: `Refund — order failed (${serviceName})`,
           idempotencyKey: `vnpr-${transactionId}`
         });
-        return { ok: false, error: e.message, status: e.statusCode || 502 };
+        // Never surface raw provider/API errors to the customer.
+        return { ok: false, error: 'We could not complete your order. You were refunded — please try again.', status: 502 };
       }
 
       if (!handle || !providerOrderId) {
@@ -722,63 +881,92 @@ export default async function(req: Request): Promise<Response> {
     }
 
     if (action === 'provider_rent') {
-      const server = getOtpServer(body.serverId);
-      if (!server || !server.url || !server.key) {
-        return Response.json({ error: 'Choose an available server' }, { status: 400 });
-      }
+      // Server selection is fully automatic: the backend picks the eligible
+      // server based on availability, country, stock and price. Customers
+      // never choose — or see — which server served the order.
       const product = ['email', 'rent'].includes(body.product) ? body.product : 'sms';
       let serviceName = '';
-      let providerCost = 0;
-      let country = null;
-      let months = 1;
-      let autoRenew = false;
-
-      if (product === 'sms') {
+      if (product === 'email') {
+        serviceName = String(body.domain || '').trim().slice(0, 80);
+        if (!serviceName) return Response.json({ error: 'Choose an email domain first' }, { status: 400 });
+      } else {
         serviceName = String(body.serviceName || '').trim().toLowerCase().slice(0, 40);
         if (!serviceName) return Response.json({ error: 'Choose the service you need the number for' }, { status: 400 });
-        const code = String(body.country || 'US').trim().toUpperCase().slice(0, 2);
-        const supported = await listSmsCountries(server).catch(() => []);
-        const match = supported.find(c => c.code === code);
-        if (supported.length && !match) {
-          return Response.json({ error: 'That country is not available on this provider' }, { status: 400 });
-        }
-        country = { code, name: match ? match.name : code };
-        const price = await getSmsPrice(server, serviceName, code);
-        providerCost = Number(price.price_ngn) || 0;
-        if (!providerCost) return Response.json({ error: 'This service is not available right now' }, { status: 502 });
-      } else if (product === 'email') {
-        serviceName = String(body.domain || '').trim().slice(0, 80);
-        const products = await listEmailProducts(server);
-        const match = (products || []).find(p => p.id === serviceName);
-        if (!match) return Response.json({ error: 'That email domain is not available' }, { status: 400 });
-        providerCost = Number(match.price_ngn) || 0;
-        if (!providerCost) return Response.json({ error: 'This email domain is not available right now' }, { status: 502 });
-      } else {
-        // Long-term rented number (1-12 months, pre-paid, not cancellable)
-        if (server.provider === 'smspool') {
-          return Response.json({ error: 'Long-term rentals are not available on this server.' }, { status: 400 });
-        }
-        serviceName = String(body.serviceName || '').trim().slice(0, 40);
-        if (!serviceName) return Response.json({ error: 'Choose the service you need the number for' }, { status: 400 });
-        months = Math.min(12, Math.max(1, Math.floor(Number(body.months) || 1)));
-        autoRenew = !!body.autoRenew;
-        const code = String(body.country || 'US').trim().toUpperCase().slice(0, 2);
-        const areas = await listRentAreas(server).catch(() => []);
-        const area = (areas || []).find(a => String(a.area_code || a.id || '').toUpperCase() === code) || (areas || [])[0];
-        if (!area) return Response.json({ error: 'Rentals are not available right now' }, { status: 502 });
-        country = { code: String(area.area_code || area.id || code).toUpperCase(), name: area.name || area.area_title || 'United States' };
-        const unit = Number(area.unit_price_ngn) || 0;
-        if (!unit) return Response.json({ error: 'Rental pricing is not available right now' }, { status: 502 });
-        providerCost = unit * months;
+      }
+      const months = product === 'rent'
+        ? Math.min(12, Math.max(1, Math.floor(Number(body.months) || 1)))
+        : 1;
+      const autoRenew = !!body.autoRenew;
+      const countryCode = String(body.country || 'NG').trim().toUpperCase().slice(0, 2);
+      const explicit = body.serverId ? getOtpServer(body.serverId) : null;
+      const candidates = explicit ? [explicit] : getOtpServers().filter(s => s.url && s.key);
+
+      let chosen = null;
+      let providerCost = 0;
+      let country = null;
+      for (const server of candidates) {
+        if (!server.url || !server.key) continue;
+        try {
+          if (product === 'sms') {
+            const supported = await listSmsCountries(server).catch(() => []);
+            if (supported.length && !supported.some(c => c.code === countryCode)) continue;
+            const apps = await listSmsServices(server).catch(() => []);
+            const svc = (apps || []).find(a => String(a.id).toLowerCase() === serviceName);
+            if (svc && Number(svc.quantity) === 0) continue; // out of stock here
+            const price = await getSmsPrice(server, serviceName, countryCode);
+            const p = Number(price.price_ngn) || 0;
+            if (p > 0) {
+              chosen = server;
+              providerCost = p;
+              country = { code: countryCode, name: (supported.find(c => c.code === countryCode) || {}).name || countryCode };
+              break;
+            }
+          } else if (product === 'email') {
+            if (server.provider === 'smspool') continue;
+            const products = await listEmailProducts(server);
+            const match = (products || []).find(p => String(p.id) === serviceName);
+            const cost = match ? Number(match.price_ngn) || 0 : 0;
+            if (cost > 0) { chosen = server; providerCost = cost; break; }
+          } else {
+            if (server.provider === 'smspool') continue;
+            const areas = await listRentAreas(server).catch(() => []);
+            const area = (areas || []).find(a => String(a.area_code || a.id || '').toUpperCase() === countryCode) || (areas || [])[0];
+            const unit = area ? Number(area.unit_price_ngn) || 0 : 0;
+            if (unit > 0) {
+              chosen = server;
+              providerCost = unit * months;
+              country = {
+                code: String(area.area_code || area.id || countryCode).toUpperCase(),
+                name: area.name || area.area_title || 'United States'
+              };
+              break;
+            }
+          }
+        } catch (e) { /* try the next server */ }
+      }
+      if (!chosen) {
+        return Response.json({ error: 'This service is currently unavailable. Please try another service.' }, { status: 502 });
       }
       const pricing = await calculatePrice(service, 'virtual_number', providerCost);
       const result = await createLiveOrder({
-        server, product, serviceName, country,
+        server: chosen, product, serviceName, country,
         providerCostInput: providerCost, customerPrice: pricing.customerPrice,
         months, autoRenew
       });
       if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
-      return Response.json({ ok: true, rental: result.rental, handle: result.handle, wallet: result.wallet });
+      // Sanitized response: internal provider/server/request fields never
+      // reach the browser — only what the customer's receipt needs.
+      const r = result.rental;
+      return Response.json({
+        ok: true,
+        rental: {
+          id: r.id, rentalRef: r.rentalRef, service: r.service,
+          country: r.country || null, product: r.product || null,
+          amount: r.amount, status: r.status, expiresAt: r.expiresAt,
+          duration: r.duration || null
+        },
+        handle: result.handle, wallet: result.wallet
+      });
     }
 
     if (action === 'provider_check') {

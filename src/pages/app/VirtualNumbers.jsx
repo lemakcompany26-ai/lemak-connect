@@ -1,39 +1,171 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Phone } from 'lucide-react';
+import { CalendarClock, ClipboardList, Hash, Loader2, Mail, MessageCircle, Phone, RefreshCw, Search } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { useApp } from '@/lib/AppContext';
-import ListingCard from '@/components/vnum/ListingCard';
+import { formatNaira } from '@/lib/format';
+import CatalogRow from '@/components/vnum/CatalogRow';
+import CatalogSection from '@/components/vnum/CatalogSection';
+import BuySheet from '@/components/vnum/BuySheet';
+import RentSheet from '@/components/vnum/RentSheet';
 import RentalCard from '@/components/vnum/RentalCard';
 import RentalChatDialog from '@/components/vnum/RentalChatDialog';
-import CreateListingForm from '@/components/vnum/CreateListingForm';
-import OtpFlow from '@/components/vnum/OtpFlow';
-import { formatNaira } from '@/lib/format';
 
+const SOCIAL = new Set([
+  'whatsapp', 'telegram', 'facebook', 'instagram', 'tiktok', 'twitter', 'x',
+  'youtube', 'snapchat', 'discord', 'linkedin', 'reddit', 'pinterest', 'twitch',
+  'threads', 'signal', 'wechat', 'line', 'viber', 'imo', 'kik'
+]);
+const FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'social', label: 'Social Media' },
+  { id: 'other', label: 'Other Services' },
+  { id: 'rental', label: 'Rental' },
+  { id: 'email', label: 'Email' }
+];
+const flag = code => code.replace(/./g, ch => String.fromCodePoint(0x1F1E6 + ch.charCodeAt(0) - 65));
+const cleanName = id => id.replace(/\.(com|net|org|io|co|me|app|email)$/i, '');
+const QUOTE_BATCH = 12;
+const QUOTE_LIMIT = 48;
+const MAX_OTHER_ROWS = 60;
+
+// Full-screen Virtual Numbers catalogue. ONE customer-facing list — the
+// backend resolves availability and final prices and picks the supplier
+// invisibly. No server, provider or markup information is ever displayed.
 export default function VirtualNumbers() {
-  const { refresh } = useApp();
   const { toast } = useToast();
+  const { refresh } = useApp();
   const navigate = useNavigate();
-  const [listings, setListings] = useState(null);
-  const [myRentals, setMyRentals] = useState(null);
-  const [sellerRentals, setSellerRentals] = useState(null);
-  const [myListings, setMyListings] = useState(null);
-  const [tab, setTab] = useState('browse');
+  const [catalog, setCatalog] = useState(null);
+  const [country, setCountry] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [prices, setPrices] = useState({}); // serviceId -> { available, customerPrice }
+  const requestedRef = useRef(new Set());
+  const [orders, setOrders] = useState(null);
+  const [view, setView] = useState('catalog'); // catalog | orders
+  const [buy, setBuy] = useState(null); // { product, service, country, countryName, price }
+  const [rentService, setRentService] = useState(null);
+  const [chat, setChat] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [chat, setChat] = useState(null); // { rental, role }
+
+  const loadCatalog = useCallback(() => {
+    base44.functions.invoke('virtualNumbers', { action: 'catalog' })
+      .then(res => {
+        const d = res.data || res;
+        setCatalog(d);
+        setCountry(prev => {
+          const codes = (d.countries || []).map(c => c.code);
+          return prev && codes.includes(prev) ? prev : (codes.includes('NG') ? 'NG' : codes[0] || null);
+        });
+      })
+      .catch(() => setCatalog({ ok: false, available: false, countries: [], smsServices: [], emailProducts: [], rentServices: [], rentAreas: [] }));
+  }, []);
+
+  useEffect(() => { loadCatalog(); }, [loadCatalog]);
+
+  // Keep availability and prices fresh while the page is open.
+  useEffect(() => {
+    const t = setInterval(loadCatalog, 60000);
+    return () => clearInterval(t);
+  }, [loadCatalog]);
+
+  const loadOrders = useCallback(() => {
+    base44.functions.invoke('virtualNumbers', { action: 'my_rentals' })
+      .then(res => setOrders((res.data || res).rentals || []))
+      .catch(() => setOrders([]));
+  }, []);
+
+  useEffect(() => { loadOrders(); }, [loadOrders]);
+
+  const sms = catalog && catalog.smsServices ? catalog.smsServices : [];
+  const q = search.trim().toLowerCase();
+
+  const socialRows = useMemo(
+    () => sms.filter(s => SOCIAL.has(s.id) && (!q || s.id.includes(q))),
+    [sms, q]
+  );
+  const otherRows = useMemo(
+    () => sms.filter(s => !SOCIAL.has(s.id) && (!q || s.id.includes(q))),
+    [sms, q]
+  );
+  const rentRows = useMemo(
+    () => (catalog && catalog.rentServices ? catalog.rentServices : []).filter(id => !q || id.includes(q)),
+    [catalog, q]
+  );
+  const emailRows = useMemo(
+    () => (catalog && catalog.emailProducts ? catalog.emailProducts : []).filter(p => !q || p.id.includes(q) || cleanName(p.id).includes(q)),
+    [catalog, q]
+  );
+
+  // Batched final-price quotes for the services currently on screen.
+  const visibleIds = useMemo(() => {
+    let ids = [];
+    if (filter === 'all' || filter === 'social') ids = ids.concat(socialRows.map(s => s.id));
+    if (filter === 'all' || filter === 'other') ids = ids.concat(otherRows.slice(0, MAX_OTHER_ROWS).map(s => s.id));
+    return ids;
+  }, [filter, socialRows, otherRows]);
+
+  useEffect(() => {
+    if (!catalog || !country || !catalog.available) return;
+    const missing = visibleIds.filter(id => !requestedRef.current.has(country + ':' + id)).slice(0, QUOTE_LIMIT);
+    if (!missing.length) return;
+    for (const id of missing) requestedRef.current.add(country + ':' + id);
+    let cancelled = false;
+    (async () => {
+      for (let i = 0; i < missing.length; i += QUOTE_BATCH) {
+        if (cancelled) return;
+        const batch = missing.slice(i, i + QUOTE_BATCH);
+        try {
+          const res = await base44.functions.invoke('virtualNumbers', { action: 'quote', country, services: batch });
+          if (cancelled) return;
+          setPrices(prev => ({ ...prev, ...((res.data || res).prices || {}) }));
+        } catch (e) {
+          if (cancelled) return;
+          const failed = {};
+          batch.forEach(id => { failed[id] = { available: false, customerPrice: null }; });
+          setPrices(prev => ({ ...prev, ...failed }));
+          return;
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [catalog, country, visibleIds]);
+
+  const onCountryChange = (code) => {
+    setCountry(code);
+    setPrices({});
+    requestedRef.current = new Set();
+  };
+
+  const priceFor = (id) => {
+    const p = prices[id];
+    if (!p) return null; // still checking
+    return p.available && p.customerPrice ? formatNaira(p.customerPrice) : false;
+  };
+
+  const countryName = ((catalog && catalog.countries) || []).find(c => c.code === country) || {};
+  const rentAreas = (catalog && catalog.rentAreas) || [];
+  const rentFromPrice = useMemo(() => {
+    let min = null;
+    for (const a of rentAreas) {
+      const one = (a.durations || []).find(d => d.months === 1);
+      if (one && (min === null || one.customerPrice < min)) min = one.customerPrice;
+    }
+    return min;
+  }, [rentAreas]);
 
   const call = async (payload, okTitle, okDesc) => {
     setBusy(true);
     try {
       const res = await base44.functions.invoke('virtualNumbers', payload);
-      const d = res.data || res;
-      if (okTitle) toast({ title: okTitle, description: okDesc });
-      load();
+      loadOrders();
       refresh();
-      return d;
+      if (okTitle) toast({ title: okTitle, description: okDesc });
+      return res.data || res;
     } catch (e) {
       const d = e.response && e.response.data;
       toast({ title: 'Action failed', description: (d && d.error) || e.message, variant: 'destructive' });
@@ -43,170 +175,276 @@ export default function VirtualNumbers() {
     }
   };
 
-  const load = useCallback(() => {
-    base44.functions.invoke('virtualNumbers', { action: 'browse' })
-      .then(res => { const d = res.data || res; setListings(d.listings || []); })
-      .catch(() => setListings([]));
-    base44.functions.invoke('virtualNumbers', { action: 'my_rentals' })
-      .then(res => { const d = res.data || res; setMyRentals(d.rentals || []); })
-      .catch(() => setMyRentals([]));
-    base44.functions.invoke('virtualNumbers', { action: 'seller_rentals' })
-      .then(res => { const d = res.data || res; setSellerRentals(d.rentals || []); })
-      .catch(() => setSellerRentals([]));
-    base44.functions.invoke('virtualNumbers', { action: 'my_listings' })
-      .then(res => { const d = res.data || res; setMyListings(d.listings || []); })
-      .catch(() => setMyListings([]));
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const rent = async (listing) => {
-    const d = await call(
-      { action: 'rent', listingId: listing.id },
-      'Number rented 🎉',
-      'Open My Rentals — the number is unlocked and the seller will send your OTP.'
-    );
-    if (d && d.ok) setTab('rentals');
-  };
-
   const complete = async (rental) => {
     await call({ action: 'complete', rentalId: rental.id }, 'Rental complete ✅', 'The seller has been paid.');
   };
 
   const cancel = async (rental) => {
-    if (rental.isLive) {
-      await call({ action: 'provider_cancel', rentalId: rental.id }, 'Rental cancelled', 'You were refunded in full.');
-    } else {
-      await call({ action: 'cancel', rentalId: rental.id }, 'Rental cancelled', 'You were refunded in full.');
-    }
-  };
-
-  const toggleListing = async (listing) => {
     await call(
-      { action: 'update_listing', listingId: listing.id, isActive: listing.isActive === false },
-      listing.isActive === false ? 'Listing live again' : 'Listing paused'
+      rental.isLive
+        ? { action: 'provider_cancel', rentalId: rental.id }
+        : { action: 'cancel', rentalId: rental.id },
+      'Order cancelled', 'You were refunded in full.'
     );
   };
 
-  const myActiveCount = (myRentals || []).filter(r => r.status === 'active').length;
-
-  // Live provider rentals: poll the provider for the OTP while the page is
-  // open. When it arrives it lands in the rental chat + a notification.
-  useEffect(() => {
-    const activeProvider = (myRentals || [])
-      .filter(r => r.isLive && r.status === 'active')
-      .slice(0, 3);
-    if (!activeProvider.length) return;
-    const timer = setInterval(async () => {
-      for (const r of activeProvider) {
-        try {
-          const res = await base44.functions.invoke('virtualNumbers', { action: 'provider_check', rentalId: r.id });
-          const d = res.data || res;
-          if (d && d.otp) {
-            toast({ title: 'OTP received 🔑', description: 'Your code is waiting in the rental chat.' });
-            load();
-            return;
-          }
-          if (d && d.status && d.status !== 'waiting' && d.status !== 'active') {
-            load();
-            return;
-          }
-        } catch (e) { /* keep polling */ }
-      }
-    }, 30000);
-    return () => clearInterval(timer);
-  }, [myRentals]);
+  const activeOrders = (orders || []).filter(r => r.status === 'active').length;
+  const showSms = filter === 'all' || filter === 'social' || filter === 'other';
+  const otherShown = otherRows.slice(0, MAX_OTHER_ROWS);
 
   return (
-    <div className="rounded-3xl bg-mk-bg border border-mk-border p-4 sm:p-6 space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-extrabold text-white flex items-center gap-2.5">
-          <Phone className="w-6 h-6 text-mk-blue" /> Virtual Numbers
-        </h1>
-        <p className="text-sm text-slate-400 mt-1">
-          SMS OTP, Email OTP or a long-term rented number — everything is delivered in your private chat.
-        </p>
-        <div className="mt-3">
-          <span className="inline-flex items-center rounded-full border border-mk-border bg-mk-card px-2.5 py-1 text-[10px] font-semibold text-slate-300">
-            Live numbers, temporary emails & long-term rentals — delivered privately
-          </span>
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-2xl font-extrabold text-white flex items-center gap-2.5">
+            <Phone className="w-6 h-6 text-amber-400" /> Virtual Numbers
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">Choose a service and get a verification number.</p>
         </div>
+        <Button
+          size="icon"
+          variant="outline"
+          className="h-9 w-9 border-mk-border text-slate-400 hover:text-white shrink-0"
+          onClick={loadCatalog}
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+        </Button>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="bg-mk-card2 border border-mk-border h-auto flex-wrap">
-          <TabsTrigger value="browse" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Browse</TabsTrigger>
-          <TabsTrigger value="rentals" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">
-            My Rentals{myActiveCount > 0 && <span className="ml-1.5 min-w-5 h-5 px-1.5 rounded-full bg-mk-blue text-white text-[10px] font-bold inline-flex items-center justify-center">{myActiveCount}</span>}
-          </TabsTrigger>
-          <TabsTrigger value="sell" className="data-[state=active]:bg-mk-blue data-[state=active]:text-white text-slate-300">Sell</TabsTrigger>
-        </TabsList>
+      {/* Search */}
+      <div className="relative">
+        <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value.slice(0, 40))}
+          placeholder="Search service"
+          className="bg-mk-card2 border-mk-border text-slate-100 h-12 pl-10 rounded-2xl placeholder:text-slate-500"
+        />
+      </div>
 
-        <TabsContent value="browse" className="mt-5 space-y-5">
-          <OtpFlow
-            onRented={(rental) => navigate('/app/virtual-numbers/order/' + rental.id)}
-          />
+      {/* Filters + My Orders */}
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-thin pb-1">
+        {FILTERS.map(f => (
+          <button
+            key={f.id}
+            type="button"
+            onClick={() => setFilter(f.id)}
+            className={'shrink-0 rounded-full border px-3.5 py-1.5 text-[11px] font-bold ' + (filter === f.id
+              ? 'border-amber-400 bg-amber-400 text-slate-900'
+              : 'border-mk-border bg-mk-card2 text-slate-300')}
+          >
+            {f.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setView(v => (v === 'catalog' ? 'orders' : 'catalog'))}
+          className={'shrink-0 ml-auto inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[11px] font-bold ' + (view === 'orders'
+            ? 'border-amber-400 bg-amber-400 text-slate-900'
+            : 'border-mk-border bg-mk-card2 text-slate-300')}
+        >
+          <ClipboardList className="w-3.5 h-3.5" /> My Orders
+          {activeOrders > 0 && (
+            <span className="min-w-4 h-4 px-1 rounded-full bg-mk-blue text-white text-[9px] font-bold inline-flex items-center justify-center">
+              {activeOrders}
+            </span>
+          )}
+        </button>
+      </div>
 
-          <div className="space-y-3">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wide">From verified sellers</h3>
-            {listings === null && <div className="py-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-mk-blue" /></div>}
-            {listings && listings.length === 0 && (
-              <div className="py-10 text-center border border-dashed border-mk-border rounded-2xl">
-                <Phone className="w-10 h-10 text-slate-600 mx-auto" />
-                <p className="mt-3 text-sm text-slate-400">No seller numbers listed yet. Approved sellers can add theirs in the Sell tab.</p>
-              </div>
-            )}
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(listings || []).map(l => <ListingCard key={l.id} listing={l} busy={busy} onRent={rent} />)}
+      {/* ---------- Catalogue ---------- */}
+      {view === 'catalog' && (
+        <div className="space-y-7">
+          {catalog === null && (
+            <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-amber-400" /></div>
+          )}
+
+          {catalog !== null && !catalog.available && (
+            <div className="rounded-2xl border border-mk-border bg-mk-card2 px-4 py-6 text-center">
+              <p className="text-sm text-slate-400">Numbers are temporarily unavailable. Please try again.</p>
             </div>
-          </div>
-        </TabsContent>
+          )}
 
-        <TabsContent value="rentals" className="mt-5 space-y-6">
-          <div className="space-y-3">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wide">Renting</h3>
-            {myRentals === null && <div className="py-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-mk-blue" /></div>}
-            {myRentals && myRentals.length === 0 && <div className="text-xs text-slate-500 py-2">You haven't rented any numbers yet.</div>}
-            {myRentals && myRentals.map(r => (
-              <RentalCard key={r.id} rental={r} role="buyer" busy={busy} onComplete={complete} onCancel={cancel} onChat={(rental) => rental.isLive ? navigate('/app/virtual-numbers/order/' + rental.id) : setChat({ rental, role: 'buyer' })} />
-            ))}
-          </div>
-          <div className="space-y-3">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wide">Your rentals as seller</h3>
-            {sellerRentals && sellerRentals.filter(r => r.buyerUserId !== r.sellerUserId).length === 0 && (
-              <div className="text-xs text-slate-500 py-2">No one has rented your numbers yet.</div>
-            )}
-            {sellerRentals && sellerRentals.filter(r => r.buyerUserId !== r.sellerUserId).map(r => (
-              <RentalCard key={r.id} rental={r} role="seller" busy={busy} onChat={(rental) => setChat({ rental, role: 'seller' })} />
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="sell" className="mt-5 space-y-5">
-          <CreateListingForm onCreated={load} />
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wide">My numbers</h3>
-            {myListings === null && <div className="py-6 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-mk-blue" /></div>}
-            {myListings && myListings.length === 0 && (
-              <div className="text-xs text-slate-500 py-2">No listings yet — add your first number above.</div>
-            )}
-            {myListings && myListings.map(l => (
-              <div key={l.id} className="flex items-center justify-between gap-3 rounded-xl bg-mk-card border border-mk-border px-4 py-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-bold text-white">{l.service} · {formatNaira(l.price)}</div>
-                  <div className="text-xs text-slate-400 truncate font-mono">{l.number}</div>
+          {catalog !== null && catalog.available && (
+            <>
+              {/* Country selector — only countries the backend supports */}
+              {showSms && (catalog.countries || []).length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Country</div>
+                  <div className="flex gap-1.5 overflow-x-auto scrollbar-thin pb-1">
+                    {(catalog.countries || []).map(c => (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => onCountryChange(c.code)}
+                        className={'shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold ' + (country === c.code
+                          ? 'border-mk-blue bg-mk-blue text-white'
+                          : 'border-mk-border bg-mk-card2 text-slate-300')}
+                      >
+                        <span aria-hidden>{flag(c.code)}</span> {c.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <Button size="sm" variant="outline" className="h-9 border-mk-border text-slate-300 hover:text-white shrink-0" disabled={busy} onClick={() => toggleListing(l)}>
-                  {l.isActive === false ? 'Paused — resume' : 'Pause'}
-                </Button>
-              </div>
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
+              )}
 
-      <RentalChatDialog rental={chat ? chat.rental : null} role={chat ? chat.role : 'buyer'} onClose={() => setChat(null)} />
+              {/* SOCIAL MEDIA OTP */}
+              {showSms && (
+                <CatalogSection
+                  icon={MessageCircle}
+                  title="Social Media OTP"
+                  count={socialRows.length}
+                  empty={socialRows.length === 0}
+                  emptyText={q ? 'No social media services match your search.' : 'No social media services available right now.'}
+                >
+                  {socialRows.map(s => (
+                    <CatalogRow
+                      key={s.id}
+                      name={s.id}
+                      availability={s.available === null ? 'Available on demand' : `Available numbers: ${s.available}`}
+                      price={priceFor(s.id)}
+                      onAction={() => setBuy({ product: 'sms', service: s.id, country, countryName: countryName.name })}
+                    />
+                  ))}
+                </CatalogSection>
+              )}
+
+              {/* OTHER OTP SERVICES */}
+              {(filter === 'all' || filter === 'other') && (
+                <CatalogSection
+                  icon={Hash}
+                  title="Other OTP Services"
+                  count={otherRows.length}
+                  empty={otherRows.length === 0}
+                  emptyText={q ? 'No other services match your search.' : 'No other services available right now.'}
+                >
+                  {otherShown.map(s => (
+                    <CatalogRow
+                      key={s.id}
+                      name={s.id}
+                      availability={s.available === null ? 'Available on demand' : `Available numbers: ${s.available}`}
+                      price={priceFor(s.id)}
+                      onAction={() => setBuy({ product: 'sms', service: s.id, country, countryName: countryName.name })}
+                    />
+                  ))}
+                  {otherRows.length > MAX_OTHER_ROWS && (
+                    <p className="text-[11px] text-slate-500 pt-1">
+                      +{otherRows.length - MAX_OTHER_ROWS} more — use the search to find a specific service.
+                    </p>
+                  )}
+                </CatalogSection>
+              )}
+
+              {/* RENT A NUMBER */}
+              {(filter === 'all' || filter === 'rental') && (
+                <CatalogSection
+                  icon={CalendarClock}
+                  title="Rent a Number"
+                  count={rentRows.length}
+                  empty={rentRows.length === 0}
+                  emptyText={q ? 'No rental services match your search.' : 'Rentals are not available right now.'}
+                >
+                  {rentRows.map(id => (
+                    <CatalogRow
+                      key={id}
+                      name={id}
+                      availability="Dedicated number · 1-12 months"
+                      price={rentFromPrice ? `from ${formatNaira(rentFromPrice)}` : null}
+                      actionLabel="Rent Number"
+                      onAction={() => setRentService(id)}
+                    />
+                  ))}
+                </CatalogSection>
+              )}
+
+              {/* EMAIL VERIFICATION */}
+              {(filter === 'all' || filter === 'email') && (
+                <CatalogSection
+                  icon={Mail}
+                  title="Email Verification"
+                  count={emailRows.length}
+                  empty={emailRows.length === 0}
+                  emptyText={q ? 'No email options match your search.' : 'Email verification is not available right now.'}
+                >
+                  {emailRows.map(p => (
+                    <CatalogRow
+                      key={p.id}
+                      name={cleanName(p.id)}
+                      availability="Temporary email address"
+                      price={p.customerPrice ? formatNaira(p.customerPrice) : false}
+                      actionLabel="Get Email"
+                      onAction={() => setBuy({ product: 'email', service: p.id, price: p.customerPrice || null })}
+                    />
+                  ))}
+                </CatalogSection>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ---------- My Orders ---------- */}
+      {view === 'orders' && (
+        <div className="space-y-3">
+          {orders === null && <div className="py-16 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-amber-400" /></div>}
+          {orders !== null && orders.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-mk-border px-4 py-10 text-center">
+              <p className="text-sm text-slate-400">You have no orders yet — pick a service above to get started.</p>
+            </div>
+          )}
+          {orders !== null && orders.map(r => (
+            <RentalCard
+              key={r.id}
+              rental={r}
+              role="buyer"
+              busy={busy}
+              onComplete={complete}
+              onCancel={cancel}
+              onChat={(rental) => rental.isLive
+                ? navigate('/app/virtual-numbers/order/' + rental.id)
+                : setChat({ rental, role: 'buyer' })}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Sheets */}
+      <BuySheet
+        open={!!buy}
+        onOpen={(o) => { if (!o) setBuy(null); }}
+        product={buy ? buy.product : 'sms'}
+        service={buy ? buy.service : ''}
+        country={buy ? buy.country : null}
+        countryName={buy ? buy.countryName : null}
+        price={buy ? buy.price : null}
+        onDone={(rental) => {
+          setBuy(null);
+          refresh();
+          loadOrders();
+          if (rental && rental.id) navigate('/app/virtual-numbers/order/' + rental.id);
+        }}
+      />
+
+      <RentSheet
+        open={!!rentService}
+        onOpen={(o) => { if (!o) setRentService(null); }}
+        service={rentService}
+        rentServices={catalog ? catalog.rentServices || [] : []}
+        rentAreas={rentAreas}
+        onDone={(rental) => {
+          setRentService(null);
+          refresh();
+          loadOrders();
+          if (rental && rental.id) navigate('/app/virtual-numbers/order/' + rental.id);
+        }}
+      />
+
+      <RentalChatDialog
+        rental={chat ? chat.rental : null}
+        role={chat ? chat.role : 'buyer'}
+        onClose={() => setChat(null)}
+      />
     </div>
   );
 }

@@ -239,7 +239,7 @@ export default function VirtualNumberOrder() {
             </p>
           )}
 
-          {isActive && !order.otpReceived && !isRent && <TypingIndicator visible />}
+          {isActive && !order.otpReceived && <TypingIndicator visible />}
 
           {isActive && isRent && (
             <p className="text-[11px] text-slate-500 text-center">

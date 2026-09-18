@@ -18,8 +18,10 @@ export default function OtpChatFeed({ messages, emptyHint, highlight }) {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin space-y-3 px-4 py-4">
       {messages.length === 0 && !(highlight && highlight.value) && (
-        <div className="h-full flex items-center justify-center text-xs text-slate-500 text-center px-6">
-          {emptyHint}
+        <div className="h-full flex items-center justify-center px-6">
+          <div className="rounded-2xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-xs font-semibold text-amber-300 text-center max-w-[85%]">
+            {emptyHint}
+          </div>
         </div>
       )}
 

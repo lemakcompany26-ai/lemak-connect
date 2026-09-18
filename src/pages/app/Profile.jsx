@@ -1,11 +1,16 @@
 import { useState } from 'react';
-import { UserCircle, Loader2, Save } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { UserCircle, Loader2, Save, Settings as SettingsIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Image } from '@/components/ui/image';
 import { useApp } from '@/lib/AppContext';
 import { formatDate } from '@/lib/format';
+import ProfileAvatarCard from '@/components/app/ProfileAvatarCard';
+import SecurityPinCard from '@/components/app/SecurityPinCard';
+import BiometricCard from '@/components/app/BiometricCard';
 
 export default function Profile() {
   const { profile, setProfile } = useApp();
@@ -40,9 +45,17 @@ export default function Profile() {
 
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full brand-gradient-soft flex items-center justify-center text-white text-2xl font-extrabold">
-            {profile.fullName ? profile.fullName[0].toUpperCase() : '?'}
-          </div>
+          {profile.avatar ? (
+            <Image
+              src={profile.avatar}
+              alt={profile.fullName || 'Profile photo'}
+              className="w-16 h-16 rounded-full object-cover border-2 border-primary/30"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-full brand-gradient-soft flex items-center justify-center text-white text-2xl font-extrabold">
+              {profile.fullName ? profile.fullName[0].toUpperCase() : '?'}
+            </div>
+          )}
           <div>
             <div className="font-heading font-bold">{profile.fullName}</div>
             <div className="text-sm text-muted-foreground">@{profile.username}</div>
@@ -83,6 +96,20 @@ export default function Profile() {
           {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : <><Save className="w-4 h-4 mr-2" /> Save changes</>}
         </Button>
       </form>
+
+      <ProfileAvatarCard />
+
+      <SecurityPinCard />
+
+      <BiometricCard />
+
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <h3 className="font-heading font-bold text-sm flex items-center gap-2"><SettingsIcon className="w-4 h-4 text-primary" /> Other settings</h3>
+        <p className="mt-1 text-xs text-muted-foreground">Notification preferences, email alerts and account controls.</p>
+        <Button asChild variant="outline" className="mt-4 w-full h-11 font-semibold">
+          <Link to="/app/settings">Open Settings</Link>
+        </Button>
+      </div>
     </div>
   );
 }

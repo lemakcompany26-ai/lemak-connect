@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { creditWallet, notifyUser } from '../../shared/lemak.ts';
+import { sendTransactionalEmail } from '../../shared/emails.ts';
 import { getOtpServer, cancelSmsRequest, cancelEmailOtp } from '../../shared/otp.ts';
 
 // Sweeper invoked every 5 minutes by the "Expire Virtual Number Rentals"
@@ -32,7 +33,7 @@ export default async function(req: Request): Promise<Response> {
           description: `Refund — expired virtual number rental ${rental.rentalRef}`,
           idempotencyKey: `vn-refund-${rental.id}`
         });
-        await service.entities.NumberRental.update(rental.id, { status: 'expired' });
+        await service.entities.NumberRental.update(rental.id, { status: 'expired', refundStatus: 'REFUNDED', refundAmount: rental.amount });
         const txs = await service.entities.Transaction.filter({ transactionId: rental.transactionId }, '-created_date', 1);
         if (txs && txs[0]) {
           await service.entities.Transaction.update(txs[0].id, {
@@ -42,9 +43,27 @@ export default async function(req: Request): Promise<Response> {
         await notifyUser(service, {
           userId: rental.buyerUserId, type: 'transaction',
           title: 'Rental expired — refunded',
-          message: `Your ${rental.service} number rental (${rental.rentalRef}) expired. ₦${Number(rental.amount).toLocaleString()} has been refunded to your wallet.`,
+          message: rental.provider
+            ? `No verification message was received within the allowed time. ₦${Number(rental.amount).toLocaleString()} has been refunded to your wallet (${rental.rentalRef}).`
+            : `Your ${rental.service} number rental (${rental.rentalRef}) expired. ₦${Number(rental.amount).toLocaleString()} has been refunded to your wallet.`,
           actionUrl: '/app/wallet'
         });
+        if (rental.provider) {
+          try {
+            const users = await service.entities.User.filter({ id: rental.buyerUserId }, '-created_date', 1);
+            const buyer = users && users[0];
+            if (buyer && buyer.email) {
+              await sendTransactionalEmail(service, {
+                emailType: 'OTP_REFUNDED', userId: rental.buyerUserId, recipientEmail: buyer.email,
+                recipientName: buyer.full_name, transactionId: rental.transactionId,
+                data: {
+                  service: rental.service, refundAmount: rental.amount,
+                  transactionId: rental.transactionId, refundStatus: 'REFUNDED', expired: true
+                }
+              });
+            }
+          } catch (e) { /* non-fatal */ }
+        }
         if (!rental.provider) {
           await notifyUser(service, {
             userId: rental.sellerUserId, type: 'marketplace',

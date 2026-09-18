@@ -1,0 +1,69 @@
+{
+  "name": "EmailLog",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string"
+    },
+    "recipientEmail": {
+      "type": "string"
+    },
+    "emailType": {
+      "type": "string",
+      "description": "Template type, e.g. TRANSACTION_SUCCESS, OTP_REFUNDED, WELCOME"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "transactionId": {
+      "type": "string"
+    },
+    "resendMessageId": {
+      "type": "string",
+      "description": "Resend message id returned on successful delivery"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "sent",
+        "failed"
+      ],
+      "default": "queued"
+    },
+    "errorCode": {
+      "type": "string"
+    },
+    "safeErrorMessage": {
+      "type": "string",
+      "description": "Customer-safe error message. Never contains API keys or headers."
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "description": "emailType + transactionId + recipientEmail \u2014 duplicate send protection"
+    },
+    "sentAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "recipientEmail",
+    "emailType",
+    "status"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": false,
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

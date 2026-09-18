@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { secrets } from 'base44:runtime';
-import { generateTransactionId, creditWallet, notifyUser, sendUserEmail, emailTemplate, round2 } from '../../shared/lemak.ts';
+import { generateTransactionId, creditWallet, notifyUser, round2 } from '../../shared/lemak.ts';
+import { sendTransactionalEmail } from '../../shared/emails.ts';
 
 // Verifies a Paystack payment server-side and credits the wallet exactly once.
 // The frontend's claim of success is never trusted — the Paystack verify API
@@ -46,7 +47,7 @@ export default async function(req: Request): Promise<Response> {
     // Credit wallet — idempotent on the reference
     const nairaAmount = round2(payment.amount / 100);
     const transactionId = generateTransactionId();
-    await creditWallet(service, {
+    const credited = await creditWallet(service, {
       userId: user.id, transactionId, type: 'deposit', amount: nairaAmount,
       reference, description: 'Wallet funding via card payment',
       idempotencyKey: `fund-${reference}`
@@ -67,11 +68,14 @@ export default async function(req: Request): Promise<Response> {
       message: `₦${nairaAmount.toLocaleString()} was added to your wallet. Reference: ${reference}`,
       actionUrl: '/app/wallet'
     });
-    await sendUserEmail({
-      to: user.email,
-      subject: 'Wallet funded — ' + reference,
-      html: emailTemplate('Wallet Funding Successful',
-        `<p>Your wallet has been funded with <b>₦${nairaAmount.toLocaleString()}</b>.</p><p><b>Reference:</b> ${reference}</p>`)
+    await sendTransactionalEmail(service, {
+      emailType: 'WALLET_FUNDING_SUCCESS', userId: user.id, recipientEmail: user.email,
+      recipientName: user.full_name, transactionId,
+      data: {
+        amount: nairaAmount, transactionId, reference,
+        status: 'Successful', date: new Date().toISOString(),
+        balance: credited && credited.wallet ? credited.wallet.balance : null
+      }
     });
 
     return Response.json({ credited: true, amount: nairaAmount, reference });

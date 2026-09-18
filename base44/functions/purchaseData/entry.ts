@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { generateTransactionId, calculatePrice, validatePromo, redeemPromo, debitWallet, creditWallet, notifyUser, sendUserEmail, emailTemplate, round2 } from '../../shared/lemak.ts';
+import { generateTransactionId, calculatePrice, validatePromo, redeemPromo, debitWallet, creditWallet, notifyUser, round2 } from '../../shared/lemak.ts';
+import { sendTransactionalEmail } from '../../shared/emails.ts';
 import { getVtuConfig, purchaseDataViaProvider, fetchDataPlans, isProviderSuccess, extractProviderReference } from '../../shared/vtu.ts';
 import { assertPinForPurchase } from '../../shared/security.ts';
 
@@ -124,13 +125,15 @@ export default async function(req: Request): Promise<Response> {
         message: `${planName} sent to ${phoneNumber} (${network}) for ₦${payable.toLocaleString()}. Reference: ${transactionId}`,
         actionUrl: '/app/transactions'
       });
-      await sendUserEmail({
-        to: user.email,
-        subject: 'Data purchase successful — ' + transactionId,
-        html: emailTemplate('Data Purchase Successful',
-          `<p>Your data purchase was successful.</p>
-           <p><b>Plan:</b> ${planName}<br/><b>Phone:</b> ${phoneNumber}<br/>
-           <b>Amount:</b> ₦${payable.toLocaleString()}<br/><b>Reference:</b> ${transactionId}</p>`)
+      await sendTransactionalEmail(service, {
+        emailType: 'TRANSACTION_SUCCESS', userId: user.id, recipientEmail: user.email,
+        recipientName: (profile && profile.fullName) || user.full_name,
+        transactionId,
+        data: {
+          service: `Data — ${planName} (${network})`, recipient: phoneNumber,
+          amount: payable, transactionId, status: 'Successful',
+          date: new Date().toISOString(), providerReference
+        }
       });
       return Response.json({ transaction, wallet: debit.wallet });
     }
@@ -149,12 +152,16 @@ export default async function(req: Request): Promise<Response> {
       message: `We could not complete your data purchase. ₦${payable.toLocaleString()} has been refunded to your wallet. Reference: ${transactionId}`,
       actionUrl: '/app/transactions'
     });
-    await sendUserEmail({
-      to: user.email,
-      subject: 'Data purchase refunded — ' + transactionId,
-      html: emailTemplate('Data Purchase Refunded',
-        `<p>We could not complete your data purchase and have refunded ₦${payable.toLocaleString()} to your wallet.</p>
-         <p><b>Reference:</b> ${transactionId}</p>`)
+    await sendTransactionalEmail(service, {
+      emailType: 'TRANSACTION_FAILED', userId: user.id, recipientEmail: user.email,
+      recipientName: (profile && profile.fullName) || user.full_name,
+      transactionId,
+      data: {
+        service: `Data — ${planName} (${network})`, recipient: phoneNumber,
+        amount: payable, transactionId, status: 'Failed — refunded',
+        date: new Date().toISOString(), reason: failureReason,
+        refundStatus: 'Refunded to your wallet'
+      }
     });
     return Response.json({ error: failureReason, transaction, wallet: refund.wallet }, { status: 502 });
   } catch (error) {

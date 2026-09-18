@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { generateTransactionId, isAdminEmail, notifyUser, sendUserEmail, emailTemplate } from '../../shared/lemak.ts';
+import { isAdminEmail, notifyUser } from '../../shared/lemak.ts';
+import { sendTransactionalEmail } from '../../shared/emails.ts';
 
 // Creates the user's profile, wallet (NGN, 0.00) and notification preferences
 // after registration. Idempotent — safe to call on every login.
@@ -57,19 +58,11 @@ export default async function(req: Request): Promise<Response> {
       actionUrl: '/app/wallet'
     });
 
-    const emailResult = await sendUserEmail({
-      to: user.email,
-      subject: 'Welcome to Lemak Connect',
-      html: emailTemplate('Welcome to Lemak Connect 🎉',
-        `<p>Hi ${fullName},</p><p>Your Lemak Connect account is ready. Your wallet has been created with a starting balance of ₦0.00.</p>
-         <p>Fund your wallet to enjoy instant airtime top-ups, data bundles, electricity tokens, cable subscriptions and more.</p>`)
+    await sendTransactionalEmail(service, {
+      emailType: 'WELCOME', userId: user.id, recipientEmail: user.email,
+      recipientName: fullName, transactionId: `signup-${user.id}`,
+      data: { name: fullName }
     });
-    if (emailResult.sent) {
-      await service.entities.Notification.update(
-        (await service.entities.Notification.filter({ userId: user.id }, '-created_date', 1))[0].id,
-        { sentEmail: true }
-      ).catch(() => {});
-    }
 
     return Response.json({ profile, wallet, alreadyOnboarded: false });
   } catch (error) {

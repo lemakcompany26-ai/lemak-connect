@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { formatDate } from '@/lib/format';
+import EmailSettingsCard from '@/components/admin/EmailSettingsCard';
 
 // Default platform settings, seeded on first load so admins can edit
 // the Google marketplace links and marketplace fee from one place.
@@ -82,6 +83,8 @@ export default function AdminSettings() {
         <h1 className="font-heading text-2xl font-extrabold">Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">Platform configuration. Changes apply immediately everywhere they're used.</p>
       </div>
+
+      <EmailSettingsCard />
 
       {settings === null && <div className="p-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>}
 

@@ -33,6 +33,7 @@ import Epin from '@/pages/app/Epin';
 import SocialGrowth from '@/pages/app/SocialGrowth';
 import ServiceSoon from '@/pages/app/ServiceSoon';
 import VirtualNumbers from '@/pages/app/VirtualNumbers';
+import VirtualNumberOrder from '@/pages/app/VirtualNumberOrder';
 import WalletPage from '@/pages/app/Wallet';
 import Transactions from '@/pages/app/Transactions';
 import Notifications from '@/pages/app/Notifications';
@@ -48,6 +49,7 @@ import AdminTransactions from '@/pages/admin/AdminTransactions';
 import AdminPricing from '@/pages/admin/AdminPricing';
 import AdminPromos from '@/pages/admin/AdminPromos';
 import AdminMarketplace from '@/pages/admin/AdminMarketplace';
+import AdminVirtualNumbers from '@/pages/admin/AdminVirtualNumbers';
 import AdminSettings from '@/pages/admin/AdminSettings';
 import AdminSystemHealth from '@/pages/admin/AdminSystemHealth';
 
@@ -107,6 +109,7 @@ const AuthenticatedApp = () => {
           <Route path="/app/epin" element={<Epin />} />
           <Route path="/app/broadband" element={<ServiceSoon service="Broadband" />} />
           <Route path="/app/virtual-numbers" element={<VirtualNumbers />} />
+          <Route path="/app/virtual-numbers/order/:orderId" element={<VirtualNumberOrder />} />
           <Route path="/app/social-growth" element={<SocialGrowth />} />
           <Route path="/app/wallet" element={<WalletPage />} />
           <Route path="/app/transactions" element={<Transactions />} />
@@ -125,6 +128,7 @@ const AuthenticatedApp = () => {
           <Route path="/admin/pricing" element={<AdminPricing />} />
           <Route path="/admin/promos" element={<AdminPromos />} />
           <Route path="/admin/marketplace" element={<AdminMarketplace />} />
+          <Route path="/admin/virtual-numbers" element={<AdminVirtualNumbers />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
           <Route path="/admin/system-health" element={<AdminSystemHealth />} />
         </Route>

@@ -23,6 +23,10 @@
     "service": {
       "type": "string"
     },
+    "country": {
+      "type": "string",
+      "description": "Country of the assigned number, when known from the provider"
+    },
     "amount": {
       "type": "number",
       "description": "Total buyer amount held in escrow for this rental"
@@ -43,15 +47,15 @@
     },
     "provider": {
       "type": "string",
-      "description": "Provider id for live rentals, e.g. fleexa"
+      "description": "Internal provider id for live rentals. Never exposed to customers."
     },
     "serverId": {
       "type": "string",
-      "description": "Which OTP server (a / b) served this live rental"
+      "description": "Internal: which OTP server (a / b) served this live rental. Never exposed to customers."
     },
     "providerOrderId": {
       "type": "string",
-      "description": "Provider-side order id used to poll for the OTP"
+      "description": "Internal provider-side order id used to poll for the OTP. Never exposed to customers."
     },
     "deliveredHandle": {
       "type": "string",
@@ -66,6 +70,37 @@
         "cancelled"
       ],
       "default": "active"
+    },
+    "otpReceived": {
+      "type": "boolean",
+      "default": false,
+      "description": "True once the provider authoritatively delivered a verification message"
+    },
+    "otpReceivedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cancelRequestedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cancelledAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "refundStatus": {
+      "type": "string",
+      "enum": [
+        "REFUND_NOT_ELIGIBLE",
+        "REFUND_PENDING",
+        "REFUNDED",
+        "REFUND_FAILED"
+      ],
+      "description": "Refund state. Only backend functions may change it."
+    },
+    "refundAmount": {
+      "type": "number",
+      "default": 0
     },
     "expiresAt": {
       "type": "string",

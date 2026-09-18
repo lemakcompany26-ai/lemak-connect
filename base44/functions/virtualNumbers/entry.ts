@@ -1,18 +1,22 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import {
   generateTransactionId, debitWallet, creditWallet,
-  computeMarketplaceFees, notifyUser, calculatePrice
+  computeMarketplaceFees, notifyUser, calculatePrice, isAdminEmail, isStaffRole
 } from '../../shared/lemak.ts';
+import { sendTransactionalEmail } from '../../shared/emails.ts';
 import {
   getOtpServers, getOtpServer, otpServerStatus, listSmsServices, getSmsPrice,
   buySmsNumber, checkSmsRequest, cancelSmsRequest, listEmailProducts,
   buyEmailOtp, checkEmailOtp, cancelEmailOtp
 } from '../../shared/otp.ts';
 
-// Virtual number rental market. Sellers list numbers for a fixed rental
-// window; buyers rent with wallet escrow. OTPs are delivered in a private
-// rental chat. Expired rentals are auto-refunded by a scheduled workflow.
-// The number itself is never exposed publicly — only to an active renter.
+// Virtual number rental market + unified live OTP service.
+// Customers see ONE "Virtual Numbers" service — the backend picks the
+// eligible provider (internal Server A / Server B) and never exposes
+// provider names, URLs, request ids or costs to the customer.
+// Seller-listed numbers use wallet escrow; expired rentals are auto-refunded
+// by a scheduled workflow. The number itself is never exposed publicly —
+// only to an active renter, inside their private order screen.
 
 function pad(n) { return String(n).padStart(2, '0'); }
 
@@ -121,7 +125,7 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ ok: true });
     }
 
-    // ---------- Rent ----------
+    // ---------- Rent (seller-listed numbers) ----------
     if (action === 'rent') {
       const listings = await service.entities.VirtualNumberListing.filter({ id: body.listingId }, '-created_date', 1);
       const listing = listings && listings[0];
@@ -194,23 +198,23 @@ export default async function(req: Request): Promise<Response> {
     }
 
     const loadRental = async (id) => {
-      const rows = await service.entities.NumberRental.filter({ id }, '-created_date', 1);
+      const rows = await service.entities.NumberRental.filter({ id: id || body.rentalId || body.orderId }, '-created_date', 1);
       const rental = rows && rows[0];
-      if (!rental) throw bad('Rental not found', 404);
+      if (!rental) throw bad('Order not found', 404);
       if (rental.buyerUserId !== user.id && rental.sellerUserId !== user.id) {
-        throw bad('You are not part of this rental', 403);
+        throw bad('You are not part of this order', 403);
       }
       return rental;
     };
 
     if (action === 'messages') {
-      const rental = await loadRental(body.rentalId);
+      const rental = await loadRental();
       const messages = await service.entities.RentalMessage.filter({ rentalId: rental.id }, 'created_date', 200);
       return Response.json({ ok: true, messages });
     }
 
     if (action === 'send_message') {
-      const rental = await loadRental(body.rentalId);
+      const rental = await loadRental();
       const content = String(body.content || '').trim().slice(0, 1000);
       if (!content) return Response.json({ error: 'Message cannot be empty' }, { status: 400 });
       if (rental.status !== 'active') {
@@ -242,14 +246,14 @@ export default async function(req: Request): Promise<Response> {
 
     // Typing indicator for the rental chat — see orderChat 'typing'.
     if (action === 'typing') {
-      const rental = await loadRental(body.rentalId);
+      const rental = await loadRental();
       const now = new Date().toISOString();
       await service.entities.NumberRental.update(rental.id, rental.buyerUserId === user.id ? { buyerTypingAt: now } : { sellerTypingAt: now });
       return Response.json({ ok: true });
     }
 
     if (action === 'complete') {
-      const rental = await loadRental(body.rentalId);
+      const rental = await loadRental();
       if (rental.buyerUserId !== user.id) {
         return Response.json({ error: 'Only the buyer can complete this rental' }, { status: 403 });
       }
@@ -281,7 +285,7 @@ export default async function(req: Request): Promise<Response> {
     }
 
     if (action === 'cancel') {
-      const rental = await loadRental(body.rentalId);
+      const rental = await loadRental();
       if (rental.buyerUserId !== user.id) {
         return Response.json({ error: 'Only the buyer can cancel this rental' }, { status: 403 });
       }
@@ -298,7 +302,7 @@ export default async function(req: Request): Promise<Response> {
         description: `Refund — cancelled virtual number rental ${rental.rentalRef}`,
         idempotencyKey: `vn-refund-${rental.id}`
       });
-      await service.entities.NumberRental.update(rental.id, { status: 'cancelled' });
+      await service.entities.NumberRental.update(rental.id, { status: 'cancelled', cancelledAt: new Date().toISOString() });
       const txs = await service.entities.Transaction.filter({ transactionId: rental.transactionId }, '-created_date', 1);
       if (txs && txs[0]) {
         await service.entities.Transaction.update(txs[0].id, { status: 'refunded', failureReason: 'Rental cancelled by buyer' }).catch(() => null);
@@ -312,11 +316,290 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ ok: true });
     }
 
-    // ---------- Live provider numbers (Fleexa-compatible: Server A / B) ----------
+    // ---------- Unified live Virtual Numbers (providers fully hidden) ----------
 
-    // Live provider rental prices (SMS + email OTP) follow the same backend
-    // fee engine as every other service — Admin → Pricing fee rules apply to
-    // the provider cost under the 'virtual_number' service.
+    // Unified catalogue: only services genuinely available from a configured
+    // provider are listed. No provider names, no server ids, no fake data.
+    if (action === 'unified_catalogue') {
+      const servers = getOtpServers().filter(s => s.url && s.key);
+      const smsSet = new Set();
+      const emailSet = new Set();
+      let online = 0;
+      for (const s of servers) {
+        try {
+          await otpServerStatus(s);
+          online++;
+        } catch (e) { continue; }
+        try {
+          const apps = await listSmsServices(s);
+          for (const a of apps || []) {
+            if (a.quantity === null || Number(a.quantity) > 0) smsSet.add(String(a.id).toLowerCase());
+          }
+        } catch (e) { /* service list unavailable on this provider */ }
+        try {
+          const products = await listEmailProducts(s);
+          for (const p of products || []) emailSet.add(String(p.id));
+        } catch (e) { /* email list unavailable on this provider */ }
+      }
+      return Response.json({
+        ok: true,
+        available: online > 0,
+        smsAvailable: smsSet.size > 0,
+        emailAvailable: emailSet.size > 0,
+        smsServices: [...smsSet].sort(),
+        emailDomains: [...emailSet].sort()
+      });
+    }
+
+    // Unified price: the backend resolves the eligible provider and returns
+    // only the final customer price.
+    if (action === 'unified_price') {
+      const product = body.product === 'email' ? 'email' : 'sms';
+      const serviceName = String(body.service || '').trim().toLowerCase().slice(0, 80);
+      if (!serviceName) return Response.json({ error: 'Choose a service first' }, { status: 400 });
+      for (const server of getOtpServers()) {
+        if (!server.url || !server.key) continue;
+        if (product === 'email' && server.id !== 'a') continue;
+        try {
+          let providerPrice = 0;
+          if (product === 'sms') {
+            const price = await getSmsPrice(server, serviceName);
+            providerPrice = Number(price.price_ngn) || 0;
+          } else {
+            const products = await listEmailProducts(server);
+            const match = (products || []).find(p => String(p.id) === serviceName);
+            providerPrice = match ? Number(match.price_ngn) || 0 : 0;
+          }
+          if (providerPrice > 0) {
+            const pricing = await calculatePrice(service, 'virtual_number', providerPrice);
+            return Response.json({ ok: true, available: true, customerPrice: pricing.customerPrice });
+          }
+        } catch (e) { /* try the next provider */ }
+      }
+      return Response.json({ ok: true, available: false });
+    }
+
+    // Create a live provider order — shared by the unified buy flow and the
+    // legacy per-server rent action. Provider details stay strictly internal.
+    const createLiveOrder = async ({ server, product, serviceName, providerCostInput, customerPrice }) => {
+      let providerCost = providerCostInput;
+      const transactionId = generateTransactionId();
+      let debit;
+      try {
+        debit = await debitWallet(service, {
+          userId: user.id, transactionId, type: 'purchase',
+          amount: customerPrice, reference: transactionId,
+          description: `Virtual ${product === 'sms' ? 'number' : 'email OTP'} — ${serviceName}`,
+          idempotencyKey: `vnp-${transactionId}`
+        });
+      } catch (e) {
+        throw bad(e.message, e.statusCode || 400);
+      }
+      if (debit.duplicated) {
+        throw bad('This order is already being processed. Refresh and try again.', 409);
+      }
+
+      let handle = '';
+      let providerOrderId = '';
+      let providerExpiresIn = 0;
+      try {
+        if (product === 'sms') {
+          const order = await buySmsNumber(server, serviceName);
+          handle = String((order && (order.phone || order.number)) || '');
+          providerExpiresIn = Number(order && order.expires_in) || 0;
+          providerOrderId = String((order && (order.id || order.activation_id || order.requestId)) || '');
+          const paid = Number(order && order.amount_paid) || 0;
+          if (paid > providerCost) {
+            // provider price changed — stop and refund
+            try { await cancelSmsRequest(server, providerOrderId); } catch (e) { /* best effort */ }
+            await creditWallet(service, {
+              userId: user.id, transactionId, type: 'refund',
+              amount: customerPrice, reference: transactionId,
+              description: `Refund — price changed (${serviceName})`,
+              idempotencyKey: `vnpr-${transactionId}`
+            });
+            return { ok: false, error: 'The price just changed. Please try again — you were refunded.', status: 409 };
+          }
+          if (paid > 0) providerCost = paid;
+        } else {
+          const order = await buyEmailOtp(server, serviceName);
+          handle = String((order && (order.email || order.address)) || '');
+          providerOrderId = String((order && (order.id || order.emailId)) || '');
+        }
+      } catch (e) {
+        await creditWallet(service, {
+          userId: user.id, transactionId, type: 'refund',
+          amount: customerPrice, reference: transactionId,
+          description: `Refund — order failed (${serviceName})`,
+          idempotencyKey: `vnpr-${transactionId}`
+        });
+        return { ok: false, error: e.message, status: e.statusCode || 502 };
+      }
+
+      if (!handle || !providerOrderId) {
+        try { await cancelSmsRequest(server, providerOrderId); } catch (e) { /* best effort */ }
+        await creditWallet(service, {
+          userId: user.id, transactionId, type: 'refund',
+          amount: customerPrice, reference: transactionId,
+          description: `Refund — order incomplete (${serviceName})`,
+          idempotencyKey: `vnpr-${transactionId}`
+        });
+        return { ok: false, error: 'We could not get your number. You were refunded — please try again.', status: 502 };
+      }
+
+      // OTP waiting window: maximum 7 minutes for numbers; 60 for email OTP.
+      const minutes = product === 'sms'
+        ? (providerExpiresIn > 0 ? Math.min(7, Math.max(1, Math.ceil(providerExpiresIn / 60))) : 7)
+        : 60;
+      const nowIso = new Date().toISOString();
+      const expiresAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+      const rental = await service.entities.NumberRental.create({
+        rentalRef: makeRef('VN'), transactionId,
+        listingId: `PROVIDER-${server.id.toUpperCase()}`,
+        buyerUserId: user.id, sellerUserId: 'system',
+        service: product === 'sms' ? `${serviceName} (live number)` : `${serviceName} (email OTP)`,
+        country: server.id === 'b' ? 'United States' : null,
+        amount: customerPrice, sellerPayout: 0, commission: 0,
+        product, provider: (server.provider || (server.id === 'b' ? 'smspool' : 'fleexa')), serverId: server.id,
+        providerOrderId, deliveredHandle: handle,
+        status: 'active', expiresAt, sellerTypingAt: nowIso,
+        otpReceived: false, refundStatus: null, refundAmount: 0
+      });
+      await service.entities.Transaction.create({
+        transactionId, userId: user.id, type: 'virtual_number',
+        service: `Virtual ${product === 'sms' ? 'Number' : 'Email OTP'} — ${serviceName}`,
+        provider: (server.provider || (server.id === 'b' ? 'smspool' : 'fleexa')), amount: customerPrice,
+        fee: customerPrice - providerCost, providerCost, customerPrice,
+        status: 'processing', recipient: handle,
+        metadata: {
+          rentalId: rental.id, rentalRef: rental.rentalRef,
+          product, serverId: server.id, providerOrderId
+        }
+      });
+      await service.entities.RentalMessage.create({
+        rentalId: rental.id, buyerUserId: user.id,
+        senderRole: 'system', senderName: 'Lemak Connect',
+        content: product === 'sms'
+          ? `Your live ${serviceName} number is ${handle}. Use it now — your verification message will appear here automatically within ${minutes} minutes.`
+          : `Your temporary email address is ${handle}. Use it to receive your verification code — it will appear here automatically.`
+      });
+      return { ok: true, rental, handle, wallet: debit.wallet };
+    };
+
+    // Unified buy: the customer picks a service; the backend chooses the
+    // eligible provider. The response never contains provider details.
+    if (action === 'vn_buy') {
+      const product = body.product === 'email' ? 'email' : 'sms';
+      const serviceName = String(body.service || '').trim().toLowerCase().slice(0, 80);
+      if (!serviceName) return Response.json({ error: 'Choose a service first' }, { status: 400 });
+
+      let chosen = null;
+      let providerCost = 0;
+      for (const server of getOtpServers()) {
+        if (!server.url || !server.key) continue;
+        if (product === 'email' && server.id !== 'a') continue;
+        try {
+          if (product === 'sms') {
+            const price = await getSmsPrice(server, serviceName);
+            const p = Number(price.price_ngn) || 0;
+            if (p > 0) { chosen = server; providerCost = p; break; }
+          } else {
+            const products = await listEmailProducts(server);
+            const match = (products || []).find(p => String(p.id) === serviceName);
+            if (match && Number(match.price_ngn) > 0) {
+              chosen = server; providerCost = Number(match.price_ngn); break;
+            }
+          }
+        } catch (e) { /* try the next provider */ }
+      }
+      if (!chosen) {
+        return Response.json({ error: 'This option is currently unavailable. Please try another service.' }, { status: 502 });
+      }
+      const pricing = await calculatePrice(service, 'virtual_number', providerCost);
+      const result = await createLiveOrder({
+        server: chosen, product, serviceName,
+        providerCostInput: providerCost, customerPrice: pricing.customerPrice
+      });
+      if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
+      const rental = result.rental;
+      await sendTransactionalEmail(service, {
+        emailType: 'OTP_NUMBER_PURCHASED', userId: user.id, recipientEmail: user.email,
+        recipientName: user.full_name, transactionId: rental.transactionId,
+        data: {
+          service: rental.service, country: rental.country || '',
+          transactionId: rental.transactionId,
+          status: 'Active — waiting for your verification message'
+        }
+      }).catch(() => null);
+      return Response.json({
+        ok: true, orderId: rental.id, handle: result.handle,
+        expiresAt: rental.expiresAt, wallet: result.wallet
+      });
+    }
+
+    // Sanitized customer order screen — internal provider fields stripped.
+    if (action === 'vn_order') {
+      const rental = await loadRental();
+      const messages = await service.entities.RentalMessage.filter({ rentalId: rental.id }, 'created_date', 200);
+      return Response.json({
+        ok: true,
+        order: {
+          id: rental.id, rentalRef: rental.rentalRef, transactionId: rental.transactionId,
+          service: rental.service, country: rental.country || '',
+          product: rental.product || null, handle: rental.deliveredHandle || null,
+          amount: rental.amount, status: rental.status,
+          otpReceived: !!rental.otpReceived,
+          refundStatus: rental.refundStatus || null, refundAmount: rental.refundAmount || 0,
+          expiresAt: rental.expiresAt, createdAt: rental.created_date
+        },
+        messages: (messages || []).map(m => ({
+          id: m.id, senderRole: m.senderRole, senderName: m.senderName,
+          content: m.content, isOtp: !!m.isOtp, createdAt: m.created_date
+        }))
+      });
+    }
+
+    // Admin virtual-number dashboard: staff only. Admins CAN see provider,
+    // server, request id, cost and markup; customers never can.
+    if (action === 'vn_admin_stats') {
+      const profiles = await service.entities.UserProfile.filter({ userId: user.id }, '-created_date', 1);
+      const profile = profiles && profiles[0] ? profiles[0] : null;
+      const authorized = (profile && isStaffRole(profile.role)) || isAdminEmail(user.email);
+      if (!authorized) return Response.json({ error: 'Forbidden' }, { status: 403 });
+
+      const rentals = await service.entities.NumberRental.list('-created_date', 500);
+      const live = (rentals || []).filter(r => r.provider);
+      const txs = await service.entities.Transaction.filter({ type: 'virtual_number' }, '-created_date', 500);
+      const successful = (txs || []).filter(t => t.status === 'successful');
+      const revenue = successful.reduce((s, t) => s + Number(t.customerPrice || 0), 0);
+      const providerCost = successful.reduce((s, t) => s + Number(t.providerCost || 0), 0);
+      return Response.json({
+        ok: true,
+        stats: {
+          total: live.length,
+          active: live.filter(r => r.status === 'active').length,
+          waiting: live.filter(r => r.status === 'active' && !r.otpReceived).length,
+          completed: live.filter(r => r.status === 'completed').length,
+          expired: live.filter(r => r.status === 'expired').length,
+          cancelled: live.filter(r => r.status === 'cancelled').length,
+          refunded: live.filter(r => r.refundStatus === 'REFUNDED').length,
+          revenue: Math.round(revenue * 100) / 100,
+          providerCost: Math.round(providerCost * 100) / 100,
+          profit: Math.round((revenue - providerCost) * 100) / 100
+        },
+        orders: live.slice(0, 100).map(r => ({
+          id: r.id, rentalRef: r.rentalRef, transactionId: r.transactionId,
+          provider: r.provider, serverId: r.serverId, providerOrderId: r.providerOrderId,
+          service: r.service, country: r.country || '', product: r.product,
+          handle: r.deliveredHandle, customerPrice: r.amount,
+          status: r.status, otpReceived: !!r.otpReceived,
+          refundStatus: r.refundStatus || null, refundAmount: r.refundAmount || 0,
+          createdAt: r.created_date
+        }))
+      });
+    }
+
+    // ---------- Legacy live-provider actions (kept for existing flows) ----------
 
     if (action === 'provider_catalog') {
       const servers = [];
@@ -382,7 +665,6 @@ export default async function(req: Request): Promise<Response> {
       const product = body.product === 'email' ? 'email' : 'sms';
       let serviceName = '';
       let providerCost = 0;
-      let customerPrice = 0;
 
       if (product === 'sms') {
         serviceName = String(body.serviceName || '').trim().toLowerCase().slice(0, 40);
@@ -399,115 +681,21 @@ export default async function(req: Request): Promise<Response> {
         if (!providerCost) return Response.json({ error: 'This email domain is not available right now' }, { status: 502 });
       }
       const pricing = await calculatePrice(service, 'virtual_number', providerCost);
-      customerPrice = pricing.customerPrice;
-
-      const transactionId = generateTransactionId();
-      let debit;
-      try {
-        debit = await debitWallet(service, {
-          userId: user.id, transactionId, type: 'purchase',
-          amount: customerPrice, reference: transactionId,
-          description: `Virtual ${product === 'sms' ? 'number' : 'email OTP'} — ${serviceName}`,
-          idempotencyKey: `vnp-${transactionId}`
-        });
-      } catch (e) {
-        return Response.json({ error: e.message }, { status: e.statusCode || 400 });
-      }
-      if (debit.duplicated) {
-        return Response.json({ error: 'This rental is already being processed. Refresh and try again.' }, { status: 409 });
-      }
-
-      let handle = '';
-      let providerOrderId = '';
-      let providerExpiresIn = 0;
-      try {
-        if (product === 'sms') {
-          const order = await buySmsNumber(server, serviceName);
-          handle = String((order && (order.phone || order.number)) || '');
-          providerExpiresIn = Number(order && order.expires_in) || 0;
-          providerOrderId = String((order && (order.id || order.activation_id || order.requestId)) || '');
-          const paid = Number(order && order.amount_paid) || 0;
-          if (paid > providerCost) {
-            // price changed at the provider — stop and refund
-            try { await cancelSmsRequest(server, providerOrderId); } catch (e) { /* best effort */ }
-            await creditWallet(service, {
-              userId: user.id, transactionId, type: 'refund',
-              amount: customerPrice, reference: transactionId,
-              description: `Refund — provider price changed (${serviceName})`,
-              idempotencyKey: `vnpr-${transactionId}`
-            });
-            return Response.json({ error: 'The provider price just changed. Please try again — you were refunded.' }, { status: 409 });
-          }
-          if (paid > 0) providerCost = paid;
-        } else {
-          const order = await buyEmailOtp(server, serviceName);
-          handle = String((order && (order.email || order.address)) || '');
-          providerOrderId = String((order && (order.id || order.emailId)) || '');
-        }
-      } catch (e) {
-        await creditWallet(service, {
-          userId: user.id, transactionId, type: 'refund',
-          amount: customerPrice, reference: transactionId,
-          description: `Refund — provider order failed (${serviceName})`,
-          idempotencyKey: `vnpr-${transactionId}`
-        });
-        return Response.json({ error: e.message }, { status: e.statusCode || 502 });
-      }
-
-      if (!handle || !providerOrderId) {
-        try { await cancelSmsRequest(server, providerOrderId); } catch (e) { /* best effort */ }
-        await creditWallet(service, {
-          userId: user.id, transactionId, type: 'refund',
-          amount: customerPrice, reference: transactionId,
-          description: `Refund — provider order incomplete (${serviceName})`,
-          idempotencyKey: `vnpr-${transactionId}`
-        });
-        return Response.json({ error: 'The provider did not return your number. You were refunded — please try again.' }, { status: 502 });
-      }
-
-      const minutes = product === 'sms'
-        ? (providerExpiresIn > 60 ? Math.min(20, Math.max(3, Math.ceil(providerExpiresIn / 60))) : 20)
-        : 60;
-      const now = new Date().toISOString();
-      const expiresAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
-      const rental = await service.entities.NumberRental.create({
-        rentalRef: makeRef('VN'), transactionId,
-        listingId: `PROVIDER-${server.id.toUpperCase()}`,
-        buyerUserId: user.id, sellerUserId: 'system',
-        service: product === 'sms' ? `${serviceName} (live number)` : `${serviceName} (email OTP)`,
-        amount: customerPrice, sellerPayout: 0, commission: 0,
-        product, provider: (server.provider || (server.id === 'b' ? 'smspool' : 'fleexa')), serverId: server.id,
-        providerOrderId, deliveredHandle: handle,
-        status: 'active', expiresAt, sellerTypingAt: now
+      const result = await createLiveOrder({
+        server, product, serviceName,
+        providerCostInput: providerCost, customerPrice: pricing.customerPrice
       });
-      await service.entities.Transaction.create({
-        transactionId, userId: user.id, type: 'virtual_number',
-        service: `Virtual ${product === 'sms' ? 'Number' : 'Email OTP'} — ${serviceName}`,
-        provider: (server.provider || (server.id === 'b' ? 'smspool' : 'fleexa')), amount: customerPrice,
-        fee: customerPrice - providerCost, providerCost, customerPrice,
-        status: 'processing', recipient: handle,
-        metadata: {
-          rentalId: rental.id, rentalRef: rental.rentalRef,
-          product, serverId: server.id, providerOrderId
-        }
-      });
-      await service.entities.RentalMessage.create({
-        rentalId: rental.id, buyerUserId: user.id,
-        senderRole: 'system', senderName: 'Lemak OTP Bot',
-        content: product === 'sms'
-          ? `Your live ${serviceName} number is ${handle}. Use it now — your OTP code will appear here automatically within ${minutes} minutes.`
-          : `Your temporary email address is ${handle}. Use it to receive your OTP code — it will appear here automatically.`
-      });
-      return Response.json({ ok: true, rental, handle, wallet: debit.wallet });
+      if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
+      return Response.json({ ok: true, rental: result.rental, handle: result.handle, wallet: result.wallet });
     }
 
     if (action === 'provider_check') {
-      const rental = await loadRental(body.rentalId);
+      const rental = await loadRental();
       if (rental.status !== 'active') {
         return Response.json({ ok: true, status: rental.status });
       }
       const server = getOtpServer(rental.serverId);
-      if (!server) return Response.json({ error: 'Provider server not found' }, { status: 400 });
+      if (!server) return Response.json({ error: 'Order server not found' }, { status: 400 });
 
       let data = null;
       try {
@@ -529,18 +717,21 @@ export default async function(req: Request): Promise<Response> {
         await creditWallet(service, {
           userId: rental.buyerUserId, transactionId: rental.transactionId,
           type: 'refund', amount: rental.amount, reference: rental.rentalRef,
-          description: `Refund — provider cancelled rental ${rental.rentalRef}`,
+          description: `Refund — provider cancelled order ${rental.rentalRef}`,
           idempotencyKey: `vn-refund-${rental.id}`
         });
-        await service.entities.NumberRental.update(rental.id, { status: 'cancelled', sellerTypingAt: null });
+        await service.entities.NumberRental.update(rental.id, {
+          status: 'cancelled', sellerTypingAt: null,
+          cancelledAt: nowIso, refundStatus: 'REFUNDED', refundAmount: rental.amount
+        });
         const txs = await service.entities.Transaction.filter({ transactionId: rental.transactionId }, '-created_date', 1);
         if (txs && txs[0]) {
           await service.entities.Transaction.update(txs[0].id, { status: 'refunded', failureReason: 'Cancelled by provider — auto-refund' }).catch(() => null);
         }
         await notifyUser(service, {
           userId: rental.buyerUserId, type: 'transaction',
-          title: 'Rental cancelled — refunded',
-          message: `The provider cancelled your ${rental.service} rental (${rental.rentalRef}). ₦${Number(rental.amount).toLocaleString()} was refunded to your wallet.`,
+          title: 'Order cancelled — refunded',
+          message: `Your ${rental.service} order (${rental.rentalRef}) was cancelled. ₦${Number(rental.amount).toLocaleString()} was refunded to your wallet.`,
           actionUrl: '/app/wallet'
         });
         return Response.json({ ok: true, status: 'cancelled' });
@@ -552,20 +743,29 @@ export default async function(req: Request): Promise<Response> {
           const nowIso = new Date().toISOString();
           await service.entities.RentalMessage.create({
             rentalId: rental.id, buyerUserId: rental.buyerUserId,
-            senderRole: 'system', senderName: 'Lemak OTP Bot',
+            senderRole: 'system', senderName: 'Lemak Connect',
             content: String(code).slice(0, 50), isOtp: true
           });
-          await service.entities.NumberRental.update(rental.id, { status: 'completed', completedAt: nowIso, sellerTypingAt: null });
+          await service.entities.NumberRental.update(rental.id, {
+            status: 'completed', completedAt: nowIso, sellerTypingAt: null,
+            otpReceived: true, otpReceivedAt: nowIso
+          });
           const txs = await service.entities.Transaction.filter({ transactionId: rental.transactionId }, '-created_date', 1);
           if (txs && txs[0]) {
             await service.entities.Transaction.update(txs[0].id, { status: 'successful', completedAt: nowIso }).catch(() => null);
           }
           await notifyUser(service, {
             userId: rental.buyerUserId, type: 'transaction',
-            title: 'OTP received 🔑',
-            message: `Your OTP code for ${rental.service} (${rental.rentalRef}) is ready — open the rental chat to view it.`,
+            title: 'Verification message received 🔑',
+            message: `Your verification code for ${rental.service} (${rental.rentalRef}) is ready — open your order screen to view it.`,
             actionUrl: '/app/virtual-numbers'
           });
+          // Notification email only — never the code itself.
+          await sendTransactionalEmail(service, {
+            emailType: 'OTP_RECEIVED', userId: rental.buyerUserId, recipientEmail: user.email,
+            recipientName: user.full_name, transactionId: rental.transactionId,
+            data: { service: rental.service, transactionId: rental.transactionId }
+          }).catch(() => null);
         }
         return Response.json({ ok: true, status: 'completed', otp: true });
       }
@@ -576,20 +776,26 @@ export default async function(req: Request): Promise<Response> {
     }
 
     if (action === 'provider_cancel') {
-      const rental = await loadRental(body.rentalId);
+      const rental = await loadRental();
       if (rental.buyerUserId !== user.id) {
-        return Response.json({ error: 'Only the buyer can cancel this rental' }, { status: 403 });
+        return Response.json({ error: 'Only the buyer can cancel this order' }, { status: 403 });
       }
       if (!rental.provider) {
-        return Response.json({ error: 'Not a live provider rental' }, { status: 400 });
+        return Response.json({ error: 'Not a live provider order' }, { status: 400 });
       }
       if (rental.status !== 'active') {
-        return Response.json({ error: `Rental already ${rental.status}` }, { status: 400 });
+        return Response.json({ error: `Order already ${rental.status}` }, { status: 400 });
       }
       const otps = await service.entities.RentalMessage.filter({ rentalId: rental.id, isOtp: true }, '-created_date', 1);
       if (otps && otps[0]) {
-        return Response.json({ error: 'An OTP was already delivered for this rental, so it cannot be cancelled.' }, { status: 400 });
+        return Response.json({ error: 'This request has already received a verification message and may no longer be eligible for cancellation.' }, { status: 400 });
       }
+      // 50-second rule: cancellation opens shortly after the order starts.
+      const ageSeconds = (Date.now() - new Date(rental.created_date).getTime()) / 1000;
+      if (ageSeconds < 50) {
+        return Response.json({ error: 'Cancellation will become available shortly.' }, { status: 400 });
+      }
+      const nowIso = new Date().toISOString();
       const server = getOtpServer(rental.serverId);
       if (server) {
         try {
@@ -600,14 +806,31 @@ export default async function(req: Request): Promise<Response> {
       await creditWallet(service, {
         userId: rental.buyerUserId, transactionId: rental.transactionId,
         type: 'refund', amount: rental.amount, reference: rental.rentalRef,
-        description: `Refund — cancelled virtual number rental ${rental.rentalRef}`,
+        description: `Refund — cancelled virtual number order ${rental.rentalRef}`,
         idempotencyKey: `vn-refund-${rental.id}`
       });
-      await service.entities.NumberRental.update(rental.id, { status: 'cancelled' });
+      await service.entities.NumberRental.update(rental.id, {
+        status: 'cancelled', cancelRequestedAt: nowIso, cancelledAt: nowIso,
+        refundStatus: 'REFUNDED', refundAmount: rental.amount
+      });
       const txs = await service.entities.Transaction.filter({ transactionId: rental.transactionId }, '-created_date', 1);
       if (txs && txs[0]) {
-        await service.entities.Transaction.update(txs[0].id, { status: 'refunded', failureReason: 'Rental cancelled by buyer' }).catch(() => null);
+        await service.entities.Transaction.update(txs[0].id, { status: 'refunded', failureReason: 'Order cancelled by buyer' }).catch(() => null);
       }
+      await notifyUser(service, {
+        userId: rental.buyerUserId, type: 'transaction',
+        title: 'Order cancelled — refunded',
+        message: `Your ${rental.service} order (${rental.rentalRef}) was cancelled. ₦${Number(rental.amount).toLocaleString()} was refunded to your wallet.`,
+        actionUrl: '/app/wallet'
+      });
+      await sendTransactionalEmail(service, {
+        emailType: 'OTP_REFUNDED', userId: rental.buyerUserId, recipientEmail: user.email,
+        recipientName: user.full_name, transactionId: rental.transactionId,
+        data: {
+          service: rental.service, refundAmount: rental.amount,
+          transactionId: rental.transactionId, refundStatus: 'REFUNDED'
+        }
+      }).catch(() => null);
       return Response.json({ ok: true });
     }
 

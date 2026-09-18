@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Loader2, Phone } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,12 +10,13 @@ import ListingCard from '@/components/vnum/ListingCard';
 import RentalCard from '@/components/vnum/RentalCard';
 import RentalChatDialog from '@/components/vnum/RentalChatDialog';
 import CreateListingForm from '@/components/vnum/CreateListingForm';
-import ProviderBrowse from '@/components/vnum/ProviderBrowse';
+import UnifiedCatalogue from '@/components/vnum/UnifiedCatalogue';
 import { formatNaira } from '@/lib/format';
 
 export default function VirtualNumbers() {
   const { refresh } = useApp();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [listings, setListings] = useState(null);
   const [myRentals, setMyRentals] = useState(null);
   const [sellerRentals, setSellerRentals] = useState(null);
@@ -22,7 +24,6 @@ export default function VirtualNumbers() {
   const [tab, setTab] = useState('browse');
   const [busy, setBusy] = useState(false);
   const [chat, setChat] = useState(null); // { rental, role }
-  const [otpInfo, setOtpInfo] = useState(null); // { servers, serviceCount }
 
   const call = async (payload, okTitle, okDesc) => {
     setBusy(true);
@@ -58,12 +59,6 @@ export default function VirtualNumbers() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  useEffect(() => {
-    base44.functions.invoke('otpServices', { action: 'list' })
-      .then(res => { const d = res.data || res; setOtpInfo({ servers: d.servers || [], serviceCount: d.serviceCount || 0 }); })
-      .catch(() => {});
-  }, []);
 
   const rent = async (listing) => {
     const d = await call(
@@ -131,20 +126,11 @@ export default function VirtualNumbers() {
         <p className="text-sm text-slate-400 mt-1">
           Rent a number, receive your OTP in a private chat, and get auto-refunded if the window expires.
         </p>
-        {otpInfo && (
-          <div className="flex flex-wrap items-center gap-2 mt-3">
-            {otpInfo.serviceCount > 0 && (
-              <span className="inline-flex items-center rounded-full border border-mk-border bg-mk-card px-2.5 py-1 text-[10px] font-semibold text-slate-300">
-                {otpInfo.serviceCount} OTP services — email, SMS & all social media
-              </span>
-            )}
-            {(otpInfo.servers || []).map(s => (
-              <span key={s.id} className={'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold ' + (s.configured ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-mk-border bg-mk-card text-slate-500')}>
-                OTP {s.id.toUpperCase()}: {s.configured ? 'connected' : 'not set'}
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="mt-3">
+          <span className="inline-flex items-center rounded-full border border-mk-border bg-mk-card px-2.5 py-1 text-[10px] font-semibold text-slate-300">
+            Live numbers & temporary email addresses — OTP delivered privately
+          </span>
+        </div>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -157,8 +143,8 @@ export default function VirtualNumbers() {
         </TabsList>
 
         <TabsContent value="browse" className="mt-5 space-y-5">
-          <ProviderBrowse
-            onRented={(rental) => { setTab('rentals'); setChat({ rental, role: 'buyer' }); load(); }}
+          <UnifiedCatalogue
+            onBought={(orderId) => navigate('/app/virtual-numbers/order/' + orderId)}
           />
 
           <div className="space-y-3">
@@ -182,7 +168,7 @@ export default function VirtualNumbers() {
             {myRentals === null && <div className="py-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-mk-blue" /></div>}
             {myRentals && myRentals.length === 0 && <div className="text-xs text-slate-500 py-2">You haven't rented any numbers yet.</div>}
             {myRentals && myRentals.map(r => (
-              <RentalCard key={r.id} rental={r} role="buyer" busy={busy} onComplete={complete} onCancel={cancel} onChat={(rental) => setChat({ rental, role: 'buyer' })} />
+              <RentalCard key={r.id} rental={r} role="buyer" busy={busy} onComplete={complete} onCancel={cancel} onChat={(rental) => rental.provider ? navigate('/app/virtual-numbers/order/' + rental.id) : setChat({ rental, role: 'buyer' })} />
             ))}
           </div>
           <div className="space-y-3">

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, LayoutGrid, Smartphone, Wifi, Lightbulb, Tv, Trophy, GraduationCap, Ticket, Globe, Phone, TrendingUp, BarChart3, Store, Wallet, ReceiptText, Bell, Headset, UserCircle, Settings, Lock } from 'lucide-react';
+import { LayoutDashboard, LayoutGrid, Smartphone, Wifi, Tv, Trophy, Ticket, Phone, TrendingUp, BarChart3, Store, Wallet, ReceiptText, Bell, Headset, UserCircle, Settings, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const APP_NAV = [
@@ -16,14 +16,11 @@ export const APP_NAV = [
 export const SERVICE_NAV = [
   { to: '/app/airtime', label: 'Airtime', icon: Smartphone, soon: false },
   { to: '/app/data', label: 'Data', icon: Wifi, soon: false },
-  { to: '/app/electricity', label: 'Electricity', icon: Lightbulb, soon: true },
-  { to: '/app/cable', label: 'Cable TV', icon: Tv, soon: true },
-  { to: '/app/betting', label: 'Betting', icon: Trophy, soon: true },
-  { to: '/app/education', label: 'Education', icon: GraduationCap, soon: true },
-  { to: '/app/epin', label: 'ePIN / Recharge', icon: Ticket, soon: true },
-  { to: '/app/broadband', label: 'Broadband', icon: Globe, soon: true },
+  { to: '/app/cable', label: 'Cable TV', icon: Tv, soon: false },
+  { to: '/app/betting', label: 'Betting', icon: Trophy, soon: false },
+  { to: '/app/epin', label: 'ePIN / Recharge', icon: Ticket, soon: false },
   { to: '/app/virtual-numbers', label: 'Virtual Numbers', icon: Phone, soon: false },
-  { to: '/app/social-growth', label: 'Social Growth', icon: TrendingUp, soon: true }
+  { to: '/app/social-growth', label: 'Social Growth', icon: TrendingUp, soon: false }
 ];
 
 export const ACCOUNT_NAV = [

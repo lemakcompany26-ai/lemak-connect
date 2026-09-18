@@ -12,8 +12,12 @@ const LIVE_ROUTES = {
   'social-growth': '/app/social-growth',
   marketplace: '/app/marketplace',
   'virtual-numbers': '/app/virtual-numbers',
+  analytics: '/app/analytics',
   social_growth_placeholder: null
 };
+
+// Not launched yet (pending provider enablement) — hidden from the app.
+const HIDDEN = ['electricity', 'education', 'broadband'];
 
 export default function Services() {
   const { profile } = useApp();
@@ -24,7 +28,7 @@ export default function Services() {
         <p className="text-sm text-muted-foreground mt-1">Everything you can buy with your Lemak wallet.</p>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {ALL_SERVICES.map(s => {
+        {ALL_SERVICES.filter(s => !HIDDEN.includes(s.slug)).map(s => {
           const to = LIVE_ROUTES[s.slug];
           const inner = (
             <>

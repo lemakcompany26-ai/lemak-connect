@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Smartphone, Wifi, Lightbulb, Tv, Store, Plus, ArrowRight, ReceiptText, Bell } from 'lucide-react';
+import { Smartphone, Wifi, Tv, Store, Plus, ArrowRight, ReceiptText, Bell } from 'lucide-react';
 import { useApp } from '@/lib/AppContext';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,8 @@ import PullToRefresh from '@/components/app/PullToRefresh';
 const QUICK_ACTIONS = [
   { to: '/app/airtime', label: 'Airtime', icon: Smartphone },
   { to: '/app/data', label: 'Data', icon: Wifi },
-  { to: '/app/electricity', label: 'Electricity', icon: Lightbulb, soon: true },
-  { to: '/app/cable', label: 'Cable TV', icon: Tv, soon: true },
-  { to: '/app/social-growth', label: 'Social Growth', icon: Store, soon: false },
+  { to: '/app/cable', label: 'Cable TV', icon: Tv },
+  { to: '/app/social-growth', label: 'Social Growth', icon: Store },
   { to: '/app/marketplace', label: 'Marketplace', icon: Store }
 ];
 

@@ -82,7 +82,8 @@ export default function VirtualNumberOrder() {
   const isRent = order && order.product === 'rent';
   const isEmail = order && order.product === 'email';
   const canCancel = isActive && !order.otpReceived && !isRent;
-  const statusLabel = isRent && isActive
+  const statusLabel = !order ? ''
+    : isRent && isActive
     ? `Active — yours for ${order.duration || '1'} month${(order.duration || '1') !== '1' ? 's' : ''}`
     : (STATUS_LABELS[order.status] || order.status);
   const expiryDate = order && order.expiresAt

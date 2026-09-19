@@ -111,15 +111,39 @@ export async function consumeBiometricApproval(service, userId, token) {
   return false;
 }
 
-// Purchase gate: passes when no PIN exists or purchase protection is off.
-// Accepts either the transaction PIN or a one-time biometric approval token.
+// Purchase gate: every payment and transaction must be verified BEFORE it
+// runs. Users with purchase-PIN protection on must enter their PIN (or use a
+// one-time biometric approval); users with a registered fingerprint / Face ID
+// must verify biometrically even when purchase PIN protection is off.
 export async function assertPinForPurchase(service, userId, pin, biometricToken) {
   const credential = await getPinCredential(service, userId);
-  if (!credential || !credential.requireForPurchases) return;
-  if (pin) {
+  if (credential && credential.requireForPurchases) {
+    if (pin) {
+      await verifyPin(service, userId, pin, { context: 'purchase' });
+      return;
+    }
+    if (biometricToken) {
+      const ok = await consumeBiometricApproval(service, userId, String(biometricToken));
+      if (ok) {
+        await logSecurityEvent(service, userId, 'biometric_verified', {
+          severity: 'info', description: 'Purchase authorized with biometric unlock'
+        });
+        return;
+      }
+      throw pinError('Biometric unlock was not valid. Enter your transaction PIN.', 403);
+    }
+    throw pinError('Enter your transaction PIN or use biometric unlock to complete this purchase', 403);
+  }
+  // A set PIN is accepted even when purchase protection is off — fallback
+  // for devices without the registered biometric.
+  if (credential && pin) {
     await verifyPin(service, userId, pin, { context: 'purchase' });
     return;
   }
+  // Biometric gate: applies to ALL users with a registered fingerprint /
+  // Face ID, even without a transaction PIN.
+  const creds = await service.entities.BiometricCredential.filter({ userId }, '-created_date', 5);
+  if (!creds || creds.length === 0) return;
   if (biometricToken) {
     const ok = await consumeBiometricApproval(service, userId, String(biometricToken));
     if (ok) {
@@ -128,7 +152,7 @@ export async function assertPinForPurchase(service, userId, pin, biometricToken)
       });
       return;
     }
-    throw pinError('Biometric unlock was not valid. Enter your transaction PIN.', 403);
+    throw pinError('Biometric unlock was not valid. Try again.', 403);
   }
-  throw pinError('Enter your transaction PIN or use biometric unlock to complete this purchase', 403);
+  throw pinError('Verify with fingerprint / Face ID to complete this purchase', 403);
 }

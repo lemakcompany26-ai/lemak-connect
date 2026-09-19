@@ -26,6 +26,7 @@ export default function Data() {
   const [success, setSuccess] = useState(null);
   const [pin, setPin] = useState('');
   const [biometricToken, setBiometricToken] = useState('');
+  const [verifyGate, setVerifyGate] = useState(false);
 
   const loadPlans = async (net) => {
     setPlans(null); setPlansError(''); setSelectedPlan(null);
@@ -154,7 +155,7 @@ export default function Data() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <PromoCodeInput serviceSlug="data" providerCost={selectedPlan ? selectedPlan.providerCost : 0} onValidated={setPromo} />
-          <TransactionPinInput value={pin} onChange={setPin} biometricToken={biometricToken} onBiometricToken={setBiometricToken} />
+          <TransactionPinInput value={pin} onChange={setPin} biometricToken={biometricToken} onBiometricToken={setBiometricToken} onGateChange={setVerifyGate} />
           {error && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /> {error}
@@ -164,7 +165,7 @@ export default function Data() {
             <span className="text-muted-foreground">Wallet balance</span>
             <span className="font-bold">{formatNaira(wallet ? wallet.balance : 0)}</span>
           </div>
-          <Button type="submit" className="w-full h-12 text-sm font-bold" disabled={loading || !phoneNumber || !selectedPlan}>
+          <Button type="submit" className="w-full h-12 text-sm font-bold" disabled={loading || !phoneNumber || !selectedPlan || (verifyGate && !pin && !biometricToken)}>
             {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing…</> : selectedPlan ? `Buy ${selectedPlan.name} — ${formatNairaShort(selectedPlan.customerPrice)}` : 'Select a plan'}
           </Button>
         </form>

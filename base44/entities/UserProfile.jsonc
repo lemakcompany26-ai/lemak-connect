@@ -47,6 +47,14 @@
     "referredByPromoCode": {
       "type": "string"
     },
+    "bvn": {
+      "type": "string",
+      "description": "Bank Verification Number \u2014 required KYC for the customer's dedicated virtual account"
+    },
+    "nin": {
+      "type": "string",
+      "description": "National Identity Number \u2014 optional KYC for the dedicated virtual account"
+    },
     "lastLoginAt": {
       "type": "string",
       "format": "date-time"

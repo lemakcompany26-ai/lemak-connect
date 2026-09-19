@@ -1,0 +1,73 @@
+{
+  "name": "VirtualBankAccount",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string",
+      "description": "Base44 user id owning this account. One permanent account per user."
+    },
+    "accountReference": {
+      "type": "string",
+      "description": "Unique LEMAK reference, format LEM-VBA-USERID-XXXXXXXX"
+    },
+    "koraUniqueId": {
+      "type": "string",
+      "description": "Internal provider unique id. Never shown to customers."
+    },
+    "accountNumber": {
+      "type": "string",
+      "description": "Real provider-issued NGN account number"
+    },
+    "accountName": {
+      "type": "string"
+    },
+    "bankName": {
+      "type": "string"
+    },
+    "bankCode": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "pending",
+        "failed"
+      ],
+      "default": "pending"
+    },
+    "lastCheckedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional free-form notes, up to 1000 characters"
+    }
+  },
+  "required": [
+    "userId",
+    "accountReference",
+    "accountNumber",
+    "accountName",
+    "bankName"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "$or": [
+        {
+          "data.userId": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}

@@ -25,6 +25,7 @@ export default function Airtime() {
   const [success, setSuccess] = useState(null);
   const [pin, setPin] = useState('');
   const [biometricToken, setBiometricToken] = useState('');
+  const [verifyGate, setVerifyGate] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -127,7 +128,7 @@ export default function Airtime() {
 
         <PromoCodeInput serviceSlug="airtime" providerCost={Number(amount) || 0} onValidated={setPromo} />
 
-        <TransactionPinInput value={pin} onChange={setPin} biometricToken={biometricToken} onBiometricToken={setBiometricToken} />
+        <TransactionPinInput value={pin} onChange={setPin} biometricToken={biometricToken} onBiometricToken={setBiometricToken} onGateChange={setVerifyGate} />
 
         {error && (
           <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
@@ -140,7 +141,7 @@ export default function Airtime() {
           <span className="font-bold">{formatNaira(wallet ? wallet.balance : 0)}</span>
         </div>
 
-        <Button type="submit" className="w-full h-12 text-sm font-bold" disabled={loading || !phoneNumber || !amount}>
+        <Button type="submit" className="w-full h-12 text-sm font-bold" disabled={loading || !phoneNumber || !amount || (verifyGate && !pin && !biometricToken)}>
           {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing…</> : `Buy ${amount ? formatNairaShort(amount) : ''} Airtime`}
         </Button>
       </form>

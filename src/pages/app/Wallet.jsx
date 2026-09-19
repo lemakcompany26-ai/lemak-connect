@@ -1,27 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Loader2, ArrowDownLeft, ArrowUpRight, CheckCircle2, AlertCircle, Wallet as WalletIcon } from 'lucide-react';
+import { Plus, Loader2, ArrowDownLeft, ArrowUpRight, CheckCircle2, Wallet as WalletIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useApp } from '@/lib/AppContext';
 import { useToast } from '@/components/ui/use-toast';
 import { formatNaira, formatNairaShort, formatDate } from '@/lib/format';
 import PullToRefresh from '@/components/app/PullToRefresh';
 import { firePurchaseConversion } from '@/lib/ads';
-
-const QUICK_AMOUNTS = [500, 1000, 2000, 5000, 10000, 20000];
+import DedicatedAccountCard from '@/components/wallet/DedicatedAccountCard';
+import FundWalletSheet from '@/components/wallet/FundWalletSheet';
 
 export default function Wallet() {
   const { wallet, refresh } = useApp();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
-  const [amount, setAmount] = useState('');
-  const [loading, setLoading] = useState(false);
   const [funding, setFunding] = useState(null); // 'verifying' | 'done'
   const [ledger, setLedger] = useState(null);
-  const [error, setError] = useState('');
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const loadLedger = () => base44.entities.WalletLedger.list('-created_date', 20).then(setLedger).catch(() => setLedger([]));
 
@@ -32,18 +28,21 @@ export default function Wallet() {
     await Promise.all([refresh(), loadLedger()]);
   };
 
-  // Returning from Paystack — verify server-side before trusting anything
+  // Returning from a payment gateway — verify server-side before trusting
+  // anything (Paystack returns ?reference, Flutterwave returns ?tx_ref).
   useEffect(() => {
     const reference = searchParams.get('reference') || searchParams.get('trxref');
-    if (!reference || funding === 'done') return;
+    const flwRef = searchParams.get('tx_ref');
+    const ref = flwRef || reference;
+    if (!ref || funding === 'done') return;
     setFunding('verifying');
     (async () => {
       try {
-        const res = await base44.functions.invoke('verifyFunding', { reference });
+        const res = await base44.functions.invoke(flwRef ? 'verifyFlutterwaveFunding' : 'verifyFunding', { reference: ref });
         const d = res.data || res;
         if (d.credited) {
           await refresh();
-          firePurchaseConversion({ value: d.amount, transactionId: reference });
+          firePurchaseConversion({ value: d.amount, transactionId: ref });
           toast({ title: 'Wallet funded!', description: `${formatNairaShort(d.amount)} was added to your wallet.` });
         } else {
           toast({ title: 'Payment not completed', description: 'If you were charged, it will reflect automatically once confirmed.', variant: 'destructive' });
@@ -56,30 +55,11 @@ export default function Wallet() {
     })();
   }, [searchParams]);
 
-  const handleFund = async () => {
-    setError('');
-    const value = Number(amount);
-    if (!value || value < 100) return setError('Minimum funding amount is ₦100');
-    setLoading(true);
-    try {
-      const res = await base44.functions.invoke('initializeFunding', {
-        amount: value,
-        callbackUrl: window.location.origin + '/app/wallet'
-      });
-      const d = res.data || res;
-      window.location.href = d.authorizationUrl;
-    } catch (err) {
-      const d = err.response && err.response.data;
-      setError((d && d.error) || err.message || 'Could not start payment');
-      setLoading(false);
-    }
-  };
-
   return (
     <PullToRefresh onRefresh={handleRefresh}>
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-extrabold flex items-center gap-2.5"><WalletIcon className="w-6 h-6 text-primary" /> Wallet</h1>
+        <h1 className="font-heading text-2xl font-extrabold flex items-center gap-2.5"><WalletIcon className="w-6 h-6 text-primary" /> LEMAK WALLET</h1>
         <p className="text-sm text-muted-foreground mt-1">Fund once, buy anything, instantly.</p>
       </div>
 
@@ -89,37 +69,20 @@ export default function Wallet() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        <div className="rounded-3xl brand-gradient p-7 relative overflow-hidden">
-          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 85% 20%, rgba(96,165,250,.6) 0%, transparent 40%)' }} />
-          <div className="relative">
-            <div className="text-xs uppercase tracking-wider font-semibold text-white/60">Available Balance</div>
-            <div className="mt-1.5 text-white text-3xl font-extrabold">{formatNaira(wallet ? wallet.balance : 0)}</div>
-            <div className="mt-1 text-xs text-white/50">Currency: {wallet ? wallet.currency : 'NGN'}</div>
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-border bg-card p-6">
-          <h3 className="font-heading font-bold text-sm flex items-center gap-2"><Plus className="w-4 h-4 text-primary" /> Fund with card</h3>
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {QUICK_AMOUNTS.map(a => (
-              <button key={a} type="button" onClick={() => setAmount(String(a))}
-                className={'rounded-xl border-2 py-2 text-xs font-bold transition-all ' + (amount === String(a) ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground hover:border-primary/40')}>
-                {formatNairaShort(a)}
-              </button>
-            ))}
-          </div>
-          <div className="mt-3 space-y-2">
-            <Label htmlFor="fundAmount">Amount (₦)</Label>
-            <Input id="fundAmount" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="Enter amount" className="h-12 text-base" />
-          </div>
-          {error && <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm"><AlertCircle className="w-4 h-4" /> {error}</div>}
-          <Button className="w-full mt-4 h-12 font-bold" onClick={handleFund} disabled={loading || !amount}>
-            {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Redirecting…</> : 'Pay Securely with Paystack'}
-          </Button>
-          <p className="mt-3 text-[11px] text-muted-foreground text-center">Your wallet is credited only after payment is confirmed server-side.</p>
+      <div className="rounded-3xl brand-gradient p-7 relative overflow-hidden">
+        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 85% 20%, rgba(96,165,250,.6) 0%, transparent 40%)' }} />
+        <div className="relative">
+          <div className="text-xs uppercase tracking-wider font-semibold text-white/60">Available Balance</div>
+          <div className="mt-1.5 text-white text-3xl font-extrabold">{formatNaira(wallet ? wallet.balance : 0)}</div>
+          <div className="mt-1 text-xs text-white/50">Currency: {wallet ? wallet.currency : 'NGN'}</div>
         </div>
       </div>
+
+      <DedicatedAccountCard />
+
+      <Button className="w-full h-12 font-bold" onClick={() => setSheetOpen(true)}>
+        <Plus className="w-4 h-4 mr-2" /> Fund Wallet
+      </Button>
 
       <div className="rounded-3xl border border-border bg-card p-6">
         <h3 className="font-heading font-bold text-sm">Wallet Activity</h3>
@@ -148,6 +111,8 @@ export default function Wallet() {
           <CheckCircle2 className="w-4 h-4" /> Payment processed. Your balance above is up to date.
         </div>
       )}
+
+      <FundWalletSheet open={sheetOpen} onOpenChange={setSheetOpen} />
     </div>
     </PullToRefresh>
   );

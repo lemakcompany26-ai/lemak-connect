@@ -10,22 +10,22 @@
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 224 76% 48%;
+    --primary: 217 100% 50%;
     --primary-foreground: 0 0% 100%;
     --secondary: 222 47% 11%;
     --secondary-foreground: 0 0% 100%;
     --muted: 215 28% 95%;
     --muted-foreground: 215 16% 47%;
-    --accent: 217 91% 60%;
+    --accent: 217 100% 50%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     --border: 214 32% 88%;
     --input: 214 32% 88%;
-    --ring: 224 76% 48%;
-    --brand: 224 76% 48%;
+    --ring: 217 100% 50%;
+    --brand: 217 100% 50%;
     --brand-dark: 222 56% 13%;
-    --chart-1: 224 76% 48%;
+    --chart-1: 217 100% 50%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
@@ -129,10 +129,10 @@
     padding-right: max(1.5rem, env(safe-area-inset-right));
   }
   .brand-gradient {
-    background-image: linear-gradient(135deg, hsl(224 76% 48%) 0%, hsl(222 56% 13%) 100%);
+    background-image: linear-gradient(135deg, hsl(217 100% 50%) 0%, hsl(222 56% 13%) 100%);
   }
   .brand-gradient-soft {
-    background-image: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(224 76% 48%) 100%);
+    background-image: linear-gradient(135deg, hsl(217 100% 60%) 0%, hsl(217 100% 50%) 100%);
   }
   .glass-card {
     background: rgba(255, 255, 255, 0.7);

@@ -7,6 +7,8 @@ import { secrets } from 'base44:runtime';
 
 export const SUPPORT_EMAIL = 'lemakcompany26@gmail.com';
 export const SUPPORT_PHONE = '09022143559';
+export const COMPANY_ADDRESS = 'No. 2 Opeyemi, Zone 2, Alakia, Ibadan, Nigeria';
+export const EMAIL_LOGO_URL = 'https://media.base44.com/images/public/6aac39a1738410bf82b900f5/c46723cf5_generated_image.png';
 export const APP_URL = 'https://lemakconnect.base44.app';
 
 const money = (n) => `₦${Number(n || 0).toLocaleString()}`;
@@ -30,9 +32,14 @@ function brandEmail({ title, intro, rows, ctaText, ctaPath, note }) {
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="font-family:Arial,Helvetica,sans-serif;background:#eef2f7;margin:0;padding:24px">
 <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0">
-  <div style="background:linear-gradient(135deg,#1d4ed8 0%,#0f172a 100%);padding:26px 24px">
-    <div style="color:#ffffff;font-size:19px;font-weight:800;letter-spacing:1px">LEMAK CONNECT</div>
-    <div style="color:#93c5fd;font-size:11px;margin-top:4px;letter-spacing:2px">DIGITAL SERVICES, SIMPLIFIED</div>
+  <div style="background:linear-gradient(135deg,#0066FF 0%,#0f172a 100%);padding:22px 24px">
+    <table style="border-collapse:collapse"><tr>
+      <td style="padding-right:14px"><img src="${EMAIL_LOGO_URL}" width="42" height="42" alt="Lemak Connect" style="border-radius:10px;display:block;border:0"/></td>
+      <td>
+        <div style="color:#ffffff;font-size:19px;font-weight:800;letter-spacing:1px">LEMAK CONNECT</div>
+        <div style="color:#93c5fd;font-size:11px;margin-top:4px;letter-spacing:2px">DIGITAL SERVICES, SIMPLIFIED</div>
+      </td>
+    </tr></table>
   </div>
   <div style="padding:26px 24px">
     <h2 style="color:#0f172a;font-size:19px;margin:0 0 10px">${esc(title)}</h2>
@@ -43,6 +50,7 @@ function brandEmail({ title, intro, rows, ctaText, ctaPath, note }) {
   </div>
   <div style="padding:18px 24px;background:#0f172a;color:#94a3b8;font-size:12px;line-height:1.7">
     <b style="color:#e2e8f0">LEMAK CONNECT</b><br/>
+    ${COMPANY_ADDRESS}<br/>
     Support: <a href="mailto:${SUPPORT_EMAIL}" style="color:#60a5fa">${SUPPORT_EMAIL}</a><br/>
     WhatsApp/Phone: ${SUPPORT_PHONE}<br/>
     <a href="${APP_URL}/privacy" style="color:#60a5fa">Privacy Policy</a> &middot; <a href="${APP_URL}/terms" style="color:#60a5fa">Terms &amp; Conditions</a>

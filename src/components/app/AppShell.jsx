@@ -4,11 +4,9 @@ import { LogOut, Bell, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useApp } from '@/lib/AppContext';
 import { AppProvider } from '@/lib/AppContext';
-import { formatNairaShort } from '@/lib/format';
 import Logo from '@/components/Logo';
 import { APP_NAV, SERVICE_NAV, ACCOUNT_NAV, NavItem } from '@/components/app/NavItems';
 import BottomNav, { getTabRootForPath } from '@/components/app/BottomNav';
-import BiometricLock, { appLockEnabled } from '@/components/app/BiometricLock';
 
 // Mobile sub-page header: bottom-nav tabs keep the plain logo; any nested
 // sub-route gets a back arrow + page name so users are never trapped.
@@ -58,8 +56,7 @@ function ShellInner() {
   const { refresh } = useApp();
   const navigate = useNavigate();
   const [checked, setChecked] = useState(false);
-  const [locked, setLocked] = useState(appLockEnabled());
-  const { wallet, profile } = useApp();
+  const { profile } = useApp();
   const location = useLocation();
   const mobileTitle = getMobileSubPageTitle(location.pathname);
 
@@ -98,11 +95,6 @@ function ShellInner() {
     );
   }
 
-  // Biometric app lock — fingerprint / Face ID before anything renders.
-  if (locked) {
-    return <BiometricLock onUnlocked={() => setLocked(false)} />;
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <aside className="hidden lg:block fixed inset-y-0 left-0 w-64 z-40">
@@ -127,19 +119,16 @@ function ShellInner() {
             )}
           </div>
           <div className="flex-1" />
-          <button
-            onClick={() => navigate('/app/wallet')}
-            className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 h-9 text-sm font-bold text-primary hover:bg-primary/10 transition-colors"
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            {formatNairaShort(wallet ? wallet.balance : 0)}
-          </button>
           <button onClick={() => navigate('/app/notifications')} className="relative p-2 rounded-lg hover:bg-muted" aria-label="Notifications">
             <Bell className="w-5 h-5 text-muted-foreground" />
           </button>
-          <div className="w-9 h-9 rounded-full brand-gradient-soft flex items-center justify-center text-white text-sm font-bold shrink-0">
+          <button
+            onClick={() => navigate('/app/profile')}
+            aria-label="Profile"
+            className="w-9 h-9 rounded-full brand-gradient-soft flex items-center justify-center text-white text-sm font-bold shrink-0"
+          >
             {(profile && profile.fullName ? profile.fullName[0] : '?').toUpperCase()}
-          </div>
+          </button>
         </header>
         <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-6 pb-24 lg:pb-6">
           <Outlet />

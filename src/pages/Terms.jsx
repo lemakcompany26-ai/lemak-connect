@@ -17,7 +17,11 @@ const SECTIONS = [
   },
   {
     title: 'Purchases and pricing',
-    body: 'Prices for each service are shown before you confirm a purchase and are locked in at the moment of payment. Every transaction receives a unique transaction ID, which appears on your confirmation screen and receipt.'
+    body: 'Prices for each service are shown before you confirm a purchase and are locked in at the moment of payment. All applicable service charges are applied automatically at the time of purchase — the final price you see is the final price you pay. Every transaction receives a unique transaction ID, which appears on your confirmation screen and receipt.'
+  },
+  {
+    title: 'Funding and payments',
+    body: 'Wallet funding is available through card payment and through your dedicated bank account. Card and bank transfers are processed by our licensed payment providers; Lemak Connect does not see or store your full card details. Wallet credits are applied automatically and only after the payment is verified.'
   },
   {
     title: 'Failed transactions and refunds',
@@ -41,7 +45,7 @@ const SECTIONS = [
   },
   {
     title: 'Contact us',
-    body: 'Reach us any time at lemakcompany26@gmail.com or 09022143559.'
+    body: 'Reach us any time at lemakcompany26@gmail.com or 09022143559. Our address: No. 2 Opeyemi, Zone 2, Alakia, Ibadan, Nigeria.'
   }
 ];
 

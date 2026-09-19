@@ -16,11 +16,6 @@ import AdminShell from '@/components/admin/AdminShell';
 // stay eager so the shell paints instantly.
 // Add page lazy imports here
 const PageNotFound = lazy(() => import('./lib/PageNotFound'));
-const Landing = lazy(() => import('@/pages/Landing'));
-const ServicesPage = lazy(() => import('@/pages/ServicesPage'));
-const HowItWorks = lazy(() => import('@/pages/HowItWorks'));
-const MarketplacePublic = lazy(() => import('@/pages/MarketplacePublic'));
-const SupportPage = lazy(() => import('@/pages/SupportPage'));
 const Terms = lazy(() => import('@/pages/Terms'));
 const Privacy = lazy(() => import('@/pages/Privacy'));
 const Login = lazy(() => import('@/pages/Login'));
@@ -65,6 +60,13 @@ const RouteFallback = () => (
     <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
   </div>
 );
+
+// Entry point: authenticated users go straight to the app; everyone else
+// lands on Login. There is no public landing page.
+const EntryRedirect = () => {
+  const { user } = useAuth();
+  return <Navigate to={user ? '/app' : '/login'} replace />;
+};
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
@@ -126,12 +128,9 @@ const AuthenticatedApp = () => {
   return (
     <Suspense fallback={<RouteFallback />}>
     <Routes>
-      {/* Public routes */}
-      <Route path="/" element={<Landing />} />
-      <Route path="/services" element={<ServicesPage />} />
-      <Route path="/how-it-works" element={<HowItWorks />} />
-      <Route path="/marketplace" element={<MarketplacePublic />} />
-      <Route path="/support" element={<SupportPage />} />
+      {/* Login-first: no public landing page. Terms/Privacy stay public for
+          compliance links. */}
+      <Route path="/" element={<EntryRedirect />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />
 
@@ -223,16 +222,6 @@ function App() {
     document.head.appendChild(s);
     window.gtag('js', new Date());
     window.gtag('config', GADS_CONVERSION_ID, { send_page_view: false });
-  }, []);
-
-  // System dark mode: follow the device preference and keep the app in sync.
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = (matches) => document.documentElement.classList.toggle('dark', matches);
-    apply(mq.matches);
-    const onChange = (e) => apply(e.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
   }, []);
 
   return (

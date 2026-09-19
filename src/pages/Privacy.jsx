@@ -21,7 +21,7 @@ const SECTIONS = [
   },
   {
     title: 'Security features',
-    body: 'Security codes such as your transaction PIN are stored only as secure, irreversible hashes — never in readable form. Biometric login uses your device\u2019s own biometric capability; your fingerprint or face data never leaves your device and is never stored by us.'
+    body: 'Security codes such as your transaction PIN are stored only as secure, irreversible hashes — never in readable form. Biometric confirmation for payments uses your device\u2019s own capability; your fingerprint or face data never leaves your device and is never stored by us.'
   },
   {
     title: 'Sharing your information',
@@ -41,7 +41,7 @@ const SECTIONS = [
   },
   {
     title: 'Contact us',
-    body: 'Reach us any time at lemakcompany26@gmail.com or 09022143559.'
+    body: 'Reach us any time at lemakcompany26@gmail.com or 09022143559. Our address: No. 2 Opeyemi, Zone 2, Alakia, Ibadan, Nigeria.'
   }
 ];
 

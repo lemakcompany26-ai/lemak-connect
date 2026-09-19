@@ -15,25 +15,26 @@ const QUICK_AMOUNTS = [500, 1000, 2000, 5000, 10000, 20000];
 // checkout. No provider API names or internals are ever shown.
 export default function FundWalletSheet({ open, onOpenChange }) {
   const [amount, setAmount] = useState('');
-  const [loading, setLoading] = useState(null); // 'paystack' | 'flutterwave'
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const fund = async (gateway) => {
+  // Online checkout — secure hosted payment. The wallet is credited only
+  // after the payment is verified server-side on return.
+  const fund = async () => {
     setError('');
     const value = Number(amount);
     if (!value || value < 100) return setError('Minimum funding amount is ₦100');
-    setLoading(gateway);
+    setLoading(true);
     try {
-      const res = await base44.functions.invoke(
-        gateway === 'flutterwave' ? 'initializeFlutterwaveFunding' : 'initializeFunding',
-        { amount: value, callbackUrl: window.location.origin + '/app/wallet' }
-      );
+      const res = await base44.functions.invoke('initializeKoraFunding', {
+        amount: value, callbackUrl: window.location.origin + '/app/wallet'
+      });
       const d = res.data || res;
-      window.location.href = gateway === 'flutterwave' ? d.paymentUrl : d.authorizationUrl;
+      window.location.href = d.checkoutUrl;
     } catch (err) {
       const d = err.response && err.response.data;
       setError((d && d.error) || err.message || 'Could not start payment');
-      setLoading(null);
+      setLoading(false);
     }
   };
 
@@ -66,7 +67,7 @@ export default function FundWalletSheet({ open, onOpenChange }) {
 
             <div>
               <div className="flex items-center gap-2 text-sm font-bold">
-                <CreditCard className="w-4 h-4 text-primary" /> Option 2 — Card Funding
+                <CreditCard className="w-4 h-4 text-primary" /> Option 2 — Pay Online
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {QUICK_AMOUNTS.map(a => (
@@ -86,11 +87,8 @@ export default function FundWalletSheet({ open, onOpenChange }) {
                 </div>
               )}
               <div className="mt-4 space-y-2">
-                <Button className="w-full h-12 font-bold" disabled={!!loading} onClick={() => fund('flutterwave')}>
-                  {loading === 'flutterwave' ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Redirecting…</> : 'Pay with Flutterwave'}
-                </Button>
-                <Button variant="outline" className="w-full h-12 font-bold" disabled={!!loading} onClick={() => fund('paystack')}>
-                  {loading === 'paystack' ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Redirecting…</> : 'Pay with Card (Paystack)'}
+                <Button className="w-full h-12 font-bold" disabled={loading} onClick={fund}>
+                  {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Redirecting…</> : 'Pay Online'}
                 </Button>
               </div>
             </div>

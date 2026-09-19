@@ -3,8 +3,9 @@ import { secrets } from 'base44:runtime';
 import { generateTransactionId, creditWallet, notifyUser, round2, applySignupPromoBonus } from '../../shared/lemak.ts';
 import { sendTransactionalEmail } from '../../shared/emails.ts';
 import { sendTransactionalSms } from '../../shared/sms.ts';
+import { completeKoraFunding, notifyKoraFunding } from '../../shared/funding.ts';
 
-// Kora virtual-account deposit webhook. Public endpoint — authenticity is
+// Kora webhook: virtual-account deposits + online-checkout funding. Public endpoint — authenticity is
 // verified with the x-korapay-signature HMAC-SHA256 header (computed over the
 // data object with the Kora secret key), then the payment is re-verified
 // against Kora's Charge Query API before the wallet is credited exactly once.
@@ -34,6 +35,51 @@ export default async function(req: Request): Promise<Response> {
     }
 
     const service = createClientFromRequest(req).asServiceRole;
+
+    // Online checkout funding — references created by initializeKoraFunding
+    // always start with LMK-KORA-. Verified through the transactions API.
+    if (reference.startsWith('LMK-KORA-')) {
+      const existingCheckoutTx = await service.entities.Transaction.filter({ idempotencyKey }, '-created_date', 1);
+      if (existingCheckoutTx && existingCheckoutTx[0]) return Response.json({ received: true });
+
+      const res = await fetch(`https://api.korapay.com/merchant/api/v1/charges/${encodeURIComponent(reference)}`, {
+        headers: { 'Authorization': `Bearer ${secretKey}` }
+      });
+      const verify = await res.json().catch(() => null);
+      const tx = verify && verify.data ? verify.data : null;
+      if (!res.ok || !tx || tx.status !== 'success' || String(tx.currency || '').toUpperCase() !== 'NGN') {
+        return Response.json({ received: true });
+      }
+
+      const payments = await service.entities.Payment.filter({ reference }, '-created_date', 1);
+      const payment = payments && payments[0] ? payments[0] : null;
+      if (!payment || payment.creditedWallet) return Response.json({ received: true });
+
+      const expectedAmount = round2(payment.amount / 100);
+      const checkoutPaidAmount = round2(Number(tx.amount_paid != null ? tx.amount_paid : tx.amount) || 0);
+      if (checkoutPaidAmount < expectedAmount) return Response.json({ received: true });
+
+      const result = await completeKoraFunding(service, {
+        userId: payment.userId, amount: expectedAmount, reference, idempotencyKey,
+        fundingMethod: 'card', providerReference: String(tx.reference || reference)
+      });
+      await service.entities.Payment.update(payment.id, {
+        status: 'successful', creditedWallet: true, paidAt: new Date().toISOString(),
+        channel: 'kora', gatewayResponse: { status: tx.status, reference }
+      });
+      if (result.duplicated) return Response.json({ received: true });
+
+      const checkoutUsers = await service.entities.User.filter({ id: payment.userId }, '-created_date', 1);
+      const checkoutOwner = checkoutUsers && checkoutUsers[0] ? checkoutUsers[0] : null;
+      await notifyKoraFunding(service, {
+        userId: payment.userId,
+        ownerEmail: checkoutOwner ? checkoutOwner.email : null,
+        ownerName: checkoutOwner ? (checkoutOwner.full_name || null) : null,
+        amount: expectedAmount, transactionId: result.transactionId, reference,
+        balance: result.balance
+      });
+      return Response.json({ received: true });
+    }
 
     // Already processed? Do nothing except return success.
     const existingTx = await service.entities.Transaction.filter({ idempotencyKey }, '-created_date', 1);

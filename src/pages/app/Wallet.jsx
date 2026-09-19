@@ -38,7 +38,10 @@ export default function Wallet() {
     setFunding('verifying');
     (async () => {
       try {
-        const res = await base44.functions.invoke(flwRef ? 'verifyFlutterwaveFunding' : 'verifyFunding', { reference: ref });
+        const verifyFn = ref.startsWith('LMK-KORA-')
+          ? 'verifyKoraFunding'
+          : (flwRef ? 'verifyFlutterwaveFunding' : 'verifyFunding');
+        const res = await base44.functions.invoke(verifyFn, { reference: ref });
         const d = res.data || res;
         if (d.credited) {
           await refresh();

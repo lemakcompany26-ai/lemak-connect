@@ -96,7 +96,7 @@ export default function AdminShell() {
       </aside>
 
       <div className="lg:pl-64">
-        <div className="lg:hidden px-4 py-3 border-b border-border flex items-center gap-2 overflow-x-auto">
+          <div className="safe-top lg:hidden px-4 py-3 border-b border-border flex items-center gap-2 overflow-x-auto">
           {NAV.map(item => (
             <NavLink key={item.to} to={item.to} end={item.to === '/admin'}
               className={({ isActive }) => cn('shrink-0 text-xs font-semibold px-3 py-2 rounded-full', isActive ? 'bg-primary text-white' : 'bg-muted text-muted-foreground')}>
@@ -104,7 +104,7 @@ export default function AdminShell() {
             </NavLink>
           ))}
         </div>
-        <main className="mx-auto max-w-6xl px-4 py-6">
+        <main className="safe-inline mx-auto max-w-6xl px-4 py-6">
           <Outlet />
         </main>
       </div>

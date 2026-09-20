@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
-import { formatNaira, formatDate } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 
 const TYPE_ICONS = {
   transaction: '💸', wallet: '👛', payment: '💳', marketplace: '🛍️',

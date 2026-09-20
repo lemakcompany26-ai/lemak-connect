@@ -130,7 +130,7 @@ function ShellInner() {
             {(profile && profile.fullName ? profile.fullName[0] : '?').toUpperCase()}
           </button>
         </header>
-        <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-6 pb-24 lg:pb-6">
+        <main className="safe-inline flex-1 mx-auto w-full max-w-5xl px-4 py-6 pb-24 lg:pb-6">
           <Outlet />
         </main>
       </div>

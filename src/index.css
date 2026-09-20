@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    color-scheme: light;
     --background: 210 40% 98%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
@@ -56,6 +57,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     --background: 222 56% 11%;
     --foreground: 210 40% 96%;
     --card: 222 50% 14%;
@@ -75,6 +77,22 @@
     --border: 222 36% 24%;
     --input: 222 36% 24%;
     --ring: 217 91% 60%;
+    --sidebar-background: 222 56% 9%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 222 56% 11%;
+    --sidebar-accent: 222 40% 20%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 222 36% 24%;
+    --sidebar-ring: 217 91% 60%;
+    --mk-bg: 220 30% 6%;
+    --mk-card: 216 26% 10%;
+    --mk-card2: 214 22% 14%;
+    --mk-border: 216 18% 22%;
+    --mk-blue: 211 100% 58%;
+    --mk-blue-soft: 211 100% 70%;
+    --mk-brown: 25 76% 36%;
+    --mk-brown-soft: 28 48% 66%;
   }
 }
 
@@ -84,9 +102,12 @@
   }
   html {
     overscroll-behavior: none;
+    min-height: 100%;
+    background: hsl(var(--background));
   }
   body {
     @apply bg-background text-foreground font-body antialiased;
+    min-height: 100%;
     overscroll-behavior-y: none;
     -webkit-tap-highlight-color: transparent;
   }
@@ -123,6 +144,10 @@
   .safe-bottom {
     padding-bottom: max(0px, env(safe-area-inset-bottom));
   }
+  .safe-inline {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+  }
   .sheet-safe-bottom {
     padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
     padding-left: max(1.5rem, env(safe-area-inset-left));
@@ -141,4 +166,28 @@
   }
   .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
   .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 9999px; }
+
+  .page-transition {
+    animation: page-transition-in 180ms ease-out both;
+  }
+
+  @keyframes page-transition-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .dark .glass-card {
+    background: hsl(var(--card) / 0.78);
+  }
+
+  /* Keep legacy light utility classes readable when the system switches theme. */
+  .dark .bg-white { background-color: hsl(var(--card)) !important; }
+  .dark .bg-slate-50 { background-color: hsl(var(--background)) !important; }
+  .dark .bg-slate-100 { background-color: hsl(var(--muted)) !important; }
+  .dark .text-slate-900,
+  .dark .text-slate-800 { color: hsl(var(--foreground)) !important; }
+  .dark .text-slate-700,
+  .dark .text-slate-600 { color: hsl(var(--muted-foreground)) !important; }
+  .dark .border-slate-100,
+  .dark .border-slate-200 { border-color: hsl(var(--border)) !important; }
 }

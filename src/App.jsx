@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
@@ -70,6 +70,7 @@ const EntryRedirect = () => {
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
+  const location = useLocation();
 
   // Google Ads SIGNUP conversion: Base44 signups finish off the app's own
   // pages and land back authenticated, so fire on the first authenticated
@@ -127,6 +128,7 @@ const AuthenticatedApp = () => {
   // Render the main app
   return (
     <Suspense fallback={<RouteFallback />}>
+    <div className="page-transition" key={location.key}>
     <Routes>
       {/* Login-first: no public landing page. Terms/Privacy stay public for
           compliance links. */}
@@ -184,6 +186,7 @@ const AuthenticatedApp = () => {
 
       <Route path="*" element={<PageNotFound />} />
     </Routes>
+    </div>
     </Suspense>
   );
 };

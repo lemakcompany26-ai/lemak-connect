@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0066FF" />
+    <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#181d2b" media="(prefers-color-scheme: dark)" />
     <meta name="description" content="Lemak Connect — Nigeria's all-in-one digital services platform. Buy airtime and data, pay electricity and cable bills, fund betting wallets, get virtual numbers for OTPs and grow your social media — instantly from one secure wallet." />
     <meta name="keywords" content="buy airtime Nigeria, cheap data bundles, electricity token, DStv subscription, betting funding, virtual number OTP, social media growth, digital services Nigeria" />
     <meta name="robots" content="index, follow" />
@@ -26,6 +27,12 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function () {
+        var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.classList.toggle('dark', dark);
+      }());
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

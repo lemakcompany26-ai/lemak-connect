@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ShieldCheck, RotateCcw, Headset, Zap, Mail, Phone, MessageCircle } from 'lucide-react';
+import { ShieldCheck, RotateCcw, Headset, Zap, Mail, MessageCircle } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 

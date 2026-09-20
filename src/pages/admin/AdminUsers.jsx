@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Search, Loader2, ShieldCheck } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { formatDate } from '@/lib/format';

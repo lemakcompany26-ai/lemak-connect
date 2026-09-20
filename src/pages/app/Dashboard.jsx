@@ -49,7 +49,6 @@ export default function Dashboard() {
 
       {/* Wallet card */}
       <div className="rounded-3xl brand-gradient p-7 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 85% 20%, rgba(96,165,250,.6) 0%, transparent 40%)' }} />
         <div className="relative flex flex-col sm:flex-row sm:items-center gap-5">
           <div className="flex-1">
             <div className="text-xs uppercase tracking-wider font-semibold text-white/60">Wallet Balance</div>
@@ -78,7 +77,7 @@ export default function Dashboard() {
       </div>
 
       {/* Promo banner */}
-      <Link to="/app/social-growth" className="block rounded-3xl bg-gradient-to-r from-primary to-[#00A3FF] p-5 relative overflow-hidden hover:shadow-lg transition-shadow">
+      <Link to="/app/social-growth" className="block rounded-3xl bg-primary p-5 relative overflow-hidden hover:shadow-lg transition-shadow">
         <div className="relative flex items-center gap-4">
           <span className="w-11 h-11 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
             <Rocket className="w-6 h-6 text-white" />

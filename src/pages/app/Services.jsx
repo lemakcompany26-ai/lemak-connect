@@ -104,7 +104,7 @@ export default function Services() {
         <div className="py-10 text-center text-sm text-muted-foreground">No services match "{q}". Try another search.</div>
       )}
 
-      <div className="rounded-2xl bg-gradient-to-r from-primary to-[#00A3FF] px-5 py-4 text-center">
+      <div className="rounded-2xl bg-primary px-5 py-4 text-center">
         <span className="text-white text-sm font-bold">Fast • Secure • Reliable</span>
         <span className="text-white/70 text-xs block mt-0.5">Lemak Connect — your trusted digital services partner.</span>
       </div>

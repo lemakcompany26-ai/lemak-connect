@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 export default function HeroSection() {
   return (
     <section className="relative overflow-hidden brand-gradient">
-      <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 20% 30%, rgba(59,130,246,.55) 0%, transparent 45%), radial-gradient(circle at 80% 70%, rgba(37,99,235,.4) 0%, transparent 40%)' }} />
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 pt-16 pb-20 md:pt-24 md:pb-28 grid md:grid-cols-2 gap-12 items-center">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/15 px-4 py-1.5 text-xs font-medium text-white/90 backdrop-blur">
@@ -14,7 +13,7 @@ export default function HeroSection() {
           <h1 className="mt-6 font-heading text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white leading-[1.05]">
             Everything digital.
             <br />
-            <span className="bg-gradient-to-r from-blue-300 to-sky-200 bg-clip-text text-transparent">One wallet.</span>
+            <span className="text-white">One wallet.</span>
           </h1>
           <p className="mt-6 text-base sm:text-lg text-white/70 max-w-lg leading-relaxed">
             Buy airtime and data, pay electricity and cable bills, fund betting wallets, get virtual numbers
@@ -45,7 +44,6 @@ export default function HeroSection() {
         </div>
 
         <div className="hidden md:block relative">
-          <div className="absolute -inset-8 bg-blue-500/30 blur-3xl rounded-full" />
           <div className="relative mx-auto w-[300px] rounded-[2rem] border-[10px] border-white/15 bg-white shadow-2xl overflow-hidden">
             <div className="brand-gradient px-5 py-4">
               <div className="text-[10px] uppercase tracking-wider text-white/60 font-semibold">Wallet Balance</div>

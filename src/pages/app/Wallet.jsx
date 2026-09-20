@@ -73,7 +73,6 @@ export default function Wallet() {
       )}
 
       <div className="rounded-3xl brand-gradient p-7 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 85% 20%, rgba(96,165,250,.6) 0%, transparent 40%)' }} />
         <div className="relative">
           <div className="text-xs uppercase tracking-wider font-semibold text-white/60">Available Balance</div>
           <div className="mt-1.5 text-white text-3xl font-extrabold">{formatNaira(wallet ? wallet.balance : 0)}</div>

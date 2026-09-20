@@ -68,7 +68,6 @@ export default function WhySection() {
 
       <section className="pb-20 px-4 sm:px-6">
         <div className="mx-auto max-w-5xl rounded-3xl brand-gradient px-8 py-12 text-center relative overflow-hidden">
-          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 85% 15%, rgba(96,165,250,.6) 0%, transparent 40%)' }} />
           <div className="relative">
             <h2 className="font-heading text-2xl sm:text-3xl font-extrabold text-white">Need help? We're one message away.</h2>
             <p className="mt-3 text-white/70 text-sm max-w-md mx-auto">Our support team is available on email and WhatsApp — and inside the app, Lemak AI Support answers instantly.</p>

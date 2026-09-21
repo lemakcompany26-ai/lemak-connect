@@ -186,7 +186,13 @@ export default async function(req: Request): Promise<Response> {
     if (action === 'my_rentals' || action === 'seller_rentals') {
       const key = action === 'my_rentals' ? 'buyerUserId' : 'sellerUserId';
       const rentals = await service.entities.NumberRental.filter({ [key]: user.id }, '-created_date', 100);
-      const ids = [...new Set((rentals || []).map(r => r.listingId))];
+      // Live provider orders carry placeholder listing ids ("PROVIDER-A"),
+      // not real VirtualNumberListing record ids — filtering by them throws
+      // "Invalid id value" and kills the whole order list. Only look up
+      // genuine record ids; live orders expose their handle directly instead.
+      const OBJECT_ID = /^[a-f0-9]{24}$/i;
+      const ids = [...new Set((rentals || []).map(r => r.listingId))]
+        .filter(id => OBJECT_ID.test(String(id || '')));
       const numbers = {};
       for (const id of ids) {
         const rows = await service.entities.VirtualNumberListing.filter({ id }, '-created_date', 1);
@@ -814,8 +820,19 @@ export default async function(req: Request): Promise<Response> {
             entry.online = true;
             try {
               const apps = await listSmsServices(s);
-              entry.smsStock = (apps || []).filter(a => a.quantity === null || Number(a.quantity) > 0).length;
-              entry.smsServices = (apps || []).slice(0, 200).map(a => ({
+              // Popular services (all major social media first) surface at the
+              // top of the customer catalogue; the rest follow alphabetically.
+              // Without this, a blind slice of a 2000+ item provider list only
+              // ever showed obscure services.
+              const rank = (a) => {
+                const i = POPULAR_SMS.indexOf(String(a.id || '').toLowerCase());
+                return i === -1 ? POPULAR_SMS.length : i;
+              };
+              const sorted = [...(apps || [])].sort(
+                (x, y) => rank(x) - rank(y) || String(x.id).localeCompare(String(y.id))
+              );
+              entry.smsStock = sorted.filter(a => a.quantity === null || Number(a.quantity) > 0).length;
+              entry.smsServices = sorted.slice(0, 400).map(a => ({
                 id: a.id,
                 quantity: a.quantity === null ? null : Number(a.quantity),
                 available: a.quantity === null ? null : Number(a.quantity)

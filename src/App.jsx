@@ -44,6 +44,7 @@ const Notifications = lazy(() => import('@/pages/app/Notifications'));
 const AppSupport = lazy(() => import('@/pages/app/Support'));
 const Profile = lazy(() => import('@/pages/app/Profile'));
 const AppSettings = lazy(() => import('@/pages/app/Settings'));
+const Referrals = lazy(() => import('@/pages/app/Referrals'));
 const Marketplace = lazy(() => import('@/pages/app/Marketplace'));
 const ListingDetail = lazy(() => import('@/pages/app/ListingDetail'));
 const AppAnalytics = lazy(() => import('@/pages/app/Analytics'));
@@ -142,6 +143,7 @@ const AuthenticatedApp = () => {
       {/* Auth routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/signup" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/oauth/consent" element={<OAuthConsent />} />
@@ -169,6 +171,7 @@ const AuthenticatedApp = () => {
           <Route path="/app/support" element={<AppSupport />} />
           <Route path="/app/profile" element={<Profile />} />
           <Route path="/app/settings" element={<AppSettings />} />
+          <Route path="/app/referrals" element={<Referrals />} />
           <Route path="/app/marketplace" element={<Marketplace />} />
           <Route path="/app/marketplace/listing/:listingId" element={<ListingDetail />} />
           <Route path="/app/analytics" element={<AppAnalytics />} />

@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { isAdminEmail, notifyUser } from '../../shared/lemak.ts';
+import { isAdminEmail, notifyUser, generateTransactionId, creditWallet, round2 } from '../../shared/lemak.ts';
 import { sendTransactionalEmail } from '../../shared/emails.ts';
 
 // Creates the user's profile, wallet (NGN, 0.00) and notification preferences
@@ -21,6 +21,7 @@ export default async function(req: Request): Promise<Response> {
     const username = String(body.username || '').trim().toLowerCase();
     const phone = String(body.phone || '').trim();
     const promoCode = String(body.promoCode || '').trim().toUpperCase();
+    const referralCode = String(body.referralCode || '').trim().toUpperCase();
 
     // Server-side promo verification: only live, active codes are accepted.
     if (promoCode) {
@@ -41,10 +42,21 @@ export default async function(req: Request): Promise<Response> {
     }
 
     const role = isAdminEmail(user.email) ? 'super_admin' : 'customer';
+    let referrer = null;
+    if (referralCode) {
+      const referrers = await service.entities.UserProfile.filter({ referralCode }, '-created_date', 2);
+      referrer = referrers && referrers[0] ? referrers[0] : null;
+      if (!referrer) return Response.json({ error: 'That referral link is not valid.' }, { status: 400 });
+      if (referrer.userId === user.id) return Response.json({ error: 'You cannot refer yourself.' }, { status: 400 });
+    }
+
+    const permanentReferralCode = `LEMAK${crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`;
     const profile = await service.entities.UserProfile.create({
       userId: user.id, fullName, username, email: user.email,
       phone, role, accountStatus: 'active',
       referredByPromoCode: promoCode || null,
+      referralCode: permanentReferralCode,
+      referredByUserId: referrer ? referrer.userId : null,
       lastLoginAt: new Date().toISOString()
     });
 
@@ -59,6 +71,56 @@ export default async function(req: Request): Promise<Response> {
     const existingPrefs = await service.entities.NotificationPreference.filter({ userId: user.id }, '-created_date', 1);
     if (!existingPrefs || !existingPrefs[0]) {
       await service.entities.NotificationPreference.create({ userId: user.id });
+    }
+
+    if (referrer) {
+      const existingReferral = await service.entities.Referral.filter({ referredUserId: user.id }, '-created_date', 1);
+      if (!existingReferral || !existingReferral[0]) {
+        const generatedWelcomeTransactionId = generateTransactionId();
+        const welcomeReward = 100;
+        const welcomeCredit = await creditWallet(service, {
+          userId: user.id, transactionId: generatedWelcomeTransactionId, type: 'promo', amount: welcomeReward,
+          reference: generatedWelcomeTransactionId, description: 'New user referral welcome reward',
+          idempotencyKey: `referral-welcome-${user.id}`
+        });
+        const welcomeTransactionId = welcomeCredit.ledger && welcomeCredit.ledger.transactionId
+          ? welcomeCredit.ledger.transactionId : generatedWelcomeTransactionId;
+        const existingWelcomeTransaction = await service.entities.Transaction.filter({ idempotencyKey: `referral-welcome-${user.id}` }, '-created_date', 1);
+        if (!existingWelcomeTransaction || !existingWelcomeTransaction[0]) await service.entities.Transaction.create({
+          transactionId: welcomeTransactionId, userId: user.id, type: 'adjustment',
+          service: 'Referral welcome reward', provider: 'LEMAK', amount: welcomeReward,
+          fee: 0, providerCost: 0, customerPrice: welcomeReward, status: 'successful',
+          providerReference: welcomeTransactionId, metadata: { referralCode }, completedAt: new Date().toISOString(),
+          idempotencyKey: `referral-welcome-${user.id}`
+        });
+
+        const settings = await service.entities.AdminSetting.list('-created_date', 200);
+        const rewardSetting = (settings || []).find(setting => setting.key === 'referrer_reward_amount');
+        const referrerReward = round2(Number(rewardSetting && rewardSetting.value) || 0);
+        let referrerTransactionId = null;
+        if (referrerReward > 0) {
+          referrerTransactionId = generateTransactionId();
+          const referrerCredit = await creditWallet(service, {
+            userId: referrer.userId, transactionId: referrerTransactionId, type: 'promo', amount: referrerReward,
+            reference: referrerTransactionId, description: 'Referral reward',
+            idempotencyKey: `referral-referrer-${user.id}`
+          });
+          const existingReferrerTransaction = await service.entities.Transaction.filter({ idempotencyKey: `referral-referrer-${user.id}` }, '-created_date', 1);
+          if (!referrerCredit.duplicated && (!existingReferrerTransaction || !existingReferrerTransaction[0])) {
+            await service.entities.Transaction.create({
+              transactionId: referrerTransactionId, userId: referrer.userId, type: 'adjustment',
+              service: 'Referral reward', provider: 'LEMAK', amount: referrerReward,
+              fee: 0, providerCost: 0, customerPrice: referrerReward, status: 'successful',
+              providerReference: referrerTransactionId, metadata: { referredUserId: user.id }, completedAt: new Date().toISOString(),
+              idempotencyKey: `referral-referrer-${user.id}`
+            });
+          }
+        }
+        await service.entities.Referral.create({
+          referrerUserId: referrer.userId, referredUserId: user.id, referralCode,
+          welcomeReward, referrerReward, welcomeTransactionId, referrerTransactionId, status: 'completed'
+        });
+      }
     }
 
     await notifyUser(service, {

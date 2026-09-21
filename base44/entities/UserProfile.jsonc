@@ -47,6 +47,14 @@
     "referredByPromoCode": {
       "type": "string"
     },
+    "referralCode": {
+      "type": "string",
+      "description": "Permanent server-generated code owned by this user"
+    },
+    "referredByUserId": {
+      "type": "string",
+      "description": "Permanent server-owned referral relationship"
+    },
     "bvn": {
       "type": "string",
       "description": "Bank Verification Number \u2014 required KYC for the customer's dedicated virtual account"

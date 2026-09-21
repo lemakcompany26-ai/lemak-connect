@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, LayoutGrid, Smartphone, Wifi, Tv, Trophy, Ticket, Phone, TrendingUp, BarChart3, Store, Wallet, ReceiptText, Bell, Headset, UserCircle, Settings, Lock, Shield } from 'lucide-react';
+import { LayoutDashboard, LayoutGrid, Smartphone, Wifi, Tv, Trophy, Ticket, Phone, TrendingUp, BarChart3, Store, Wallet, ReceiptText, Bell, Headset, UserCircle, Settings, Lock, Shield, Gift } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const APP_NAV = [
@@ -25,6 +25,7 @@ export const SERVICE_NAV = [
 
 export const ACCOUNT_NAV = [
   { to: '/app/profile', label: 'Profile', icon: UserCircle },
+  { to: '/app/referrals', label: 'Invite & Earn', icon: Gift },
   { to: '/app/settings', label: 'Settings', icon: Settings }
 ];
 

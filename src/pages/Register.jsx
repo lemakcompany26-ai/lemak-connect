@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,10 +13,12 @@ import { safeReturnTo } from "@/lib/authReturnTo";
 import SignupPromoInput from "@/components/app/SignupPromoInput";
 
 export default function Register() {
+  const location = useLocation();
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
   const [promoCode, setPromoCode] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -24,6 +26,11 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
   const [otpCode, setOtpCode] = useState("");
+
+  React.useEffect(() => {
+    const ref = new URLSearchParams(location.search).get('ref');
+    if (ref) setReferralCode(ref.toUpperCase().slice(0, 40));
+  }, [location.search]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -42,7 +49,8 @@ export default function Register() {
         fullName: fullName.trim(),
         username: username.trim().toLowerCase(),
         phone: phone.trim(),
-        promoCode: promoCode.trim()
+        promoCode: promoCode.trim(),
+        referralCode: referralCode.trim()
       })
     );
     setLoading(true);

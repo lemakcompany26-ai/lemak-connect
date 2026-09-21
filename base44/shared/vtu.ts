@@ -61,6 +61,15 @@ export function isProviderSuccess(response) {
   return false;
 }
 
+export function isProviderPending(response) {
+  const d = response && response.data;
+  if (!d) return false;
+  const values = [d.status, d.data && d.data.status, d.result && d.result.status]
+    .filter(value => value !== undefined && value !== null)
+    .map(value => String(value).toLowerCase());
+  return values.some(value => ['pending', 'processing', 'queued', 'in_progress', 'in-progress'].includes(value));
+}
+
 export function extractProviderReference(d) {
   if (!d) return null;
   return d.reference || d.transaction_id || d.transactionId || d.order_id || d.orderId || d.trans_id

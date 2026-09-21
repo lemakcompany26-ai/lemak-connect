@@ -34,7 +34,7 @@ export default function CompleteProfile() {
     try {
       await base44.functions.invoke('onboardUser', {
         fullName: fullName.trim(), username: username.trim().toLowerCase(),
-        phone: phone.trim(), promoCode: promoCode.trim()
+        phone: phone.trim(), promoCode: promoCode.trim(), referralCode: pending.referralCode || ''
       });
       localStorage.removeItem('lemak_pending_onboarding');
       navigate('/app', { replace: true });

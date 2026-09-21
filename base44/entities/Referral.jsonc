@@ -1,0 +1,28 @@
+{
+  "name": "Referral",
+  "type": "object",
+  "properties": {
+    "referrerUserId": { "type": "string" },
+    "referredUserId": { "type": "string" },
+    "referralCode": { "type": "string" },
+    "welcomeReward": { "type": "number" },
+    "referrerReward": { "type": "number" },
+    "welcomeTransactionId": { "type": "string" },
+    "referrerTransactionId": { "type": "string" },
+    "status": { "type": "string", "enum": ["completed", "pending", "rejected"] }
+  },
+  "required": ["referrerUserId", "referredUserId", "referralCode", "welcomeReward", "status"],
+  "rls": {
+    "create": false,
+    "read": {
+      "$or": [
+        { "created_by_id": "{{user.id}}" },
+        { "data.referrerUserId": "{{user.id}}" },
+        { "data.referredUserId": "{{user.id}}" },
+        { "user_condition": { "role": "admin" } }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}

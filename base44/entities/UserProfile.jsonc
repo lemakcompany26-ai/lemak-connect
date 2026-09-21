@@ -51,6 +51,10 @@
       "type": "string",
       "description": "Permanent server-generated code owned by this user"
     },
+    "referralLink": {
+      "type": "string",
+      "description": "Permanent server-generated invite URL owned by this user"
+    },
     "referredByUserId": {
       "type": "string",
       "description": "Permanent server-owned referral relationship"

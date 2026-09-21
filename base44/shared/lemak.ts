@@ -23,6 +23,11 @@ export function generateTransactionId() {
   return `LEM-${y}${m}${d}-${rand}`;
 }
 
+export function generateReferralIdentity() {
+  const code = `LEMAK${crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+  return { code, link: `https://www.lemakconnect.com/signup?ref=${encodeURIComponent(code)}` };
+}
+
 export function round2(n) {
   return Math.round(Number(n) * 100) / 100;
 }

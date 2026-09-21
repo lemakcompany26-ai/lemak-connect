@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { isAdminEmail, notifyUser, generateTransactionId, creditWallet, round2 } from '../../shared/lemak.ts';
+import { isAdminEmail, notifyUser, generateTransactionId, generateReferralIdentity, creditWallet, round2 } from '../../shared/lemak.ts';
 import { sendTransactionalEmail } from '../../shared/emails.ts';
 
 // Creates the user's profile, wallet (NGN, 0.00) and notification preferences
@@ -50,12 +50,13 @@ export default async function(req: Request): Promise<Response> {
       if (referrer.userId === user.id) return Response.json({ error: 'You cannot refer yourself.' }, { status: 400 });
     }
 
-    const permanentReferralCode = `LEMAK${crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+    const referralIdentity = generateReferralIdentity();
     const profile = await service.entities.UserProfile.create({
       userId: user.id, fullName, username, email: user.email,
       phone, role, accountStatus: 'active',
       referredByPromoCode: promoCode || null,
-      referralCode: permanentReferralCode,
+      referralCode: referralIdentity.code,
+      referralLink: referralIdentity.link,
       referredByUserId: referrer ? referrer.userId : null,
       lastLoginAt: new Date().toISOString()
     });

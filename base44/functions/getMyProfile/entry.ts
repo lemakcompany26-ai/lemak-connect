@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { getWallet, ensureWallet } from '../../shared/lemak.ts';
+import { ensureWallet, generateReferralIdentity } from '../../shared/lemak.ts';
 
 // Returns the caller's profile, wallet and notification preferences.
 export default async function(req: Request): Promise<Response> {
@@ -10,7 +10,14 @@ export default async function(req: Request): Promise<Response> {
     const service = base44.asServiceRole;
 
     const profiles = await service.entities.UserProfile.filter({ userId: user.id }, '-created_date', 1);
-    const profile = profiles && profiles[0] ? profiles[0] : null;
+    let profile = profiles && profiles[0] ? profiles[0] : null;
+    if (profile && (!profile.referralCode || !profile.referralLink)) {
+      const identity = generateReferralIdentity();
+      profile = await service.entities.UserProfile.update(profile.id, {
+        referralCode: profile.referralCode || identity.code,
+        referralLink: profile.referralLink || `https://www.lemakconnect.com/signup?ref=${encodeURIComponent(profile.referralCode || identity.code)}`
+      });
+    }
     const wallet = await ensureWallet(service, user.id);
     const prefsList = await service.entities.NotificationPreference.filter({ userId: user.id }, '-created_date', 1);
     const preferences = prefsList && prefsList[0] ? prefsList[0] : null;

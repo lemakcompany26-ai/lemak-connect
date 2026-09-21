@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
+import { generateReferralIdentity } from '../../shared/lemak.ts';
 
 export default async function(req: Request): Promise<Response> {
   try {
@@ -11,13 +12,16 @@ export default async function(req: Request): Promise<Response> {
     if (!profile) return Response.json({ error: 'Profile is not ready yet.' }, { status: 409 });
     const referrals = await service.entities.Referral.filter({ referrerUserId: user.id }, '-created_date', 100);
     let code = profile.referralCode || null;
-    if (!code) {
-      code = `LEMAK${crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`;
-      await service.entities.UserProfile.update(profile.id, { referralCode: code });
+    let link = profile.referralLink || null;
+    if (!code || !link) {
+      const identity = generateReferralIdentity();
+      code = code || identity.code;
+      link = link || `https://www.lemakconnect.com/signup?ref=${encodeURIComponent(code)}`;
+      await service.entities.UserProfile.update(profile.id, { referralCode: code, referralLink: link });
     }
     return Response.json({
       code,
-      link: code ? `https://www.lemakconnect.com/signup?ref=${encodeURIComponent(code)}` : null,
+      link,
       totalReferrals: (referrals || []).length,
       rewards: (referrals || []).reduce((sum, row) => sum + Number(row.referrerReward || 0), 0),
       history: (referrals || []).map(row => ({

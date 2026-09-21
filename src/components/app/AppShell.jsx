@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Bell, ArrowLeft } from 'lucide-react';
+import { LogOut, Bell, ArrowLeft, Shield } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useApp } from '@/lib/AppContext';
 import { AppProvider } from '@/lib/AppContext';
 import Logo from '@/components/Logo';
-import { APP_NAV, SERVICE_NAV, ACCOUNT_NAV, NavItem } from '@/components/app/NavItems';
+import { APP_NAV, SERVICE_NAV, ACCOUNT_NAV, ADMIN_NAV, isStaffProfile, NavItem } from '@/components/app/NavItems';
 import BottomNav, { getTabRootForPath } from '@/components/app/BottomNav';
 
 // Mobile sub-page header: bottom-nav tabs keep the plain logo; any nested
@@ -27,7 +27,7 @@ function getMobileSubPageTitle(pathname) {
   return ROUTE_TITLES[pathname] || '';
 }
 
-function Sidebar({ onNavigate }) {
+function Sidebar({ onNavigate, isStaff }) {
   const { logout } = useAuth();
   return (
     <div className="flex h-full flex-col bg-secondary">
@@ -42,6 +42,12 @@ function Sidebar({ onNavigate }) {
           <div className="px-3.5 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-white/30">Account</div>
           <div className="space-y-1">{ACCOUNT_NAV.map(item => <NavItem key={item.to} item={item} onNavigate={onNavigate} />)}</div>
         </div>
+        {isStaff && (
+          <div>
+            <div className="px-3.5 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-white/30">Management</div>
+            <div className="space-y-1">{ADMIN_NAV.map(item => <NavItem key={item.to} item={item} onNavigate={onNavigate} />)}</div>
+          </div>
+        )}
       </nav>
       <div className="p-3 border-t border-white/10">
         <button onClick={() => logout('/login')} className="w-full flex items-center gap-3 rounded-xl px-3.5 h-11 text-sm text-white/80 hover:bg-white/10">
@@ -59,6 +65,7 @@ function ShellInner() {
   const { profile } = useApp();
   const location = useLocation();
   const mobileTitle = getMobileSubPageTitle(location.pathname);
+  const isStaff = isStaffProfile(profile);
 
   // Per-tab path memory: the deepest path visited inside each bottom-nav
   // tab is stored, so switching tabs returns you where you left off.
@@ -98,7 +105,7 @@ function ShellInner() {
   return (
     <div className="min-h-screen bg-background">
       <aside className="hidden lg:block fixed inset-y-0 left-0 w-64 z-40">
-        <Sidebar />
+        <Sidebar onNavigate={() => {}} isStaff={isStaff} />
       </aside>
       <div className="lg:pl-64 flex flex-col min-h-screen">
         <header className="sticky top-0 z-30 min-h-14 border-b border-border bg-background/80 backdrop-blur flex items-center gap-3 px-4 safe-top">
@@ -119,6 +126,11 @@ function ShellInner() {
             )}
           </div>
           <div className="flex-1" />
+          {isStaff && (
+            <button onClick={() => navigate('/admin')} className="p-2 rounded-lg hover:bg-muted" aria-label="Admin Dashboard" title="Admin Dashboard">
+              <Shield className="w-5 h-5 text-primary" />
+            </button>
+          )}
           <button onClick={() => navigate('/app/notifications')} className="relative p-2 rounded-lg hover:bg-muted" aria-label="Notifications">
             <Bell className="w-5 h-5 text-muted-foreground" />
           </button>

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, LayoutGrid, Smartphone, Wifi, Tv, Trophy, Ticket, Phone, TrendingUp, BarChart3, Store, Wallet, ReceiptText, Bell, Headset, UserCircle, Settings, Lock } from 'lucide-react';
+import { LayoutDashboard, LayoutGrid, Smartphone, Wifi, Tv, Trophy, Ticket, Phone, TrendingUp, BarChart3, Store, Wallet, ReceiptText, Bell, Headset, UserCircle, Settings, Lock, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const APP_NAV = [
@@ -27,6 +27,20 @@ export const ACCOUNT_NAV = [
   { to: '/app/profile', label: 'Profile', icon: UserCircle },
   { to: '/app/settings', label: 'Settings', icon: Settings }
 ];
+
+// Staff-only entry point into the full admin dashboard
+export const ADMIN_NAV = [
+  { to: '/admin', label: 'Admin Dashboard', icon: Shield }
+];
+
+export const ADMIN_EMAILS = ['lemakcompany26@gmail.com', 'dammyqueen107@gmail.com'];
+const STAFF_ROLES = ['admin', 'super_admin', 'moderator'];
+
+export function isStaffProfile(profile) {
+  if (!profile) return false;
+  if (STAFF_ROLES.includes(profile.role)) return true;
+  return ADMIN_EMAILS.includes(String(profile.email || '').toLowerCase());
+}
 
 export function NavItem({ item, onNavigate, unreadCount }) {
   const location = useLocation();

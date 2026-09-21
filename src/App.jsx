@@ -31,6 +31,9 @@ const Data = lazy(() => import('@/pages/app/Data'));
 const Cable = lazy(() => import('@/pages/app/Cable'));
 const Betting = lazy(() => import('@/pages/app/Betting'));
 const Epin = lazy(() => import('@/pages/app/Epin'));
+const Electricity = lazy(() => import('@/pages/app/Electricity'));
+const Education = lazy(() => import('@/pages/app/Education'));
+const Broadband = lazy(() => import('@/pages/app/Broadband'));
 const SocialGrowth = lazy(() => import('@/pages/app/SocialGrowth'));
 const ServiceSoon = lazy(() => import('@/pages/app/ServiceSoon'));
 const VirtualNumbers = lazy(() => import('@/pages/app/VirtualNumbers'));
@@ -151,12 +154,12 @@ const AuthenticatedApp = () => {
           <Route path="/app/services" element={<AppServices />} />
           <Route path="/app/airtime" element={<Airtime />} />
           <Route path="/app/data" element={<Data />} />
-          <Route path="/app/electricity" element={<ServiceSoon service="Electricity" />} />
+          <Route path="/app/electricity" element={<Electricity />} />
           <Route path="/app/cable" element={<Cable />} />
           <Route path="/app/betting" element={<Betting />} />
-          <Route path="/app/education" element={<ServiceSoon service="Education" />} />
+          <Route path="/app/education" element={<Education />} />
           <Route path="/app/epin" element={<Epin />} />
-          <Route path="/app/broadband" element={<ServiceSoon service="Broadband" />} />
+          <Route path="/app/broadband" element={<Broadband />} />
           <Route path="/app/virtual-numbers" element={<VirtualNumbers />} />
           <Route path="/app/virtual-numbers/order/:orderId" element={<VirtualNumberOrder />} />
           <Route path="/app/social-growth" element={<SocialGrowth />} />

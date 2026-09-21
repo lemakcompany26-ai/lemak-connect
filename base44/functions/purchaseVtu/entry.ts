@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { generateTransactionId, calculatePrice, validatePromo, redeemPromo, debitWallet, creditWallet, notifyUser, sendUserEmail, emailTemplate, round2 } from '../../shared/lemak.ts';
-import { getVtuConfig, isProviderSuccess, extractProviderReference, fetchCablePlans, purchaseCableViaProvider, BETTING_PROVIDERS, fundBettingViaProvider, fetchRechargePinPlans, purchaseRechargePinViaProvider } from '../../shared/vtu.ts';
+import { getVtuConfig, isProviderSuccess, extractProviderReference, fetchCablePlans, purchaseCableViaProvider, BETTING_PROVIDERS, fundBettingViaProvider, fetchRechargePinPlans, purchaseRechargePinViaProvider, fetchServicePlans, normalizeServicePlan, purchaseServiceViaProvider } from '../../shared/vtu.ts';
 import { assertPinForPurchase } from '../../shared/security.ts';
 import { sendTransactionalSms } from '../../shared/sms.ts';
 
@@ -9,7 +9,7 @@ import { sendTransactionalSms } from '../../shared/sms.ts';
 // -> promo -> idempotent transaction -> debit wallet -> provider call
 // -> verify -> notify / refund on failure.
 
-const LABELS = { cable: 'Cable TV', betting: 'Betting', epin: 'ePIN / Recharge' };
+const LABELS = { cable: 'Cable TV', betting: 'Betting', epin: 'ePIN / Recharge', electricity: 'Electricity', education: 'Education', broadband: 'Broadband' };
 
 export default async function(req: Request): Promise<Response> {
   try {
@@ -20,7 +20,7 @@ export default async function(req: Request): Promise<Response> {
 
     const body = await req.json();
     const action = String(body.action || '');
-    if (!['cable', 'betting', 'epin'].includes(action)) {
+    if (!['cable', 'betting', 'epin', 'electricity', 'education', 'broadband'].includes(action)) {
       return Response.json({ error: 'Unknown action' }, { status: 400 });
     }
 
@@ -115,6 +115,25 @@ export default async function(req: Request): Promise<Response> {
       recipient = user.email;
       metadata = { network, planId: String(planId), size: rawPlan.size ? String(rawPlan.size) : '' };
       providerCall = () => purchaseRechargePinViaProvider({ planId: String(planId) });
+    }
+
+    if (['electricity', 'education', 'broadband'].includes(action)) {
+      const planId = String(body.planId || '');
+      const rawPlans = await fetchServicePlans(action);
+      const rawPlan = rawPlans.map((item, index) => normalizeServicePlan(item, index))
+        .find(plan => String(plan.id) === planId);
+      if (!rawPlan || !rawPlan.amount) {
+        return Response.json({ error: 'That plan is no longer available. Please refresh and pick another.' }, { status: 400 });
+      }
+      providerCost = rawPlan.amount;
+      itemLabel = rawPlan.name;
+      recipient = String(body.recipient || user.email).trim();
+      if (!recipient || recipient.length < 3) return Response.json({ error: 'Enter a valid recipient.' }, { status: 400 });
+      metadata = { planId, planName: rawPlan.name, providerName: rawPlan.providerName || null, variationCode: rawPlan.variationCode || planId };
+      providerCall = () => purchaseServiceViaProvider({
+        serviceType: action, planId, variationCode: rawPlan.variationCode || planId,
+        recipient, amount: providerCost, customerName: body.customerName || null, meterType: body.meterType || null
+      });
     }
 
     // Authoritative backend pricing

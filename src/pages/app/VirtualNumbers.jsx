@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarClock, ClipboardList, Hash, Loader2, Mail, MessageCircle, Phone, RefreshCw, Search } from 'lucide-react';
+import { CalendarClock, CheckCircle2, ClipboardList, Hash, Loader2, Mail, MessageCircle, Phone, RefreshCw, Search, Server } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +40,8 @@ export default function VirtualNumbers() {
   const { refresh } = useApp();
   const navigate = useNavigate();
   const [catalog, setCatalog] = useState(null);
+  const [servers, setServers] = useState(null);
+  const [selectedServer, setSelectedServer] = useState(null);
   const [country, setCountry] = useState(null);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
@@ -53,17 +55,23 @@ export default function VirtualNumbers() {
   const [busy, setBusy] = useState(false);
 
   const loadCatalog = useCallback(() => {
-    base44.functions.invoke('virtualNumbers', { action: 'catalog' })
+    base44.functions.invoke('virtualNumbers', { action: 'provider_catalog' })
       .then(res => {
         const d = res.data || res;
-        setCatalog(d);
+        setServers(d.servers || []);
+        setSelectedServer(prev => {
+          const next = (d.servers || []).find(s => s.id === prev) || (d.servers || []).find(s => s.online) || null;
+          setCatalog(next);
+          return next ? next.id : null;
+        });
         setCountry(prev => {
-          const codes = (d.countries || []).map(c => c.code);
+          const active = (d.servers || []).find(s => s.id === selectedServer) || (d.servers || []).find(s => s.online);
+          const codes = (active && active.countries || []).map(c => c.code);
           return prev && codes.includes(prev) ? prev : (codes.includes('NG') ? 'NG' : codes[0] || null);
         });
       })
-      .catch(() => setCatalog({ ok: false, available: false, countries: [], smsServices: [], emailProducts: [], rentServices: [], rentAreas: [] }));
-  }, []);
+      .catch(() => { setServers([]); setCatalog(null); });
+  }, [selectedServer]);
 
   useEffect(() => { loadCatalog(); }, [loadCatalog]);
 
@@ -110,7 +118,7 @@ export default function VirtualNumbers() {
   }, [filter, socialRows, otherRows]);
 
   useEffect(() => {
-    if (!catalog || !country || !catalog.available) return;
+    if (!catalog || !selectedServer || !country || !catalog.online) return;
     const missing = visibleIds.filter(id => !requestedRef.current.has(country + ':' + id)).slice(0, QUOTE_LIMIT);
     if (!missing.length) return;
     for (const id of missing) requestedRef.current.add(country + ':' + id);
@@ -120,7 +128,7 @@ export default function VirtualNumbers() {
         if (cancelled) return;
         const batch = missing.slice(i, i + QUOTE_BATCH);
         try {
-          const res = await base44.functions.invoke('virtualNumbers', { action: 'quote', country, services: batch });
+          const res = await base44.functions.invoke('virtualNumbers', { action: 'quote', serverId: selectedServer, country, services: batch });
           if (cancelled) return;
           setPrices(prev => ({ ...prev, ...((res.data || res).prices || {}) }));
         } catch (e) {
@@ -133,10 +141,19 @@ export default function VirtualNumbers() {
       }
     })();
     return () => { cancelled = true; };
-  }, [catalog, country, visibleIds]);
+  }, [catalog, country, selectedServer, visibleIds]);
 
   const onCountryChange = (code) => {
     setCountry(code);
+    setPrices({});
+    requestedRef.current = new Set();
+  };
+
+  const chooseServer = (server) => {
+    if (!server.online) return;
+    setSelectedServer(server.id);
+    setCatalog(server);
+    setCountry((server.countries || []).some(c => c.code === country) ? country : ((server.countries || [])[0] || {}).code || null);
     setPrices({});
     requestedRef.current = new Set();
   };
@@ -212,6 +229,36 @@ export default function VirtualNumbers() {
         </Button>
       </div>
 
+      <section className="space-y-2.5">
+        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+          <Server className="h-3.5 w-3.5 text-amber-400" /> Choose a server
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(servers || []).map(server => (
+            <button
+              key={server.id}
+              type="button"
+              disabled={!server.online}
+              onClick={() => chooseServer(server)}
+              className={'rounded-2xl border p-4 text-left transition-colors ' + (selectedServer === server.id
+                ? 'border-amber-400 bg-amber-400/10'
+                : 'border-mk-border bg-mk-card2 hover:border-amber-400/60') + (!server.online ? ' opacity-60' : '')}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-base font-extrabold text-white">Server {server.id === 'a' ? '1' : '2'}</div>
+                  <div className="mt-1 text-xs font-semibold text-slate-400">Provider: {server.provider}</div>
+                </div>
+                {selectedServer === server.id && <CheckCircle2 className="h-5 w-5 shrink-0 text-amber-400" />}
+              </div>
+              <div className="mt-3 text-[11px] font-bold text-slate-400">
+                {server.online ? `${server.smsStock} live services · ${(server.countries || []).length} countries` : 'Currently unavailable'}
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+
       {/* Search */}
       <div className="relative">
         <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -260,13 +307,13 @@ export default function VirtualNumbers() {
             <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-amber-400" /></div>
           )}
 
-          {catalog !== null && !catalog.available && (
+          {servers !== null && servers.length > 0 && !selectedServer && (
             <div className="rounded-2xl border border-mk-border bg-mk-card2 px-4 py-6 text-center">
-              <p className="text-sm text-slate-400">Numbers are temporarily unavailable. Please try again.</p>
+              <p className="text-sm text-slate-400">Choose an available server to view live services.</p>
             </div>
           )}
 
-          {catalog !== null && catalog.available && (
+          {catalog !== null && catalog.online && selectedServer && (
             <>
               {/* Country selector — only countries the backend supports */}
               {showSms && (catalog.countries || []).length > 0 && (
@@ -304,7 +351,7 @@ export default function VirtualNumbers() {
                       name={s.id}
                       availability={s.available === null ? 'Available on demand' : `Available numbers: ${s.available}`}
                       price={priceFor(s.id)}
-                      onAction={() => setBuy({ product: 'sms', service: s.id, country, countryName: countryName.name })}
+                      onAction={() => setBuy({ product: 'sms', service: s.id, country, countryName: countryName.name, serverId: selectedServer })}
                     />
                   ))}
                 </CatalogSection>
@@ -325,7 +372,7 @@ export default function VirtualNumbers() {
                       name={s.id}
                       availability={s.available === null ? 'Available on demand' : `Available numbers: ${s.available}`}
                       price={priceFor(s.id)}
-                      onAction={() => setBuy({ product: 'sms', service: s.id, country, countryName: countryName.name })}
+                      onAction={() => setBuy({ product: 'sms', service: s.id, country, countryName: countryName.name, serverId: selectedServer })}
                     />
                   ))}
                   {otherRows.length > MAX_OTHER_ROWS && (
@@ -374,7 +421,7 @@ export default function VirtualNumbers() {
                       availability="Temporary email address"
                       price={p.customerPrice ? formatNaira(p.customerPrice) : false}
                       actionLabel="Get Email"
-                      onAction={() => setBuy({ product: 'email', service: p.id, price: p.customerPrice || null })}
+                      onAction={() => setBuy({ product: 'email', service: p.id, price: p.customerPrice || null, serverId: selectedServer })}
                     />
                   ))}
                 </CatalogSection>
@@ -418,6 +465,7 @@ export default function VirtualNumbers() {
         country={buy ? buy.country : null}
         countryName={buy ? buy.countryName : null}
         price={buy ? buy.price : null}
+        serverId={buy ? buy.serverId : selectedServer}
         onDone={(rental) => {
           setBuy(null);
           refresh();

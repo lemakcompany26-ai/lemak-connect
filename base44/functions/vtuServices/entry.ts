@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { calculatePrice } from '../../shared/lemak.ts';
-import { fetchCablePlans, verifyCableCard, BETTING_PROVIDERS, CABLE_PROVIDERS, validateBettingCustomer, fetchRechargePinPlans, isProviderSuccess, extractCustomerName } from '../../shared/vtu.ts';
+import { fetchCablePlans, verifyCableCard, BETTING_PROVIDERS, CABLE_PROVIDERS, validateBettingCustomer, fetchRechargePinPlans, fetchServicePlans, normalizeServicePlan, isProviderSuccess, extractCustomerName } from '../../shared/vtu.ts';
 
 // Catalogue + verification endpoints for the extra VTU services.
 // No money moves here — purchases go through purchaseVtu.
@@ -98,6 +98,23 @@ export default async function(req: Request): Promise<Response> {
           size: p.size ? String(p.size) : '',
           providerCost: pricing.providerCost,
           customerPrice: pricing.customerPrice
+        });
+      }
+      return Response.json({ plans });
+    }
+
+    const liveService = action.endsWith('_plans') ? action.slice(0, -6) : '';
+    if (['electricity', 'education', 'broadband'].includes(liveService)) {
+      const raw = await fetchServicePlans(liveService);
+      const plans = [];
+      for (const [index, item] of raw.entries()) {
+        const plan = normalizeServicePlan(item, index);
+        if (!plan.id || !plan.amount) continue;
+        const pricing = await calculatePrice(service, liveService, plan.amount);
+        plans.push({
+          id: String(plan.id), name: plan.name, providerName: plan.providerName,
+          variationCode: plan.variationCode ? String(plan.variationCode) : String(plan.id),
+          stock: plan.stock, customerPrice: pricing.customerPrice
         });
       }
       return Response.json({ plans });

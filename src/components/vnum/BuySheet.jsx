@@ -10,7 +10,7 @@ import { firePurchaseConversion } from '@/lib/ads';
 // Confirm-and-buy drawer for SMS numbers and email OTP addresses. The final
 // price is re-quoted from the backend right before purchase, and the server
 // picks the supplier invisibly — the customer only ever sees the final price.
-export default function BuySheet({ open, onOpen, product, service, country, countryName, price, onDone }) {
+export default function BuySheet({ open, onOpen, product, service, country, countryName, price, serverId, onDone }) {
   const { toast } = useToast();
   const [quote, setQuote] = useState(undefined); // undefined = checking
   const [busy, setBusy] = useState(false);
@@ -21,10 +21,16 @@ export default function BuySheet({ open, onOpen, product, service, country, coun
     setBusy(false);
     setQuote(undefined);
     if (product === 'email') {
-      setQuote({ available: price != null && price !== false, customerPrice: price });
+      base44.functions.invoke('virtualNumbers', { action: 'provider_price', serverId, product: 'email', domain: service })
+        .then(res => {
+          if (cancelled) return;
+          const d = res.data || res;
+          setQuote({ available: !!d.available || Number(d.customerPrice) > 0, customerPrice: d.customerPrice || null });
+        })
+        .catch(() => { if (!cancelled) setQuote({ available: false, customerPrice: null }); });
       return;
     }
-    base44.functions.invoke('virtualNumbers', { action: 'quote', country: country || 'NG', services: [service] })
+    base44.functions.invoke('virtualNumbers', { action: 'quote', serverId, country: country || 'NG', services: [service] })
       .then(res => {
         if (cancelled) return;
         const d = res.data || res;
@@ -37,9 +43,10 @@ export default function BuySheet({ open, onOpen, product, service, country, coun
   const buy = async () => {
     setBusy(true);
     try {
+      const idempotencyKey = `vn-${serverId}-${product}-${service}-${country || 'email'}-${Date.now()}`;
       const res = await base44.functions.invoke('virtualNumbers', product === 'sms'
-        ? { action: 'provider_rent', product: 'sms', serviceName: service, country: country || 'NG' }
-        : { action: 'provider_rent', product: 'email', domain: service });
+        ? { action: 'provider_rent', product: 'sms', serverId, serviceName: service, country: country || 'NG', idempotencyKey }
+        : { action: 'provider_rent', product: 'email', serverId, domain: service, idempotencyKey });
       const d = res.data || res;
       const charged = d.rental ? Number(d.rental.amount) : null;
       firePurchaseConversion({ value: charged, transactionId: d.rental ? d.rental.id : null });

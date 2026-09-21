@@ -257,6 +257,84 @@ export async function purchaseRechargePinViaProvider(opts) {
   return vtuRequest(config, '/api/v2/vtu/recharge-pin/purchase/', { method: 'POST', body: payload });
 }
 
+// --- Electricity, education and broadband ---
+
+const SERVICE_PATHS = {
+  electricity: {
+    plans: ['/api/v2/electricity/plans/', '/api/v2/vtu/electricity/plans/'],
+    purchase: ['/api/v2/electricity/purchase/', '/api/v2/vtu/electricity/purchase/']
+  },
+  education: {
+    plans: ['/api/v2/education/plans/', '/api/v2/vtu/education/plans/'],
+    purchase: ['/api/v2/education/purchase/', '/api/v2/vtu/education/purchase/']
+  },
+  broadband: {
+    plans: ['/api/v2/broadband/plans/', '/api/v2/vtu/broadband/plans/'],
+    purchase: ['/api/v2/broadband/purchase/', '/api/v2/vtu/broadband/purchase/']
+  }
+};
+
+function servicePaths(serviceType, kind) {
+  const paths = SERVICE_PATHS[serviceType] && SERVICE_PATHS[serviceType][kind];
+  return paths || [];
+}
+
+export function normalizeServicePlan(plan, index) {
+  const value = plan && plan.data && typeof plan.data === 'object' ? plan.data : plan;
+  return {
+    id: value && (value.id || value.plan_id || value.planId || value.code || value.variation_code || value.variationCode) || String(index),
+    name: String(value && (value.product_name || value.productName || value.plan_name || value.planName || value.name || value.description) || 'Available service'),
+    providerName: String(value && (value.provider_name || value.providerName || value.disco || value.biller_name || value.billerName || '') || ''),
+    variationCode: value && (value.variation_code || value.variationCode || value.code || value.id),
+    amount: Number(value && (value.amount || value.price || value.cost || value.regular_price || value.selling_price) || 0),
+    stock: value && (value.stock ?? value.available ?? value.availability ?? value.quantity ?? null),
+    raw: value
+  };
+}
+
+export async function fetchServicePlans(serviceType) {
+  const config = getVtuConfig();
+  if (!config.configured) {
+    const err = new Error(`${serviceType} service is temporarily unavailable. Please try again later.`);
+    err.statusCode = 503;
+    throw err;
+  }
+  let lastResponse = null;
+  for (const path of servicePaths(serviceType, 'plans')) {
+    const response = await vtuRequest(config, path, { method: 'GET' });
+    lastResponse = response;
+    const arr = extractPlansArray(response.data);
+    if (arr) return arr;
+  }
+  const err = new Error(`Could not load ${serviceType} plans right now. Please try again shortly.`);
+  err.statusCode = lastResponse && lastResponse.status === 401 ? 502 : 502;
+  throw err;
+}
+
+export async function purchaseServiceViaProvider(opts) {
+  const { serviceType, planId, variationCode, recipient, amount, customerName, meterType } = opts;
+  const config = getVtuConfig();
+  const payload = {
+    plan: planId,
+    plan_id: planId,
+    variation_code: variationCode || planId,
+    customer_id: recipient,
+    meter_number: recipient,
+    phone_number: recipient,
+    amount,
+    customer_name: customerName || undefined,
+    meter_type: meterType || undefined,
+    pin: config.pin
+  };
+  let lastResponse = null;
+  for (const path of servicePaths(serviceType, 'purchase')) {
+    const response = await vtuRequest(config, path, { method: 'POST', body: payload });
+    lastResponse = response;
+    if (response.ok || isProviderSuccess(response)) return response;
+  }
+  return lastResponse;
+}
+
 // Best-effort customer-name extraction from a verification response.
 export function extractCustomerName(d) {
   if (!d || typeof d !== 'object') return null;

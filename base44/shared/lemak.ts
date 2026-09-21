@@ -110,7 +110,9 @@ export async function calculatePrice(service, serviceSlug, providerCost) {
   const rule = serviceRule || globalRule;
   const cost = round2(providerCost);
   if (!rule) {
-    return { providerCost: cost, fee: 0, customerPrice: cost, feeRuleId: null };
+    const defaultMarkup = serviceSlug === 'airtime' ? 3 : serviceSlug === 'virtual_number' ? 30 : 20;
+    const fee = round2((cost * defaultMarkup) / 100);
+    return { providerCost: cost, fee, customerPrice: round2(cost + fee), feeRuleId: null };
   }
   const providerCharge = Number(rule.providerCharge) || 0;
   const fixedFee = Number(rule.fixedFee) || 0;

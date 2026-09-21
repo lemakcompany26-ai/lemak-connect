@@ -5,12 +5,12 @@ import { Search, Smartphone, Wifi, Zap, Tv, Trophy, GraduationCap, Ticket, Globe
 const EVERYDAY = [
   { name: 'Airtime', to: '/app/airtime', icon: Smartphone, color: 'bg-[#00A3FF]' },
   { name: 'Data', to: '/app/data', icon: Wifi, color: 'bg-[#00CC66]' },
-  { name: 'Electricity', to: '/app/electricity', icon: Zap, color: 'bg-[#FF9900]', soon: true },
+  { name: 'Electricity', to: '/app/electricity', icon: Zap, color: 'bg-[#FF9900]' },
   { name: 'Cable TV', to: '/app/cable', icon: Tv, color: 'bg-[#8B5CF6]' },
   { name: 'Betting', to: '/app/betting', icon: Trophy, color: 'bg-[#FF3366]' },
-  { name: 'Education', to: '/app/education', icon: GraduationCap, color: 'bg-[#00A3FF]', soon: true },
+  { name: 'Education', to: '/app/education', icon: GraduationCap, color: 'bg-[#00A3FF]' },
   { name: 'ePIN', to: '/app/epin', icon: Ticket, color: 'bg-[#F59E0B]' },
-  { name: 'Broadband', to: '/app/broadband', icon: Globe, color: 'bg-[#00CC66]', soon: true }
+  { name: 'Broadband', to: '/app/broadband', icon: Globe, color: 'bg-[#00CC66]' }
 ];
 
 const VNUM = [

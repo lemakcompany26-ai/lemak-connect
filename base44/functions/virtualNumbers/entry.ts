@@ -471,9 +471,10 @@ export default async function(req: Request): Promise<Response> {
         return entry;
       };
       const prices = {};
+      const quoteServers = body.serverId ? [getOtpServer(body.serverId)] : getOtpServers();
       for (const name of services) {
         prices[name] = { available: false, customerPrice: null };
-        for (const server of getOtpServers()) {
+        for (const server of quoteServers.filter(Boolean)) {
           if (!server.url || !server.key) continue;
           try {
             const lists = await loadServerLists(server);
@@ -556,7 +557,7 @@ export default async function(req: Request): Promise<Response> {
 
     // Create a live provider order — shared by the unified buy flow and the
     // legacy per-server rent action. Provider details stay strictly internal.
-    const createLiveOrder = async ({ server, product, serviceName, providerCostInput, customerPrice, country, months = 1, autoRenew = false }) => {
+    const createLiveOrder = async ({ server, product, serviceName, providerCostInput, customerPrice, country, months = 1, autoRenew = false, idempotencyKey = null }) => {
       let providerCost = providerCostInput;
       const transactionId = generateTransactionId();
       let debit;
@@ -565,7 +566,7 @@ export default async function(req: Request): Promise<Response> {
           userId: user.id, transactionId, type: 'purchase',
           amount: customerPrice, reference: transactionId,
           description: `Virtual ${product === 'sms' ? 'number' : 'email OTP'} — ${serviceName}`,
-          idempotencyKey: `vnp-${transactionId}`
+          idempotencyKey: idempotencyKey || `vnp-${transactionId}`
         });
       } catch (e) {
         throw bad(e.message, e.statusCode || 400);
@@ -657,7 +658,7 @@ export default async function(req: Request): Promise<Response> {
         service: product === 'sms' ? `Virtual Number — ${serviceName}` : product === 'email' ? `Email OTP — ${serviceName}` : `Rented Number — ${serviceName} (${months} month${months > 1 ? 's' : ''})`,
         provider: (server.provider || (server.id === 'b' ? 'smspool' : 'fleexa')), amount: customerPrice,
         fee: customerPrice - providerCost, providerCost, customerPrice,
-        status: 'processing', recipient: handle,
+        status: 'processing', recipient: handle, idempotencyKey: idempotencyKey || `vnp-${transactionId}`,
         metadata: {
           rentalId: rental.id, rentalRef: rental.rentalRef,
           product, serverId: server.id, providerOrderId
@@ -707,7 +708,8 @@ export default async function(req: Request): Promise<Response> {
       const pricing = await calculatePrice(service, 'virtual_number', providerCost);
       const result = await createLiveOrder({
         server: chosen, product, serviceName,
-        providerCostInput: providerCost, customerPrice: pricing.customerPrice
+        providerCostInput: providerCost, customerPrice: pricing.customerPrice,
+        idempotencyKey: String(body.idempotencyKey || '').slice(0, 100) || null
       });
       if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
       const rental = result.rental;
@@ -796,7 +798,8 @@ export default async function(req: Request): Promise<Response> {
       for (const s of getOtpServers()) {
         const entry = {
           id: s.id,
-          label: `Server ${s.id.toUpperCase()}`,
+          label: s.provider === 'smspool' ? 'SMSPool' : 'Fleexa',
+          provider: s.provider === 'smspool' ? 'SMSPool' : 'Fleexa',
           supportsRent: s.provider !== 'smspool',
           configured: Boolean(s.url && s.key),
           online: false,
@@ -812,11 +815,21 @@ export default async function(req: Request): Promise<Response> {
             try {
               const apps = await listSmsServices(s);
               entry.smsStock = (apps || []).filter(a => a.quantity === null || Number(a.quantity) > 0).length;
-              entry.smsServices = (apps || []).slice(0, 200).map(a => ({ id: a.id, quantity: a.quantity === null ? null : Number(a.quantity) }));
+              entry.smsServices = (apps || []).slice(0, 200).map(a => ({
+                id: a.id,
+                quantity: a.quantity === null ? null : Number(a.quantity),
+                available: a.quantity === null ? null : Number(a.quantity)
+              }));
             } catch (e) { /* stock list unavailable on this server */ }
             try {
               const products = await listEmailProducts(s);
-              entry.emailProducts = (products || []).slice(0, 60).map(p => ({ id: p.id, price: Number(p.price_ngn) || 0 }));
+              const emailPrices = await Promise.all((products || []).slice(0, 60).map(async p => {
+                const cost = Number(p.price_ngn) || 0;
+                if (!cost) return null;
+                const pricing = await calculatePrice(service, 'virtual_number', cost);
+                return { id: p.id, customerPrice: pricing.customerPrice };
+              }));
+              entry.emailProducts = emailPrices.filter(Boolean);
             } catch (e) { /* email list unavailable on this server */ }
             try {
               const countries = await listSmsCountries(s);
@@ -963,7 +976,7 @@ export default async function(req: Request): Promise<Response> {
       const result = await createLiveOrder({
         server: chosen, product, serviceName, country,
         providerCostInput: providerCost, customerPrice: pricing.customerPrice,
-        months, autoRenew
+        months, autoRenew, idempotencyKey: String(body.idempotencyKey || '').slice(0, 100) || null
       });
       if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
       // Sanitized response: internal provider/server/request fields never

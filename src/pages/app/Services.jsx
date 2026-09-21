@@ -22,10 +22,15 @@ const VNUM = [
 ];
 
 const GROWTH = [
+  { name: 'Digital Marketing', desc: 'Grow your audience across social platforms', to: '/app/social-growth', icon: Rocket, color: 'bg-primary' },
   { name: 'TikTok', to: '/app/social-growth', icon: Rocket, color: 'bg-[#FF3366]' },
   { name: 'Instagram', to: '/app/social-growth', icon: Rocket, color: 'bg-[#8B5CF6]' },
   { name: 'Facebook', to: '/app/social-growth', icon: Rocket, color: 'bg-[#00A3FF]' },
   { name: 'YouTube', to: '/app/social-growth', icon: Rocket, color: 'bg-[#FF3366]' }
+];
+
+const MARKETPLACE = [
+  { name: 'Marketplace', desc: 'Buy and sell digital accounts', to: '/app/marketplace', icon: Store, color: 'bg-[#0066FF]' }
 ];
 
 function ServiceTile({ item, q }) {
@@ -51,6 +56,7 @@ export default function Services() {
   const everyday = match(EVERYDAY);
   const vnum = match(VNUM);
   const growth = match(GROWTH);
+  const marketplace = match(MARKETPLACE);
 
   return (
     <div className="space-y-6">
@@ -100,7 +106,16 @@ export default function Services() {
         </section>
       )}
 
-      {everyday.length === 0 && vnum.length === 0 && growth.length === 0 && (
+      {marketplace.length > 0 && (
+        <section>
+          <h2 className="font-heading font-bold text-sm uppercase tracking-wider text-muted-foreground">Marketplace</h2>
+          <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 gap-4">
+            {marketplace.map(s => <ServiceTile key={s.name} item={s} />)}
+          </div>
+        </section>
+      )}
+
+      {everyday.length === 0 && vnum.length === 0 && growth.length === 0 && marketplace.length === 0 && (
         <div className="py-10 text-center text-sm text-muted-foreground">No services match "{q}". Try another search.</div>
       )}
 

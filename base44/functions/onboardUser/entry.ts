@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { isAdminEmail, notifyUser, generateTransactionId, generateReferralIdentity, creditWallet, round2 } from '../../shared/lemak.ts';
+import { isAdminEmail, notifyUser, generateTransactionId, generateReferralIdentity, creditWallet, finalizeReferralReward } from '../../shared/lemak.ts';
 import { sendTransactionalEmail } from '../../shared/emails.ts';
 
 // Creates the user's profile, wallet (NGN, 0.00) and notification preferences
@@ -13,6 +13,7 @@ export default async function(req: Request): Promise<Response> {
 
     const existingProfiles = await service.entities.UserProfile.filter({ userId: user.id }, '-created_date', 1);
     if (existingProfiles && existingProfiles[0]) {
+      await finalizeReferralReward(service, existingProfiles[0]);
       return Response.json({ profile: existingProfiles[0], alreadyOnboarded: true });
     }
 
@@ -95,32 +96,7 @@ export default async function(req: Request): Promise<Response> {
           idempotencyKey: `referral-welcome-${user.id}`
         });
 
-        const settings = await service.entities.AdminSetting.list('-created_date', 200);
-        const rewardSetting = (settings || []).find(setting => setting.key === 'referrer_reward_amount');
-        const referrerReward = round2(Number(rewardSetting && rewardSetting.value) || 0);
-        let referrerTransactionId = null;
-        if (referrerReward > 0) {
-          referrerTransactionId = generateTransactionId();
-          const referrerCredit = await creditWallet(service, {
-            userId: referrer.userId, transactionId: referrerTransactionId, type: 'promo', amount: referrerReward,
-            reference: referrerTransactionId, description: 'Referral reward',
-            idempotencyKey: `referral-referrer-${user.id}`
-          });
-          const existingReferrerTransaction = await service.entities.Transaction.filter({ idempotencyKey: `referral-referrer-${user.id}` }, '-created_date', 1);
-          if (!referrerCredit.duplicated && (!existingReferrerTransaction || !existingReferrerTransaction[0])) {
-            await service.entities.Transaction.create({
-              transactionId: referrerTransactionId, userId: referrer.userId, type: 'adjustment',
-              service: 'Referral reward', provider: 'LEMAK', amount: referrerReward,
-              fee: 0, providerCost: 0, customerPrice: referrerReward, status: 'successful',
-              providerReference: referrerTransactionId, metadata: { referredUserId: user.id }, completedAt: new Date().toISOString(),
-              idempotencyKey: `referral-referrer-${user.id}`
-            });
-          }
-        }
-        await service.entities.Referral.create({
-          referrerUserId: referrer.userId, referredUserId: user.id, referralCode,
-          welcomeReward, referrerReward, welcomeTransactionId, referrerTransactionId, status: 'completed'
-        });
+        await finalizeReferralReward(service, profile);
       }
     }
 

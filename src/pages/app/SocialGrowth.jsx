@@ -167,6 +167,7 @@ export default function SocialGrowth() {
                 <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
                   <span className="truncate pr-2">{s.category}</span>
                   <span className="shrink-0">₦{(s.rate).toFixed(2)} / 1,000 · min {s.min.toLocaleString()}</span>
+                                  <span className="shrink-0">Provider: ₦{(s.rate).toFixed(2)} / 1,000 · min {s.min.toLocaleString()}</span>
                 </div>
               </button>
             ))}
@@ -190,6 +191,7 @@ export default function SocialGrowth() {
           {displayPrice != null && (
             <div className="flex items-center justify-between rounded-xl bg-primary/5 border border-primary/20 px-4 py-3 text-sm">
               <span className="text-muted-foreground">Total for {qtyNum.toLocaleString()}</span>
+                            <span className="text-muted-foreground">Final price for {qtyNum.toLocaleString()} (incl. admin markup)</span>
               <span className="font-extrabold text-primary">{formatNaira(displayPrice)}</span>
             </div>
           )}

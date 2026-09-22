@@ -28,6 +28,50 @@ export function generateReferralIdentity() {
   return { code, link: `https://www.lemakconnect.com/signup?ref=${encodeURIComponent(code)}` };
 }
 
+export const REFERRAL_REWARD_AMOUNT = 100;
+
+export async function finalizeReferralReward(service, referredProfile) {
+  const referrerUserId = String(referredProfile && referredProfile.referredByUserId || '').trim();
+  const referredUserId = String(referredProfile && referredProfile.userId || '').trim();
+  if (!referrerUserId || !referredUserId || referrerUserId === referredUserId) return { credited: false };
+  const referrers = await service.entities.UserProfile.filter({ userId: referrerUserId }, '-created_date', 1);
+  if (!referrers || !referrers[0]) return { credited: false };
+
+  const referralCode = String(referredProfile.referralCode || '').trim();
+  const idempotencyKey = `referral-referrer-${referredUserId}`;
+  const transactions = await service.entities.Transaction.filter({ idempotencyKey }, '-created_date', 1);
+  const referrals = await service.entities.Referral.filter({ referredUserId }, '-created_date', 1);
+  const existingReferral = referrals && referrals[0] ? referrals[0] : null;
+  if (existingReferral && existingReferral.status === 'completed' && transactions && transactions[0]) {
+    return { credited: false, referral: existingReferral, transaction: transactions[0] };
+  }
+
+  const transactionId = transactions && transactions[0] ? transactions[0].transactionId : generateTransactionId();
+  const credit = await creditWallet(service, {
+    userId: referrerUserId, transactionId, type: 'promo', amount: REFERRAL_REWARD_AMOUNT,
+    reference: transactionId, description: 'Referral reward', idempotencyKey
+  });
+  const actualTransactionId = credit.ledger && credit.ledger.transactionId ? credit.ledger.transactionId : transactionId;
+  const transaction = transactions && transactions[0] ? transactions[0] : await service.entities.Transaction.create({
+    transactionId: actualTransactionId, userId: referrerUserId, type: 'adjustment',
+    service: 'Referral reward', provider: 'LEMAK', amount: REFERRAL_REWARD_AMOUNT,
+    fee: 0, providerCost: 0, customerPrice: REFERRAL_REWARD_AMOUNT, status: 'successful',
+    providerReference: actualTransactionId, metadata: { referredUserId, referralCode },
+    completedAt: new Date().toISOString(), idempotencyKey
+  });
+  const referral = existingReferral || await service.entities.Referral.create({
+    referrerUserId, referredUserId, referralCode, welcomeReward: 0,
+    referrerReward: REFERRAL_REWARD_AMOUNT, welcomeTransactionId: null,
+    referrerTransactionId: actualTransactionId, status: 'completed'
+  });
+  if (existingReferral && existingReferral.status !== 'completed') {
+    await service.entities.Referral.update(existingReferral.id, {
+      referrerReward: REFERRAL_REWARD_AMOUNT, referrerTransactionId: actualTransactionId, status: 'completed'
+    });
+  }
+  return { credited: !credit.duplicated, referral, transaction, wallet: credit.wallet };
+}
+
 export function round2(n) {
   return Math.round(Number(n) * 100) / 100;
 }

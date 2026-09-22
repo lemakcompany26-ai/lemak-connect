@@ -53,8 +53,9 @@ export default function Referrals() {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-border bg-card p-4"><Users className="w-4 h-4 text-primary mb-2" /><div className="text-xl font-extrabold">{data.totalReferrals}</div><div className="text-xs text-muted-foreground">Total referrals</div></div>
-          <div className="rounded-2xl border border-border bg-card p-4"><Gift className="w-4 h-4 text-primary mb-2" /><div className="text-xl font-extrabold">{formatNaira(data.rewards)}</div><div className="text-xs text-muted-foreground">Referral rewards</div></div>
+          <div className="rounded-2xl border border-border bg-card p-4"><Users className="w-4 h-4 text-primary mb-2" /><div className="text-xl font-extrabold">{data.totalReferrals}</div><div className="text-xs text-muted-foreground">Total people referred</div></div>
+          <div className="rounded-2xl border border-border bg-card p-4"><Users className="w-4 h-4 text-primary mb-2" /><div className="text-xl font-extrabold">{data.successfulRegistrations ?? data.totalReferrals}</div><div className="text-xs text-muted-foreground">Successful registrations</div></div>
+          <div className="rounded-2xl border border-border bg-card p-4 col-span-2"><Gift className="w-4 h-4 text-primary mb-2" /><div className="text-xl font-extrabold">{formatNaira(data.totalReferralEarnings ?? data.rewards)}</div><div className="text-xs text-muted-foreground">Total referral earnings</div></div>
         </div>
         <div className="rounded-3xl border border-border bg-card p-5">
           <h2 className="font-heading font-bold text-sm flex items-center gap-2"><History className="w-4 h-4 text-primary" /> Referral history</h2>

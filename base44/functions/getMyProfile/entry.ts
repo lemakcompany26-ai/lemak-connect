@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { ensureWallet, generateReferralIdentity } from '../../shared/lemak.ts';
+import { ensureWallet, generateReferralIdentity, finalizeReferralReward } from '../../shared/lemak.ts';
 
 // Returns the caller's profile, wallet and notification preferences.
 export default async function(req: Request): Promise<Response> {
@@ -18,6 +18,7 @@ export default async function(req: Request): Promise<Response> {
         referralLink: profile.referralLink || `https://www.lemakconnect.com/signup?ref=${encodeURIComponent(profile.referralCode || identity.code)}`
       });
     }
+    if (profile) await finalizeReferralReward(service, profile);
     const wallet = await ensureWallet(service, user.id);
     const prefsList = await service.entities.NotificationPreference.filter({ userId: user.id }, '-created_date', 1);
     const preferences = prefsList && prefsList[0] ? prefsList[0] : null;

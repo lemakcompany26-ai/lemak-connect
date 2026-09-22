@@ -29,7 +29,12 @@ export default function Register() {
 
   React.useEffect(() => {
     const ref = new URLSearchParams(location.search).get('ref');
-    if (ref) setReferralCode(ref.toUpperCase().slice(0, 40));
+    if (ref) {
+      const normalizedRef = ref.toUpperCase().slice(0, 40);
+      setReferralCode(normalizedRef);
+      const pending = JSON.parse(localStorage.getItem("lemak_pending_onboarding") || "{}");
+      localStorage.setItem("lemak_pending_onboarding", JSON.stringify({ ...pending, referralCode: normalizedRef }));
+    }
   }, [location.search]);
 
   const handleSubmit = async (e) => {
@@ -107,6 +112,8 @@ export default function Register() {
   };
 
   const handleGoogle = () => {
+    const ref = new URLSearchParams(location.search).get('ref');
+    if (ref) localStorage.setItem("lemak_pending_onboarding", JSON.stringify({ referralCode: ref.toUpperCase().slice(0, 40) }));
     base44.auth.loginWithProvider("google", safeReturnTo());
   };
 

@@ -23,8 +23,10 @@ export default async function(req: Request): Promise<Response> {
       code,
       link,
       totalReferrals: (referrals || []).length,
-      rewards: (referrals || []).reduce((sum, row) => sum + Number(row.referrerReward || 0), 0),
-      history: (referrals || []).map(row => ({
+      successfulRegistrations: (referrals || []).filter((row: any) => row.status === 'completed').length,
+      totalReferralEarnings: (referrals || []).reduce((sum: number, row: any) => sum + Number(row.referrerReward || 0), 0),
+      rewards: (referrals || []).reduce((sum: number, row: any) => sum + Number(row.referrerReward || 0), 0),
+      history: (referrals || []).map((row: any) => ({
         id: row.id, date: row.created_date, reward: Number(row.referrerReward || 0), status: row.status
       }))
     });

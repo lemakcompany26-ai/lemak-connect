@@ -17,6 +17,8 @@ export default function FundWalletSheet({ open, onOpenChange }) {
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const payable = Number(amount) || 0;
+  const credit = Math.max(0, payable - 50);
 
   // Online checkout — secure hosted payment. The wallet is credited only
   // after the payment is verified server-side on return.
@@ -81,6 +83,7 @@ export default function FundWalletSheet({ open, onOpenChange }) {
                 <Label htmlFor="fundAmount">Amount (₦)</Label>
                 <Input id="fundAmount" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="Enter amount" className="h-12 text-base" />
               </div>
+              {payable >= 100 && <div className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">You pay {formatNairaShort(payable)} · provider charge {formatNairaShort(50)} · wallet credit {formatNairaShort(credit)}</div>}
               {error && (
                 <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
                   <AlertCircle className="w-4 h-4" /> {error}
@@ -88,7 +91,7 @@ export default function FundWalletSheet({ open, onOpenChange }) {
               )}
               <div className="mt-4 space-y-2">
                 <Button className="w-full h-12 font-bold" disabled={loading} onClick={fund}>
-                  {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Redirecting…</> : 'Pay Online'}
+                  {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Redirecting…</> : payable >= 100 ? `Pay ${formatNairaShort(payable)}` : 'Pay Online'}
                 </Button>
               </div>
             </div>

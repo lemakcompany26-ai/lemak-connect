@@ -46,7 +46,7 @@ export default function Wallet() {
         if (d.credited) {
           await refresh();
           firePurchaseConversion({ value: d.amount, transactionId: ref });
-          toast({ title: 'Wallet funded!', description: `${formatNairaShort(d.amount)} was added to your wallet.` });
+          toast({ title: 'Wallet funded!', description: `${formatNairaShort(d.amount)} credited after a ${formatNairaShort(d.fee || 50)} funding fee.` });
         } else {
           toast({ title: 'Payment not completed', description: 'If you were charged, it will reflect automatically once confirmed.', variant: 'destructive' });
         }

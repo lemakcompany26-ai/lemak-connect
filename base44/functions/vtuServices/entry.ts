@@ -67,7 +67,7 @@ export default async function(req: Request): Promise<Response> {
       if (!BETTING_PROVIDERS.some(p => p.code === billerCode)) {
         return Response.json({ error: 'Select a valid betting platform' }, { status: 400 });
       }
-      if (!/^[A-Za-z0-9_-]{4,30}$/.test(customerId)) {
+      if (!/^[A-Za-z0-9._-]{3,50}$/.test(customerId)) {
         return Response.json({ error: 'Enter a valid betting account / user ID' }, { status: 400 });
       }
       const response = await validateBettingCustomer({ billerCode, customerId });

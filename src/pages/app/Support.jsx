@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Send, Bot, Mail, MessageCircle } from 'lucide-react';
+import { Send, Bot, Mail, MessageCircle, LifeBuoy, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,12 @@ export default function Support() {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [ticketOpen, setTicketOpen] = useState(false);
+  const [ticketLoading, setTicketLoading] = useState(false);
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketTransactionId, setTicketTransactionId] = useState('');
+  const [ticketDetails, setTicketDetails] = useState('');
+  const [ticketNotice, setTicketNotice] = useState('');
   const endRef = useRef(null);
 
   useEffect(() => { endRef.current && endRef.current.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
@@ -30,10 +36,28 @@ export default function Support() {
       const d = res.data || res;
       setMessages(prev => [...prev, { role: 'assistant', content: d.reply }]);
     } catch (err) {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I hit a snag. Please email lemakcompany26@gmail.com or WhatsApp 09022143559 and our team will help you.' }]);
+    setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I hit a snag. Please email lemakcompany26@gmail.com or WhatsApp +2349022143559 and our team will help you.' }]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const submitTicket = async (event) => {
+    event.preventDefault();
+    if (!ticketDetails.trim() || ticketLoading) return;
+    setTicketLoading(true); setTicketNotice('');
+    try {
+      await base44.functions.invoke('submitSupportTicket', {
+        subject: ticketSubject || 'Customer support request',
+        transactionId: ticketTransactionId,
+        content: ticketDetails
+      });
+      setTicketSubject(''); setTicketTransactionId(''); setTicketDetails('');
+      setTicketNotice('Your complaint was sent to support. We will reply by email.');
+    } catch (err) {
+      const data = err.response && err.response.data;
+      setTicketNotice((data && data.error) || err.message || 'Could not send your complaint.');
+    } finally { setTicketLoading(false); }
   };
 
   return (
@@ -88,8 +112,25 @@ export default function Support() {
           <Mail className="w-4 h-4 text-primary" /> Email Support
         </a>
         <a href="https://wa.me/2349022143559" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-xs font-semibold hover:border-primary/40 transition-colors">
-          <MessageCircle className="w-4 h-4 text-emerald-600" /> WhatsApp 0902 214 3559
+          <MessageCircle className="w-4 h-4 text-emerald-600" /> WhatsApp +234 902 214 3559
         </a>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <Button type="button" variant="outline" className="w-full" onClick={() => setTicketOpen(value => !value)}>
+          <LifeBuoy className="w-4 h-4 mr-2" /> Contact human support
+        </Button>
+        {ticketOpen && (
+          <form onSubmit={submitTicket} className="mt-4 space-y-3">
+            <Input value={ticketSubject} onChange={e => setTicketSubject(e.target.value)} placeholder="Subject" />
+            <Input value={ticketTransactionId} onChange={e => setTicketTransactionId(e.target.value)} placeholder="Transaction ID (optional)" />
+            <textarea value={ticketDetails} onChange={e => setTicketDetails(e.target.value)} placeholder="Describe your complaint or query" className="min-h-28 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary" />
+            <Button type="submit" className="w-full" disabled={ticketLoading || !ticketDetails.trim()}>
+              {ticketLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending…</> : 'Send complaint'}
+            </Button>
+            {ticketNotice && <p className="text-xs text-muted-foreground">{ticketNotice}</p>}
+          </form>
+        )}
       </div>
     </div>
   );

@@ -161,13 +161,13 @@ export default async function(req: Request): Promise<Response> {
       if (existing && existing[0]) return Response.json({ ok: true, alreadyFrozen: true, freeze: existing[0] });
       const amount = round2(ledger.amount);
       const transactionId = generateTransactionId();
-      const debit = await debitWallet(service, {
-        userId: ledger.userId, transactionId, type: 'adjustment', amount,
-        reference: ledger.transactionId || ledger.id,
-        description: `Promotional funds frozen: ${reason}`,
-        idempotencyKey: `promo-freeze-${ledger.id}`
-      });
-      if (debit.duplicated) return Response.json({ ok: true, alreadyFrozen: true });
+      const wallets = await service.entities.Wallet.filter({ userId: ledger.userId }, '-created_date', 1);
+      const wallet = wallets && wallets[0];
+      const promotionalBalance = round2(Number(wallet && wallet.promotionalBalance) || 0);
+      if (!wallet || promotionalBalance < amount) {
+        return Response.json({ error: 'Promotional balance is lower than this credit or was already frozen' }, { status: 409 });
+      }
+      await service.entities.Wallet.update(wallet.id, { promotionalBalance: round2(promotionalBalance - amount) });
       const freeze = await service.entities.PromoFundFreeze.create({
         userId: ledger.userId, walletLedgerId: ledger.id, transactionId, amount,
         reason, frozenAt: new Date().toISOString(), frozenBy: user.email
@@ -180,7 +180,7 @@ export default async function(req: Request): Promise<Response> {
         completedAt: new Date().toISOString(), idempotencyKey: `promo-freeze-${ledger.id}`
       });
       await audit('WalletLedger', ledger.id, { action: 'freeze_promo_funds', amount, reason, transactionId });
-      return Response.json({ ok: true, freeze, wallet: debit.wallet });
+      return Response.json({ ok: true, freeze, wallet: { ...wallet, promotionalBalance: round2(promotionalBalance - amount) } });
     }
 
     if (entityKind === 'charges') {

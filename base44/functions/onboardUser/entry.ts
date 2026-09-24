@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { isAdminEmail, notifyUser, generateReferralIdentity, finalizeReferralReward, ensureNeyoIbadanPromo, normalizeSignupPromo } from '../../shared/lemak.ts';
+import { isAdminEmail, notifyUser, generateReferralIdentity, ensureNeyoIbadanPromo, normalizeSignupPromo } from '../../shared/lemak.ts';
 import { sendTransactionalEmail } from '../../shared/emails.ts';
 
 // Creates the user's profile, wallet (NGN, 0.00) and notification preferences
@@ -13,7 +13,6 @@ export default async function(req: Request): Promise<Response> {
 
     const existingProfiles = await service.entities.UserProfile.filter({ userId: user.id }, '-created_date', 1);
     if (existingProfiles && existingProfiles[0]) {
-      await finalizeReferralReward(service, existingProfiles[0]);
       return Response.json({ profile: existingProfiles[0], alreadyOnboarded: true });
     }
 
@@ -79,7 +78,10 @@ export default async function(req: Request): Promise<Response> {
     if (referrer) {
       const existingReferral = await service.entities.Referral.filter({ referredUserId: user.id }, '-created_date', 1);
       if (!existingReferral || !existingReferral[0]) {
-        await finalizeReferralReward(service, profile);
+        await service.entities.Referral.create({
+          referrerUserId: referrer.userId, referredUserId: user.id, referralCode,
+          welcomeReward: 0, referrerReward: 100, status: 'pending'
+        });
       }
     }
 

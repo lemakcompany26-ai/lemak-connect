@@ -6,7 +6,7 @@ import { secrets } from 'base44:runtime';
 // and deduplicated on (emailType + transactionId + recipientEmail).
 
 export const SUPPORT_EMAIL = 'lemakcompany26@gmail.com';
-export const SUPPORT_PHONE = '09022143559';
+export const SUPPORT_PHONE = '+2349022143559';
 export const COMPANY_ADDRESS = 'No. 2 Opeyemi, Zone 2, Alakia, Ibadan, Nigeria';
 export const EMAIL_LOGO_URL = 'https://media.base44.com/images/public/6aac39a1738410bf82b900f5/c46723cf5_generated_image.png';
 export const APP_URL = 'https://lemakconnect.base44.app';

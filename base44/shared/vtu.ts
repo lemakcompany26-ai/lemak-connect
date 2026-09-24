@@ -52,6 +52,7 @@ async function vtuRequest(config, path, opts) {
 export function isProviderSuccess(response) {
   const d = response && response.data;
   if (!d) return false;
+  if (d.valid === true || (d.data && d.data.valid === true)) return true;
   if (d.success === true) return true;
   if (typeof d.status === 'boolean') return d.status === true;
   if (typeof d.status === 'string') {
@@ -92,7 +93,13 @@ function extractPlansArray(d) {
   return null;
 }
 
-// Fetch data plans for a network from the provider.
+const DATA_PLANS_CACHE_TTL_MS = 30_000;
+const dataPlansCache = new Map();
+const dataPlansInFlight = new Map();
+
+// Fetch data plans for a network from the provider. The provider catalogue is
+// shared briefly and concurrent callers share one request to avoid rate-limit
+// bursts from page refreshes and React effects.
 export async function fetchDataPlans(network) {
   const config = getVtuConfig();
   if (!config.configured) {
@@ -101,6 +108,12 @@ export async function fetchDataPlans(network) {
     throw err;
   }
   const id = networkId(network);
+  const cacheKey = String(network || 'all').toUpperCase();
+  const cached = dataPlansCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.plans;
+  if (dataPlansInFlight.has(cacheKey)) return dataPlansInFlight.get(cacheKey);
+
+  const request = (async () => {
   const attempts = id
     ? [`/api/v2/vtu/data/plans/?network=${id}`]
     : ['/api/v2/vtu/data/plans/'];
@@ -110,13 +123,23 @@ export async function fetchDataPlans(network) {
       const response = await vtuRequest(config, path, { method: 'GET' });
       lastResponse = response;
       const arr = extractPlansArray(response.data);
-      if (arr && arr.length > 0) return arr;
+      if (arr && arr.length > 0) {
+        dataPlansCache.set(cacheKey, { plans: arr, expiresAt: Date.now() + DATA_PLANS_CACHE_TTL_MS });
+        return arr;
+      }
     } catch (e) { lastResponse = { ok: false, data: null, error: e.message }; }
   }
-  if (isProviderSuccess(lastResponse)) return [];
+  if (isProviderSuccess(lastResponse)) {
+    dataPlansCache.set(cacheKey, { plans: [], expiresAt: Date.now() + DATA_PLANS_CACHE_TTL_MS });
+    return [];
+  }
+  if (cached && cached.plans) return cached.plans;
   const err = new Error('Could not load data plans right now. Please try again shortly.');
   err.statusCode = 502;
   throw err;
+  })();
+  dataPlansInFlight.set(cacheKey, request);
+  try { return await request; } finally { dataPlansInFlight.delete(cacheKey); }
 }
 
 // Purchase airtime through the provider.
@@ -278,6 +301,7 @@ export async function purchaseRechargePinViaProvider(opts) {
 const SERVICE_PATHS = {
   electricity: {
     plans: ['/api/v2/electricity/plans/', '/api/v2/vtu/electricity/plans/'],
+    validate: ['/api/v2/electricity/validate/', '/api/v2/vtu/electricity/validate/'],
     purchase: ['/api/v2/electricity/purchase/', '/api/v2/vtu/electricity/purchase/']
   },
   education: {
@@ -344,6 +368,26 @@ export async function purchaseServiceViaProvider(opts) {
   };
   let lastResponse = null;
   for (const path of servicePaths(serviceType, 'purchase')) {
+    const response = await vtuRequest(config, path, { method: 'POST', body: payload });
+    lastResponse = response;
+    if (response.ok || isProviderSuccess(response)) return response;
+  }
+  return lastResponse;
+}
+
+export async function validateElectricityCustomer(opts) {
+  const { meterNumber, meterType, planId, variationCode } = opts;
+  const config = getVtuConfig();
+  const payload = {
+    meter_number: meterNumber,
+    customer_id: meterNumber,
+    meter_type: meterType || 'prepaid',
+    plan: planId,
+    plan_id: planId,
+    variation_code: variationCode || planId
+  };
+  let lastResponse = null;
+  for (const path of servicePaths('electricity', 'validate')) {
     const response = await vtuRequest(config, path, { method: 'POST', body: payload });
     lastResponse = response;
     if (response.ok || isProviderSuccess(response)) return response;

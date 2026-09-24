@@ -71,12 +71,13 @@ export default async function(req: Request): Promise<Response> {
     if (!result.duplicated) {
       await notifyKoraFunding(service, {
         userId: user.id, ownerEmail: user.email, ownerName: user.full_name || null,
-        amount: expected, transactionId: result.transactionId, reference,
+        amount: result.creditedAmount, paidAmount: result.paidAmount, fee: result.fee,
+        transactionId: result.transactionId, reference,
         balance: result.balance
       });
     }
 
-    return Response.json({ credited: true, amount: expected, reference });
+    return Response.json({ credited: true, amount: result.creditedAmount, paidAmount: result.paidAmount, fee: result.fee, reference });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

@@ -14,6 +14,11 @@
       "type": "number",
       "default": 0
     },
+    "promotionalBalance": {
+      "type": "number",
+      "default": 0,
+      "description": "Unfrozen promotional credits, tracked separately from normal wallet funds"
+    },
     "status": {
       "type": "string",
       "enum": [

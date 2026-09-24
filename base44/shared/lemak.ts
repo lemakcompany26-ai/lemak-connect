@@ -29,6 +29,13 @@ export function generateReferralIdentity() {
 }
 
 export const REFERRAL_REWARD_AMOUNT = 100;
+export const WALLET_FUNDING_FEE = 50;
+
+export function getFundingSettlement(amount) {
+  const paidAmount = round2(amount);
+  const fee = WALLET_FUNDING_FEE;
+  return { paidAmount, fee, creditedAmount: round2(Math.max(0, paidAmount - fee)) };
+}
 
 export async function finalizeReferralReward(service, referredProfile) {
   const referrerUserId = String(referredProfile && referredProfile.referredByUserId || '').trim();
@@ -108,14 +115,19 @@ export async function creditWallet(service, opts) {
     throw err;
   }
   const balanceBefore = round2(wallet.balance || 0);
-  const balanceAfter = round2(balanceBefore + round2(amount));
-  await service.entities.Wallet.update(wallet.id, { balance: balanceAfter });
+  const creditAmount = round2(amount);
+  const balanceAfter = round2(balanceBefore + creditAmount);
+  const walletPatch = { balance: balanceAfter };
+  if (type === 'promo') {
+    walletPatch.promotionalBalance = round2(Number(wallet.promotionalBalance) || 0) + creditAmount;
+  }
+  await service.entities.Wallet.update(wallet.id, walletPatch);
   const ledger = await service.entities.WalletLedger.create({
     userId, walletId: wallet.id, transactionId: transactionId || null,
-    type, amount: round2(amount), balanceBefore, balanceAfter,
+    type, amount: creditAmount, balanceBefore, balanceAfter,
     reference: reference || null, description: description || null, idempotencyKey: idempotencyKey || null
   });
-  return { ledger, duplicated: false, wallet: { ...wallet, balance: balanceAfter } };
+  return { ledger, duplicated: false, wallet: { ...wallet, ...walletPatch } };
 }
 
 // Debit a wallet. Refuses insufficient balance and frozen wallets. Idempotent when idempotencyKey provided.

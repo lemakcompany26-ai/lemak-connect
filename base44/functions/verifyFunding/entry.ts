@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { secrets } from 'base44:runtime';
-import { generateTransactionId, creditWallet, notifyUser, round2, applySignupPromoBonus } from '../../shared/lemak.ts';
+import { generateTransactionId, creditWallet, notifyUser, round2, applySignupPromoBonus, getFundingSettlement, finalizeReferralReward } from '../../shared/lemak.ts';
 import { sendTransactionalEmail } from '../../shared/emails.ts';
 import { sendTransactionalSms } from '../../shared/sms.ts';
 
@@ -46,7 +46,8 @@ export default async function(req: Request): Promise<Response> {
     }
 
     // Credit wallet — idempotent on the reference
-    const nairaAmount = round2(payment.amount / 100);
+    const settlement = getFundingSettlement(payment.amount / 100);
+    const nairaAmount = settlement.creditedAmount;
     const transactionId = generateTransactionId();
     const credited = await creditWallet(service, {
       userId: user.id, transactionId, type: 'deposit', amount: nairaAmount,
@@ -59,21 +60,22 @@ export default async function(req: Request): Promise<Response> {
     });
     await service.entities.Transaction.create({
       transactionId, userId: user.id, type: 'wallet_funding', service: 'Wallet Funding',
-      provider: 'Paystack', amount: nairaAmount, fee: 0, providerCost: nairaAmount,
-      customerPrice: nairaAmount, status: 'successful', providerReference: reference,
+      provider: 'Paystack', amount: nairaAmount, fee: settlement.fee, providerCost: settlement.paidAmount,
+      customerPrice: settlement.paidAmount, status: 'successful', providerReference: reference,
+      metadata: { fundingFee: settlement.fee, paidAmount: settlement.paidAmount, creditedAmount: nairaAmount },
       idempotencyKey: `fund-${reference}`, completedAt: new Date().toISOString()
     });
     await notifyUser(service, {
       userId: user.id, type: 'wallet',
       title: 'Wallet funded successfully',
-      message: `₦${nairaAmount.toLocaleString()} was added to your wallet. Reference: ${reference}`,
+      message: `₦${nairaAmount.toLocaleString()} was credited after a ₦${settlement.fee} funding fee. You paid ₦${settlement.paidAmount.toLocaleString()}. Reference: ${reference}`,
       actionUrl: '/app/wallet'
     });
     await sendTransactionalEmail(service, {
       emailType: 'WALLET_FUNDING_SUCCESS', userId: user.id, recipientEmail: user.email,
       recipientName: user.full_name, transactionId,
       data: {
-        amount: nairaAmount, transactionId, reference,
+        amount: nairaAmount, paidAmount: settlement.paidAmount, fee: settlement.fee, transactionId, reference,
         status: 'Successful', date: new Date().toISOString(),
         balance: credited && credited.wallet ? credited.wallet.balance : null
       }
@@ -81,15 +83,17 @@ export default async function(req: Request): Promise<Response> {
     await sendTransactionalSms(service, {
       smsType: 'WALLET_FUNDING_SUCCESS', userId: user.id, transactionId,
       data: {
-        amount: nairaAmount, transactionId,
+        amount: nairaAmount, paidAmount: settlement.paidAmount, fee: settlement.fee, transactionId,
         balance: credited && credited.wallet ? credited.wallet.balance : null
       }
     });
     // ₦1,000 welcome bonus for new users who signed up with a live promo
     // code — credited once, right after their first real funding.
     await applySignupPromoBonus(service, user.id);
+    const profiles = await service.entities.UserProfile.filter({ userId: user.id }, '-created_date', 1);
+    await finalizeReferralReward(service, profiles && profiles[0]);
 
-    return Response.json({ credited: true, amount: nairaAmount, reference });
+    return Response.json({ credited: true, amount: nairaAmount, paidAmount: settlement.paidAmount, fee: settlement.fee, reference });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

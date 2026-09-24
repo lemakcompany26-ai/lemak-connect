@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { secrets } from 'base44:runtime';
-import { generateTransactionId, creditWallet, notifyUser, round2, applySignupPromoBonus } from '../../shared/lemak.ts';
+import { generateTransactionId, creditWallet, notifyUser, round2, applySignupPromoBonus, getFundingSettlement, finalizeReferralReward } from '../../shared/lemak.ts';
 import { sendTransactionalEmail } from '../../shared/emails.ts';
 import { sendTransactionalSms } from '../../shared/sms.ts';
 
@@ -38,7 +38,8 @@ export default async function(req: Request): Promise<Response> {
     });
     const verify = await res.json().catch(() => null);
     const tx = verify && verify.data ? verify.data : null;
-    const expected = round2(payment.amount / 100);
+    const settlement = getFundingSettlement(payment.amount / 100);
+    const expected = settlement.paidAmount;
     const ok = res.ok && verify && verify.status === 'success' && tx &&
       tx.status === 'successful' &&
       String(tx.currency || '').toUpperCase() === 'NGN' &&
@@ -50,7 +51,7 @@ export default async function(req: Request): Promise<Response> {
     const idempotencyKey = `FLW-DEPOSIT:${txRef}`;
     const transactionId = generateTransactionId();
     const credited = await creditWallet(service, {
-      userId: payment.userId, transactionId, type: 'deposit', amount: expected,
+      userId: payment.userId, transactionId, type: 'deposit', amount: settlement.creditedAmount,
       reference: txRef, description: 'Wallet funding via card payment (Flutterwave)',
       idempotencyKey
     });
@@ -64,9 +65,9 @@ export default async function(req: Request): Promise<Response> {
     await service.entities.Transaction.create({
       transactionId, userId: payment.userId, type: 'wallet_funding',
       service: 'Wallet Funding — Card (Flutterwave)', provider: 'Flutterwave',
-      amount: expected, fee: 0, providerCost: expected, customerPrice: expected,
+      amount: settlement.creditedAmount, fee: settlement.fee, providerCost: settlement.paidAmount, customerPrice: settlement.paidAmount,
       status: 'successful', providerReference: String(tx.id || txRef),
-      metadata: { fundingMethod: 'card', webhookVerified: true, verification: 'verify_by_reference' },
+      metadata: { fundingMethod: 'card', webhookVerified: true, verification: 'verify_by_reference', fundingFee: settlement.fee, paidAmount: settlement.paidAmount, creditedAmount: settlement.creditedAmount },
       idempotencyKey, completedAt: new Date().toISOString()
     });
 
@@ -76,7 +77,7 @@ export default async function(req: Request): Promise<Response> {
     await notifyUser(service, {
       userId: payment.userId, type: 'wallet',
       title: 'Wallet funded successfully',
-      message: `₦${expected.toLocaleString()} was added to your wallet. Reference: ${transactionId}`,
+      message: `₦${settlement.creditedAmount.toLocaleString()} was credited after a ₦${settlement.fee} funding fee. You paid ₦${settlement.paidAmount.toLocaleString()}. Reference: ${transactionId}`,
       actionUrl: '/app/wallet'
     });
     if (owner && owner.email) {
@@ -85,7 +86,7 @@ export default async function(req: Request): Promise<Response> {
         recipientEmail: owner.email, recipientName: owner.full_name || null,
         transactionId,
         data: {
-          amount: expected, transactionId, reference: txRef,
+          amount: settlement.creditedAmount, paidAmount: settlement.paidAmount, fee: settlement.fee, transactionId, reference: txRef,
           status: 'Successful', date: new Date().toISOString(),
           balance: credited.wallet ? credited.wallet.balance : null
         }
@@ -93,9 +94,11 @@ export default async function(req: Request): Promise<Response> {
     }
     await sendTransactionalSms(service, {
       smsType: 'WALLET_FUNDING_SUCCESS', userId: payment.userId, transactionId,
-      data: { amount: expected, transactionId, balance: credited.wallet ? credited.wallet.balance : null }
+      data: { amount: settlement.creditedAmount, paidAmount: settlement.paidAmount, fee: settlement.fee, transactionId, balance: credited.wallet ? credited.wallet.balance : null }
     });
     await applySignupPromoBonus(service, payment.userId);
+    const profiles = await service.entities.UserProfile.filter({ userId: payment.userId }, '-created_date', 1);
+    await finalizeReferralReward(service, profiles && profiles[0]);
 
     return Response.json({ received: true });
   } catch (error) {

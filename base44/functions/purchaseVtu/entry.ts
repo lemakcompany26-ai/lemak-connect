@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { generateTransactionId, calculatePrice, validatePromo, redeemPromo, debitWallet, creditWallet, notifyUser, sendUserEmail, emailTemplate, round2 } from '../../shared/lemak.ts';
-import { getVtuConfig, isProviderSuccess, isProviderPending, extractProviderReference, extractProviderError, fetchCablePlans, purchaseCableViaProvider, BETTING_PROVIDERS, validateBettingCustomer, fundBettingViaProvider, fetchRechargePinPlans, purchaseRechargePinViaProvider, fetchServicePlans, normalizeServicePlan, purchaseServiceViaProvider } from '../../shared/vtu.ts';
+import { getVtuConfig, isProviderSuccess, isProviderPending, extractProviderReference, extractProviderError, fetchCablePlans, purchaseCableViaProvider, BETTING_PROVIDERS, validateBettingCustomer, fundBettingViaProvider, fetchRechargePinPlans, purchaseRechargePinViaProvider, fetchServicePlans, normalizeServicePlan, purchaseServiceViaProvider, validateElectricityCustomer } from '../../shared/vtu.ts';
 import { assertPinForPurchase } from '../../shared/security.ts';
 import { sendTransactionalSms } from '../../shared/sms.ts';
 
@@ -85,7 +85,7 @@ export default async function(req: Request): Promise<Response> {
       const nairaAmount = Number(body.amount);
       const providerInfo = BETTING_PROVIDERS.find(p => p.code === billerCode);
       if (!providerInfo) return Response.json({ error: 'Select a valid betting platform' }, { status: 400 });
-      if (!/^[A-Za-z0-9_-]{4,30}$/.test(customerId)) {
+      if (!/^[A-Za-z0-9._-]{3,50}$/.test(customerId)) {
         return Response.json({ error: 'Enter a valid betting account / user ID' }, { status: 400 });
       }
       if (!nairaAmount || nairaAmount < 100) {
@@ -142,6 +142,15 @@ export default async function(req: Request): Promise<Response> {
       recipient = String(body.recipient || user.email).trim();
       if (!recipient || recipient.length < 3) return Response.json({ error: 'Enter a valid recipient.' }, { status: 400 });
       metadata = { planId, planName: rawPlan.name, providerName: rawPlan.providerName || null, variationCode: rawPlan.variationCode || planId };
+      if (action === 'electricity') {
+        const validation = await validateElectricityCustomer({
+          meterNumber: recipient, meterType: body.meterType || 'prepaid',
+          planId, variationCode: rawPlan.variationCode || planId
+        });
+        if (!validation || !isProviderSuccess(validation)) {
+          return Response.json({ error: extractProviderError(validation, 'Could not validate this meter number. Please check it and try again.') }, { status: 400 });
+        }
+      }
       providerCall = () => purchaseServiceViaProvider({
         serviceType: action, planId, variationCode: rawPlan.variationCode || planId,
         recipient, amount: providerCost, customerName: body.customerName || null, meterType: body.meterType || null

@@ -11,6 +11,8 @@ import TransactionProcessingOverlay, { PROCESSING_DURATION_MS } from '@/componen
 import TransactionPinInput from '@/components/app/TransactionPinInput';
 
 const NETWORK_COLORS = { MTN: 'bg-yellow-400', Airtel: 'bg-red-500', Glo: 'bg-green-600', '9mobile': 'bg-emerald-700' };
+const plansCache = new Map();
+const plansInFlight = new Map();
 
 export default function Data() {
   const { wallet, setWalletLocal } = useApp();
@@ -30,14 +32,22 @@ export default function Data() {
 
   const loadPlans = async (net) => {
     setPlans(null); setPlansError(''); setSelectedPlan(null);
+    const cached = plansCache.get(net);
+    if (cached && cached.expiresAt > Date.now()) return setPlans(cached.plans);
     try {
-      const res = await base44.functions.invoke('getDataPlans', { network: net });
+      const request = plansInFlight.get(net) || base44.functions.invoke('getDataPlans', { network: net });
+      plansInFlight.set(net, request);
+      const res = await request;
       const d = res.data || res;
-      setPlans(d.plans || []);
+      const nextPlans = d.plans || [];
+      plansCache.set(net, { plans: nextPlans, expiresAt: Date.now() + 30_000 });
+      setPlans(nextPlans);
     } catch (err) {
       const d = err.response && err.response.data;
       setPlansError((d && d.error) || err.message || 'Could not load plans');
       setPlans([]);
+    } finally {
+      plansInFlight.delete(net);
     }
   };
 

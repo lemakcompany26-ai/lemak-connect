@@ -134,10 +134,11 @@ export default async function(req: Request): Promise<Response> {
       const rawPlans = await fetchServicePlans(action);
       const rawPlan = rawPlans.map((item, index) => normalizeServicePlan(item, index))
         .find(plan => String(plan.id) === planId);
-      if (!rawPlan || !rawPlan.amount) {
+      const requestedAmount = Number(body.amount);
+      if (!rawPlan || (action === 'electricity' ? (!requestedAmount || requestedAmount < 100) : !rawPlan.amount)) {
         return Response.json({ error: 'That plan is no longer available. Please refresh and pick another.' }, { status: 400 });
       }
-      providerCost = rawPlan.amount;
+      providerCost = action === 'electricity' ? requestedAmount : rawPlan.amount;
       itemLabel = rawPlan.name;
       recipient = String(body.recipient || user.email).trim();
       if (!recipient || recipient.length < 3) return Response.json({ error: 'Enter a valid recipient.' }, { status: 400 });

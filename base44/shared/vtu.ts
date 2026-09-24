@@ -94,6 +94,8 @@ function extractPlansArray(d) {
   for (const c of candidates) {
     if (Array.isArray(c)) return c;
     if (c && Array.isArray(c.plans)) return c.plans;
+    if (c && Array.isArray(c.providers)) return c.providers;
+    if (c && Array.isArray(c.billers)) return c.billers;
     if (c && Array.isArray(c.data)) return c.data;
   }
   return null;
@@ -306,9 +308,9 @@ export async function purchaseRechargePinViaProvider(opts) {
 
 const SERVICE_PATHS = {
   electricity: {
-    plans: ['/api/v2/electricity/plans/', '/api/v2/vtu/electricity/plans/'],
-    validate: ['/api/v2/electricity/validate/', '/api/v2/vtu/electricity/validate/'],
-    purchase: ['/api/v2/electricity/purchase/', '/api/v2/vtu/electricity/purchase/']
+    plans: ['/api/v2/bills/electricity/providers/'],
+    validate: ['/api/v2/bills/electricity/verify/'],
+    purchase: ['/api/v2/bills/electricity/pay/']
   },
   education: {
     plans: ['/api/v2/education/plans/', '/api/v2/vtu/education/plans/'],
@@ -328,10 +330,10 @@ function servicePaths(serviceType, kind) {
 export function normalizeServicePlan(plan, index) {
   const value = plan && plan.data && typeof plan.data === 'object' ? plan.data : plan;
   return {
-    id: value && (value.id || value.plan_id || value.planId || value.code || value.variation_code || value.variationCode) || String(index),
-    name: String(value && (value.product_name || value.productName || value.plan_name || value.planName || value.name || value.description) || 'Available service'),
+    id: value && (value.id || value.plan_id || value.planId || value.code || value.provider_code || value.disco_code || value.biller_code || value.variation_code || value.variationCode) || String(index),
+    name: String(value && (value.product_name || value.productName || value.plan_name || value.planName || value.provider_name || value.providerName || value.disco || value.biller_name || value.billerName || value.name || value.description) || 'Available service'),
     providerName: String(value && (value.provider_name || value.providerName || value.disco || value.biller_name || value.billerName || '') || ''),
-    variationCode: value && (value.variation_code || value.variationCode || value.code || value.id),
+    variationCode: value && (value.variation_code || value.variationCode || value.provider_code || value.disco_code || value.biller_code || value.code || value.id),
     amount: Number(value && (value.amount || value.price || value.cost || value.regular_price || value.selling_price) || 0),
     stock: value && (value.stock ?? value.available ?? value.availability ?? value.quantity ?? null),
     raw: value
@@ -367,8 +369,12 @@ export async function purchaseServiceViaProvider(opts) {
     customer_id: recipient,
     meter_number: recipient,
     phone_number: recipient,
+    disco: variationCode || planId,
+    disco_code: variationCode || planId,
+    biller_code: variationCode || planId,
     amount,
     customer_name: customerName || undefined,
+    Customer_name: customerName || undefined,
     meter_type: meterType || undefined,
     pin: config.pin
   };
@@ -388,6 +394,9 @@ export async function validateElectricityCustomer(opts) {
     meter_number: meterNumber,
     customer_id: meterNumber,
     meter_type: meterType || 'prepaid',
+    disco: variationCode || planId,
+    disco_code: variationCode || planId,
+    biller_code: variationCode || planId,
     plan: planId,
     plan_id: planId,
     variation_code: variationCode || planId

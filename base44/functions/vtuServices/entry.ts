@@ -26,11 +26,11 @@ export default async function(req: Request): Promise<Response> {
       checks.bettingValidation = await vtuDiagnosticRequest('/api/v2/betting/validate/', {
         method: 'POST', body: { biller_code: 'bet9ja', customer_id: '0000000000' }
       });
-      checks.electricityPlans = await vtuDiagnosticRequest('/api/v2/electricity/plans/', { method: 'GET' });
-      checks.electricityValidation = await vtuDiagnosticRequest('/api/v2/electricity/validate/', {
+      checks.electricityProviders = await vtuDiagnosticRequest('/api/v2/bills/electricity/providers/', { method: 'GET' });
+      checks.electricityValidation = await vtuDiagnosticRequest('/api/v2/bills/electricity/verify/', {
         method: 'POST', body: {
           meter_number: '000000000000', customer_id: '000000000000', meter_type: 'prepaid',
-          plan: '1', plan_id: '1', variation_code: '1'
+          phone_number: '08000000000', disco: 'ekedc', disco_code: 'ekedc', biller_code: 'ekedc'
         }
       });
       checks.dataPlans = await vtuDiagnosticRequest('/api/v2/vtu/data/plans/?network=1', { method: 'GET' });
@@ -131,7 +131,7 @@ export default async function(req: Request): Promise<Response> {
       const plans = [];
       for (const [index, item] of raw.entries()) {
         const plan = normalizeServicePlan(item, index);
-        if (!plan.id || !plan.amount) continue;
+        if (!plan.id || (liveService !== 'electricity' && !plan.amount)) continue;
         const pricing = await calculatePrice(service, liveService, plan.amount);
         plans.push({
           id: String(plan.id), name: plan.name, providerName: plan.providerName,

@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { generateTransactionId, calculatePrice, validatePromo, redeemPromo, debitWallet, creditWallet, notifyUser, sendUserEmail, emailTemplate, round2 } from '../../shared/lemak.ts';
-import { getVtuConfig, isProviderSuccess, isProviderPending, extractProviderReference, fetchCablePlans, purchaseCableViaProvider, BETTING_PROVIDERS, fundBettingViaProvider, fetchRechargePinPlans, purchaseRechargePinViaProvider, fetchServicePlans, normalizeServicePlan, purchaseServiceViaProvider } from '../../shared/vtu.ts';
+import { getVtuConfig, isProviderSuccess, isProviderPending, extractProviderReference, extractProviderError, fetchCablePlans, purchaseCableViaProvider, BETTING_PROVIDERS, validateBettingCustomer, fundBettingViaProvider, fetchRechargePinPlans, purchaseRechargePinViaProvider, fetchServicePlans, normalizeServicePlan, purchaseServiceViaProvider } from '../../shared/vtu.ts';
 import { assertPinForPurchase } from '../../shared/security.ts';
 import { sendTransactionalSms } from '../../shared/sms.ts';
 
@@ -94,6 +94,18 @@ export default async function(req: Request): Promise<Response> {
       providerCost = nairaAmount;
       itemLabel = `${providerInfo.name} wallet funding`;
       recipient = customerId;
+      let validation;
+      try {
+        validation = await validateBettingCustomer({ billerCode, customerId });
+      } catch (e) {
+        return Response.json({ error: e.message || 'Could not validate this betting ID. Please try again.' }, { status: e.statusCode || 502 });
+      }
+      const validationData = validation && validation.data && validation.data.data;
+      if (!isProviderSuccess(validation) || (validationData && validationData.valid === false)) {
+        return Response.json({
+          error: extractProviderError(validation, 'Could not validate this betting ID. Please check your account ID and try again.')
+        }, { status: 400 });
+      }
       metadata = {
         billerCode, providerName: providerInfo.name, customerId,
         customerName: body.customerName || null

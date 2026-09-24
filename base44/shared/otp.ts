@@ -122,11 +122,20 @@ const SMSPOOL_COUNTRY = 'US';
 const SMSPOOL_USD_NGN = Number(secrets.get('SMSPOOL_USD_NGN_RATE')) || 0;
 let smspoolServicesCache = null;
 
+function smspoolRows(payload, key) {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+  const nested = payload[key] || payload.data;
+  if (Array.isArray(nested)) return nested;
+  if (nested && Array.isArray(nested[key])) return nested[key];
+  return [];
+}
+
 // Countries a provider serves, as { code, name } pairs.
 export async function listSmsCountries(server) {
   if (isSmspool(server)) {
     const data = await smspoolPost(server, '/request/countries');
-    const rows = Array.isArray(data) ? data : (data && (data.countries || data.data)) || [];
+    const rows = smspoolRows(data, 'countries');
     return rows.map(c => ({
       code: String((c && (c.code || c.short_name || c.id)) || '').toUpperCase(),
       name: String((c && (c.name || c.country || c.title)) || (c && (c.code || c.id)) || '')
@@ -177,7 +186,7 @@ async function smspoolPost(server, path, fields) {
 async function smspoolExactName(server, wanted) {
   if (!smspoolServicesCache) {
     const data = await smspoolPost(server, '/request/services');
-    smspoolServicesCache = Array.isArray(data) ? data : [];
+    smspoolServicesCache = smspoolRows(data, 'services');
   }
   const target = String(wanted || '').toLowerCase();
   return smspoolServicesCache.find(s => String(s.name).toLowerCase() === target) ||
@@ -205,7 +214,7 @@ export async function listSmsServices(server) {
   if (isSmspool(server)) {
     if (!smspoolServicesCache) {
       const data = await smspoolPost(server, '/request/services');
-      smspoolServicesCache = Array.isArray(data) ? data : [];
+      smspoolServicesCache = smspoolRows(data, 'services');
     }
     // SMSPool does not expose per-service stock; quantity null means
     // "available on demand" — the purchase itself fails gracefully if empty.
@@ -227,7 +236,7 @@ export async function getSmsPrice(server, serviceName, country) {
     const data = await smspoolPost(server, '/request/price', {
       service: exactName.name, country: (country || SMSPOOL_COUNTRY).toUpperCase()
     });
-    const usd = Number(data.price) || 0;
+    const usd = Number(data && (data.price || (data.data && data.data.price))) || 0;
     if (!usd) throw smspoolUnavailable('No price available for this service right now.');
     return { price_ngn: usd * SMSPOOL_USD_NGN, success_rate: data.success_rate || null };
   }
@@ -241,10 +250,13 @@ export async function buySmsNumber(server, serviceName, country) {
     const data = await smspoolPost(server, '/purchase/sms', {
       service: exactName.name, country: (country || SMSPOOL_COUNTRY).toUpperCase()
     });
+    const result = data && data.data && typeof data.data === 'object' ? data.data : data;
     return {
-      number: data.number, phone: data.number,
-      id: data.order_id, requestId: data.order_id,
-      expires_in: Number(data.expires_in) || 0,
+      number: result.phone_number || result.number || result.phone,
+      phone: result.phone_number || result.number || result.phone,
+      id: result.order_id || result.orderid || result.id,
+      requestId: result.order_id || result.orderid || result.id,
+      expires_in: Number(result.expires_in || result.expire_in) || 0,
       amount_paid: 0
     };
   }
@@ -258,14 +270,15 @@ export async function checkSmsRequest(server, requestId) {
   if (isSmspool(server)) {
     const data = await smspoolPost(server, '/sms/check', { orderid: String(requestId) });
     // SMSPool statuses: 1 pending, 2 receiving, 3/4 SMS received, 5/6/7 cancelled or timed out
-    const n = Number(data.status) || 0;
+    const result = data && data.data && typeof data.data === 'object' ? data.data : data;
+    const n = Number(result && result.status) || 0;
     const received = n === 3 || n === 4;
-    const code = data.sms && String(data.sms) !== '0' && String(data.sms).toLowerCase() !== 'null'
-      ? String(data.sms) : null;
+    const code = result && result.sms && String(result.sms) !== '0' && String(result.sms).toLowerCase() !== 'null'
+      ? String(result.sms) : null;
     return {
       status: received ? 'received' : (n >= 5 ? 'cancelled' : 'pending'),
       sms_code: received ? code : null,
-      full_sms: received ? (data.full_sms || null) : null
+      full_sms: received ? (result && (result.full_sms || result.full_sms_text) || null) : null
     };
   }
   return await serverFetch(server, '/sms4/check/' + encodeURIComponent(String(requestId)));

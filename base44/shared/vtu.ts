@@ -230,6 +230,13 @@ export async function validateBettingCustomer(opts) {
   });
 }
 
+export function extractProviderError(response, fallback) {
+  const d = response && response.data;
+  if (!d) return fallback;
+  const nested = d.data && typeof d.data === 'object' ? d.data : null;
+  return d.message || d.error || (nested && (nested.message || nested.error)) || fallback;
+}
+
 export async function fundBettingViaProvider(opts) {
   const { billerCode, customerId, amount } = opts;
   const config = getVtuConfig();

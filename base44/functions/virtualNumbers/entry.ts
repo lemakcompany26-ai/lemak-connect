@@ -585,6 +585,7 @@ export default async function(req: Request): Promise<Response> {
       let providerOrderId = '';
       let providerExpiresIn = 0;
       let rentExpiresAt = '';
+      let providerError = null;
       try {
         if (product === 'sms') {
           const order = await buySmsNumber(server, serviceName, country && country.code);
@@ -617,14 +618,14 @@ export default async function(req: Request): Promise<Response> {
           if (order && order.cost_ngn > 0) providerCost = order.cost_ngn;
         }
       } catch (e) {
+        providerError = e && e.message ? String(e.message).slice(0, 240) : null;
         await creditWallet(service, {
           userId: user.id, transactionId, type: 'refund',
           amount: customerPrice, reference: transactionId,
           description: `Refund — order failed (${serviceName})`,
           idempotencyKey: `vnpr-${transactionId}`
         });
-        // Never surface raw provider/API errors to the customer.
-        return { ok: false, error: 'We could not complete your order. You were refunded — please try again.', status: 502 };
+        return { ok: false, error: providerError || 'We could not complete your order. You were refunded — please try again.', status: 502 };
       }
 
       if (!handle || !providerOrderId) {
@@ -943,6 +944,7 @@ export default async function(req: Request): Promise<Response> {
       let chosen = null;
       let providerCost = 0;
       let country = null;
+      let lastProviderError = null;
       for (const server of candidates) {
         if (!server.url || !server.key) continue;
         try {
@@ -981,10 +983,12 @@ export default async function(req: Request): Promise<Response> {
               break;
             }
           }
-        } catch (e) { /* try the next server */ }
+        } catch (e) {
+          lastProviderError = e && e.message ? String(e.message).slice(0, 240) : null;
+        }
       }
       if (!chosen) {
-        return Response.json({ error: 'This service is currently unavailable. Please try another service.' }, { status: 502 });
+        return Response.json({ error: lastProviderError || 'This service is currently unavailable. Please try another service.' }, { status: 502 });
       }
       const pricing = await calculatePrice(service, 'virtual_number', providerCost);
       const result = await createLiveOrder({

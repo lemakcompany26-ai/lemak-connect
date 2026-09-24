@@ -11,7 +11,7 @@ import OtpChatFeed from '@/components/vnum/OtpChatFeed';
 import AdminChatSheet from '@/components/chat/AdminChatSheet';
 
 const STATUS_LABELS = {
-  active: 'Waiting for verification message…',
+  active: 'Waiting for verification code...',
   completed: 'Message received',
   cancelled: 'Cancelled',
   expired: 'Expired',
@@ -139,7 +139,7 @@ export default function VirtualNumberOrder() {
         ? 'Your rented number is live — every SMS it receives appears here automatically.'
         : isEmail
           ? 'Waiting for your verification email… it will appear here automatically.'
-          : 'Waiting for your verification message… it will appear here automatically.')
+          : 'Waiting for verification code...')
     : 'This order has ended.';
 
   return (
@@ -184,6 +184,9 @@ export default function VirtualNumberOrder() {
               </span>
             )}
             <span className="ml-auto shrink-0">Paid {formatNaira(order.amount)}</span>
+          </div>
+          <div className="mt-1 text-[10px] font-mono font-bold text-slate-700 truncate">
+            Transaction ID: {order.transactionId}
           </div>
         </div>
 

@@ -10,6 +10,7 @@ import {
   buyEmailOtp, checkEmailOtp, cancelEmailOtp,
   listRentAreas, listRentServices, buyRentNumber, listRentSms
 } from '../../shared/otp.ts';
+import { otpProviderDiagnostics } from '../../shared/otp.ts';
 
 // Virtual number rental market + unified live OTP service.
 // Customers see ONE "Virtual Numbers" service — the backend picks the
@@ -43,6 +44,23 @@ export default async function(req: Request): Promise<Response> {
 
     const body = await req.json();
     const action = String(body.action || '');
+
+    if (action === 'provider_diagnostics') {
+      const profiles = await service.entities.UserProfile.filter({ userId: user.id }, '-created_date', 1);
+      const profile = profiles && profiles[0];
+      if (!(profile && isStaffRole(profile.role)) && !isAdminEmail(user.email)) {
+        return Response.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      const servers = [];
+      for (const server of getOtpServers()) {
+        if (!server.url || !server.key) {
+          servers.push({ provider: server.provider, serverId: server.id, configured: false });
+          continue;
+        }
+        servers.push(await otpProviderDiagnostics(server));
+      }
+      return Response.json({ ok: true, servers });
+    }
 
     // ---------- Public browse (numbers hidden) ----------
     if (action === 'browse') {

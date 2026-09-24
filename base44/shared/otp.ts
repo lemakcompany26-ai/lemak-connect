@@ -181,6 +181,51 @@ async function smspoolPost(server, path, fields) {
   return payload;
 }
 
+// Admin-only production diagnostics. This never performs a purchase and never
+// includes the provider key in the returned payload.
+export async function otpProviderDiagnostics(server) {
+  const checks = [];
+  const request = async (path, options) => {
+    const url = server.url.replace(/\/+$/, '') + path;
+    const res = await fetch(url, {
+      ...(options || {}),
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${server.key}`,
+        ...((options && options.headers) || {})
+      }
+    });
+    const text = await res.text();
+    let payload = null;
+    try { payload = text ? JSON.parse(text) : null; } catch (e) { payload = { raw: text.slice(0, 1000) }; }
+    return { status: res.status, ok: res.ok, response: payload };
+  };
+  const smspoolRequest = async (path, fields) => {
+    const url = server.url.replace(/\/+$/, '') + path;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Bearer ${server.key}` },
+      body: new URLSearchParams({ key: server.key, ...(fields || {}) }).toString()
+    });
+    const text = await res.text();
+    let payload = null;
+    try { payload = text ? JSON.parse(text) : null; } catch (e) { payload = { raw: text.slice(0, 1000) }; }
+    return { status: res.status, ok: res.ok, response: payload };
+  };
+  const endpoints = isSmspool(server)
+    ? [['balance', '/request/balance'], ['services', '/request/services'], ['countries', '/request/countries']]
+    : [['balance', '/balance'], ['services', '/sms4/apps'], ['countries', '/sms4/countries']];
+  for (const [name, path] of endpoints) {
+    try {
+      const result = isSmspool(server) ? await smspoolRequest(path) : await request(path);
+      checks.push({ name, path, ...result });
+    } catch (error) {
+      checks.push({ name, path, status: null, ok: false, error: error.message });
+    }
+  }
+  return { provider: server.provider, serverId: server.id, configured: Boolean(server.url && server.key), checks };
+}
+
 // Resolve a lowercase service id (whatsapp, google…) to SMSPool's exact
 // service name via the public service list (cached per invocation).
 async function smspoolExactName(server, wanted) {

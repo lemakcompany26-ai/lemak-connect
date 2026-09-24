@@ -48,6 +48,12 @@ async function vtuRequest(config, path, opts) {
   return { status: res.status, ok: res.ok, data, error: null };
 }
 
+export async function vtuDiagnosticRequest(path, opts) {
+  const config = getVtuConfig();
+  if (!config.configured) return { status: 503, ok: false, data: { error: 'Bigisubs is not configured' } };
+  return vtuRequest(config, path, opts);
+}
+
 // Normalize common provider success indicators.
 export function isProviderSuccess(response) {
   const d = response && response.data;

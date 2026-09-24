@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { calculatePrice } from '../../shared/lemak.ts';
-import { fetchCablePlans, verifyCableCard, BETTING_PROVIDERS, CABLE_PROVIDERS, validateBettingCustomer, fetchRechargePinPlans, fetchServicePlans, normalizeServicePlan, isProviderSuccess, extractCustomerName } from '../../shared/vtu.ts';
+import { calculatePrice, isAdminEmail, isStaffRole } from '../../shared/lemak.ts';
+import { fetchCablePlans, verifyCableCard, BETTING_PROVIDERS, CABLE_PROVIDERS, validateBettingCustomer, fetchRechargePinPlans, fetchServicePlans, normalizeServicePlan, isProviderSuccess, extractCustomerName, getVtuConfig, vtuDiagnosticRequest } from '../../shared/vtu.ts';
 
 // Catalogue + verification endpoints for the extra VTU services.
 // No money moves here — purchases go through purchaseVtu.
@@ -14,6 +14,28 @@ export default async function(req: Request): Promise<Response> {
 
     const body = await req.json();
     const action = String(body.action || '');
+
+    if (action === 'provider_diagnostics') {
+      const profiles = await service.entities.UserProfile.filter({ userId: user.id }, '-created_date', 1);
+      const profile = profiles && profiles[0];
+      if (!(profile && isStaffRole(profile.role)) && !isAdminEmail(user.email)) {
+        return Response.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      const config = getVtuConfig();
+      const checks = {};
+      checks.bettingValidation = await vtuDiagnosticRequest('/api/v2/betting/validate/', {
+        method: 'POST', body: { biller_code: 'bet9ja', customer_id: '0000000000' }
+      });
+      checks.electricityPlans = await vtuDiagnosticRequest('/api/v2/electricity/plans/', { method: 'GET' });
+      checks.electricityValidation = await vtuDiagnosticRequest('/api/v2/electricity/validate/', {
+        method: 'POST', body: {
+          meter_number: '000000000000', customer_id: '000000000000', meter_type: 'prepaid',
+          plan: '1', plan_id: '1', variation_code: '1'
+        }
+      });
+      checks.dataPlans = await vtuDiagnosticRequest('/api/v2/vtu/data/plans/?network=1', { method: 'GET' });
+      return Response.json({ ok: true, configured: config.configured, checks });
+    }
 
     if (action === 'cable_providers') {
       return Response.json({ providers: CABLE_PROVIDERS });

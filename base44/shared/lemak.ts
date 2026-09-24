@@ -174,6 +174,32 @@ export async function calculatePrice(service, serviceSlug, providerCost) {
   return { providerCost: cost, fee, customerPrice: round2(cost + fee), feeRuleId: rule.id };
 }
 
+export async function ensureNeyoIbadanPromo(service) {
+  const code = 'NEYOIBADAN1';
+  const rows = await service.entities.PromoCode.filter({ code }, '-created_date', 1);
+  if (rows && rows[0]) return rows[0];
+  return service.entities.PromoCode.create({
+    code, description: '₦1,000 signup bonus after verified funding of ₦5,000 or more',
+    discountType: 'fixed', discountValue: 0, signupBonus: 1000,
+    qualifyingFundingAmount: 5000, perUserLimit: 1, newUsersOnly: true, isActive: true
+  });
+}
+
+// Signup offers are configuration, not client input. Keep the active promo
+// terms authoritative when older records contain previous reward values.
+export async function normalizeSignupPromo(service, promo) {
+  if (!promo || !promo.isActive) return promo;
+  const code = String(promo.code || '').trim().toUpperCase();
+  const expected = code === 'NEYOIBADAN1'
+    ? { signupBonus: 1000, qualifyingFundingAmount: 5000 }
+    : { signupBonus: 500, qualifyingFundingAmount: 1000 };
+  if (Number(promo.signupBonus) !== expected.signupBonus || Number(promo.qualifyingFundingAmount) !== expected.qualifyingFundingAmount) {
+    await service.entities.PromoCode.update(promo.id, expected).catch(() => null);
+    return { ...promo, ...expected };
+  }
+  return promo;
+}
+
 // Server-side promo validation. Returns { valid, discount, promoId, code, reason }
 export async function validatePromo(service, opts) {
   const { code, userId, serviceSlug, customerPrice, isNewUser } = opts;
@@ -238,11 +264,17 @@ const PUSH_PREF_FLAG = {
 // response and never blocks the main transaction flow; failures are silent.
 export async function notifyUser(service, opts) {
   const { userId, type, title, message, actionUrl } = opts;
+    const { idempotencyKey } = opts; // Added idempotencyKey to destructuring
   try {
-    await service.entities.Notification.create({
-      userId, type, title, message,
-      actionUrl: actionUrl || null, isRead: false, sentEmail: false
-    });
+      if (idempotencyKey) {
+        const existing = await service.entities.Notification.filter({ userId, idempotencyKey }, '-created_date', 1);
+        if (existing && existing[0]) return; // Return if notification already exists
+      }
+      await service.entities.Notification.create({
+        userId, type, title, message,
+        actionUrl: actionUrl || null, isRead: false, sentEmail: false,
+        idempotencyKey: idempotencyKey || null // Include idempotencyKey in the notification
+      });
   } catch (e) { /* non-fatal */ }
   try {
     let allowed = true;
@@ -388,26 +420,40 @@ export async function applySignupPromoBonus(service, userId) {
     if (!profile || !profile.referredByPromoCode) return { credited: false };
     const code = String(profile.referredByPromoCode).trim().toUpperCase();
     const promos = await service.entities.PromoCode.filter({ code }, '-created_date', 10);
-    const promo = promos && promos[0];
+    const promo = await normalizeSignupPromo(service, promos && promos[0]);
     if (!promo || !promo.isActive) return { credited: false };
     if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) return { credited: false };
     if (promo.totalUsageLimit != null && (promo.totalUsageCount || 0) >= Number(promo.totalUsageLimit)) {
       return { credited: false };
     }
-    const bonus = round2(Number(promo.signupBonus) || 0);
+    const isNeyoIbadan = code === 'NEYOIBADAN1';
+    const bonus = round2(isNeyoIbadan ? 1000 : (Number(promo.signupBonus) > 0 ? 500 : 0));
+    const qualifyingAmount = round2(isNeyoIbadan ? 5000 : (Number(promo.qualifyingFundingAmount) || 1000));
     if (bonus <= 0) return { credited: false };
-    const redemptions = await service.entities.PromoRedemption.filter({ userId }, '-created_date', 100);
-    if (redemptions && redemptions.some(r => r.promoCodeId === promo.id)) return { credited: false };
+    const fundingTransactions = await service.entities.Transaction.filter({ userId, type: 'wallet_funding', status: 'successful' }, '-created_date', 500);
+    const qualifyingFunding = (fundingTransactions || []).find(tx => Number(tx.amount || 0) >= qualifyingAmount);
+    const verifiedFunding = qualifyingFunding ? round2(Number(qualifyingFunding.amount || 0)) : 0;
+    if (!qualifyingFunding) return { credited: false, qualifyingAmount, verifiedFunding };
+    const idempotencyKey = `signup-bonus-${userId}-${promo.id}`;
+    const redemptions = await service.entities.PromoRedemption.filter({ userId, promoCodeId: promo.id }, '-created_date', 10);
+    if (redemptions && redemptions[0]) return { credited: false };
+    const transactionId = generateTransactionId();
     const credited = await creditWallet(service, {
-      userId, transactionId: null, type: 'promo', amount: bonus,
+      userId, transactionId, type: 'promo', amount: bonus,
       reference: code, description: `Welcome bonus — promo code ${code}`,
-      idempotencyKey: `signup-bonus-${userId}-${promo.id}`
+      idempotencyKey
     });
     if (credited.duplicated) return { credited: false };
+    await service.entities.Transaction.create({
+      transactionId, userId, type: 'adjustment', service: 'Signup promo reward', provider: 'LEMAK',
+      amount: bonus, fee: 0, providerCost: 0, customerPrice: bonus, status: 'successful',
+      providerReference: transactionId,
+      metadata: { promoCode: code, qualifyingFundingAmount: qualifyingAmount, verifiedFunding },
+      completedAt: new Date().toISOString(), idempotencyKey
+    });
     await service.entities.PromoRedemption.create({
       promoCodeId: promo.id, promoCode: code, userId,
-      transactionId: credited.ledger ? credited.ledger.transactionId : null,
-      discountApplied: 0, redeemedAt: new Date().toISOString()
+      transactionId, discountApplied: 0, description: `Verified funding of ₦${verifiedFunding.toLocaleString()} qualified this signup reward`, redeemedAt: new Date().toISOString()
     });
     await service.entities.PromoCode.update(promo.id, { totalUsageCount: (promo.totalUsageCount || 0) + 1 });
     await notifyUser(service, {

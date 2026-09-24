@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { isAdminEmail, notifyUser, generateTransactionId, generateReferralIdentity, creditWallet, finalizeReferralReward } from '../../shared/lemak.ts';
+import { isAdminEmail, notifyUser, generateReferralIdentity, finalizeReferralReward, ensureNeyoIbadanPromo, normalizeSignupPromo } from '../../shared/lemak.ts';
 import { sendTransactionalEmail } from '../../shared/emails.ts';
 
 // Creates the user's profile, wallet (NGN, 0.00) and notification preferences
@@ -26,8 +26,9 @@ export default async function(req: Request): Promise<Response> {
 
     // Server-side promo verification: only live, active codes are accepted.
     if (promoCode) {
+      if (promoCode === 'NEYOIBADAN1') await ensureNeyoIbadanPromo(service);
       const promos = await service.entities.PromoCode.filter({ code: promoCode }, '-created_date', 10);
-      const promo = promos && promos[0];
+      const promo = await normalizeSignupPromo(service, promos && promos[0]);
       const promoInvalid = () => Response.json({ error: 'That promo code is not valid or active. Please clear it and try again.' }, { status: 400 });
       if (!promo || !promo.isActive) return promoInvalid();
       if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) return promoInvalid();
@@ -78,24 +79,6 @@ export default async function(req: Request): Promise<Response> {
     if (referrer) {
       const existingReferral = await service.entities.Referral.filter({ referredUserId: user.id }, '-created_date', 1);
       if (!existingReferral || !existingReferral[0]) {
-        const generatedWelcomeTransactionId = generateTransactionId();
-        const welcomeReward = 100;
-        const welcomeCredit = await creditWallet(service, {
-          userId: user.id, transactionId: generatedWelcomeTransactionId, type: 'promo', amount: welcomeReward,
-          reference: generatedWelcomeTransactionId, description: 'New user referral welcome reward',
-          idempotencyKey: `referral-welcome-${user.id}`
-        });
-        const welcomeTransactionId = welcomeCredit.ledger && welcomeCredit.ledger.transactionId
-          ? welcomeCredit.ledger.transactionId : generatedWelcomeTransactionId;
-        const existingWelcomeTransaction = await service.entities.Transaction.filter({ idempotencyKey: `referral-welcome-${user.id}` }, '-created_date', 1);
-        if (!existingWelcomeTransaction || !existingWelcomeTransaction[0]) await service.entities.Transaction.create({
-          transactionId: welcomeTransactionId, userId: user.id, type: 'adjustment',
-          service: 'Referral welcome reward', provider: 'LEMAK', amount: welcomeReward,
-          fee: 0, providerCost: 0, customerPrice: welcomeReward, status: 'successful',
-          providerReference: welcomeTransactionId, metadata: { referralCode }, completedAt: new Date().toISOString(),
-          idempotencyKey: `referral-welcome-${user.id}`
-        });
-
         await finalizeReferralReward(service, profile);
       }
     }
@@ -103,8 +86,8 @@ export default async function(req: Request): Promise<Response> {
     await notifyUser(service, {
       userId: user.id, type: 'system',
       title: 'Welcome to Lemak Connect',
-      message: 'Your account is ready. Fund your wallet to start enjoying instant airtime, data, bills and more.',
-      actionUrl: '/app/wallet'
+      message: 'Welcome to LEMAK Connect. Fund your wallet to access Airtime, Data, Electricity, Cable TV, Betting, Education/ePIN, Broadband, Virtual Numbers & OTP, Email Verification, Digital Marketing/SMM, Marketplace and Refer & Earn.',
+      actionUrl: '/app/wallet', idempotencyKey: `welcome-notification-${user.id}`
     });
 
     await sendTransactionalEmail(service, {

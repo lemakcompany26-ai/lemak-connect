@@ -804,9 +804,6 @@ export default async function(req: Request): Promise<Response> {
       for (const s of getOtpServers()) {
         const entry = {
           id: s.id,
-          label: s.provider === 'smspool' ? 'SMSPool' : 'Fleexa',
-          provider: s.provider === 'smspool' ? 'SMSPool' : 'Fleexa',
-          supportsRent: s.provider !== 'smspool',
           configured: Boolean(s.url && s.key),
           online: false,
           smsStock: 0,

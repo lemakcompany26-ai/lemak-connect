@@ -119,55 +119,19 @@ export async function otpServerRequest(path, options) {
 // POSTs with the key in the body. Prices are USD and are converted to NGN
 // at a conservative fixed rate. SMSPool has no email OTP product.
 const SMSPOOL_COUNTRY = 'US';
-const SMSPOOL_USD_NGN = 1600;
+const SMSPOOL_USD_NGN = Number(secrets.get('SMSPOOL_USD_NGN_RATE')) || 0;
 let smspoolServicesCache = null;
-
-// SMSPool serves most ISO country short codes; these are the most requested.
-// Fleexa exposes its own live country list via /sms4/countries.
-const SMSPOOL_COUNTRIES = [
-  { code: 'US', name: 'United States' },
-  { code: 'NG', name: 'Nigeria' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' },
-  { code: 'NL', name: 'Netherlands' },
-  { code: 'ES', name: 'Spain' },
-  { code: 'IT', name: 'Italy' },
-  { code: 'PL', name: 'Poland' },
-  { code: 'PT', name: 'Portugal' },
-  { code: 'RO', name: 'Romania' },
-  { code: 'RU', name: 'Russia' },
-  { code: 'UA', name: 'Ukraine' },
-  { code: 'TR', name: 'Turkey' },
-  { code: 'EG', name: 'Egypt' },
-  { code: 'ZA', name: 'South Africa' },
-  { code: 'GH', name: 'Ghana' },
-  { code: 'KE', name: 'Kenya' },
-  { code: 'IN', name: 'India' },
-  { code: 'ID', name: 'Indonesia' },
-  { code: 'PH', name: 'Philippines' },
-  { code: 'VN', name: 'Vietnam' },
-  { code: 'TH', name: 'Thailand' },
-  { code: 'MY', name: 'Malaysia' },
-  { code: 'PK', name: 'Pakistan' },
-  { code: 'BD', name: 'Bangladesh' },
-  { code: 'BR', name: 'Brazil' },
-  { code: 'MX', name: 'Mexico' },
-  { code: 'AE', name: 'United Arab Emirates' },
-  { code: 'SA', name: 'Saudi Arabia' },
-  { code: 'IL', name: 'Israel' },
-  { code: 'CN', name: 'China' },
-  { code: 'JP', name: 'Japan' },
-  { code: 'AU', name: 'Australia' },
-  { code: 'HK', name: 'Hong Kong' },
-  { code: 'SE', name: 'Sweden' },
-  { code: 'CH', name: 'Switzerland' }
-];
 
 // Countries a provider serves, as { code, name } pairs.
 export async function listSmsCountries(server) {
-  if (isSmspool(server)) return SMSPOOL_COUNTRIES;
+  if (isSmspool(server)) {
+    const data = await smspoolPost(server, '/request/countries');
+    const rows = Array.isArray(data) ? data : (data && (data.countries || data.data)) || [];
+    return rows.map(c => ({
+      code: String((c && (c.code || c.short_name || c.id)) || '').toUpperCase(),
+      name: String((c && (c.name || c.country || c.title)) || (c && (c.code || c.id)) || '')
+    })).filter(c => c.code);
+  }
   const data = await serverFetch(server, '/sms4/countries');
   return (Array.isArray(data) ? data : [])
     .map(c => ({
@@ -248,11 +212,16 @@ export async function listSmsServices(server) {
     return smspoolServicesCache.map(s => ({ id: String(s.name).toLowerCase(), quantity: null }));
   }
   const data = await serverFetch(server, '/sms4/apps');
-  return Array.isArray(data) ? data : [];
+  return (Array.isArray(data) ? data : []).map(app => ({
+    ...app,
+    id: String(app && (app.id || app.serviceName || app.service || app.name || '')).trim().toLowerCase(),
+    quantity: app && app.quantity !== undefined ? app.quantity : (app && (app.stock ?? app.available ?? null))
+  })).filter(app => app.id);
 }
 
 export async function getSmsPrice(server, serviceName, country) {
   if (isSmspool(server)) {
+    if (!SMSPOOL_USD_NGN) throw smspoolUnavailable('This OTP server has no configured currency rate.');
     const exactName = await smspoolExactName(server, serviceName);
     if (!exactName) throw smspoolUnavailable('That service is not available on this server.');
     const data = await smspoolPost(server, '/request/price', {

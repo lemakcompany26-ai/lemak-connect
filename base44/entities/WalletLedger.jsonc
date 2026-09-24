@@ -44,6 +44,12 @@
     "idempotencyKey": {
       "type": "string",
       "description": "Prevents duplicate debit/refund operations"
+    },
+    "freezeStatus": {
+      "type": "string",
+      "enum": ["none", "frozen"],
+      "default": "none",
+      "description": "Administrative status for promotional credits; original ledger rows remain immutable"
     }
   },
   "required": [

@@ -25,6 +25,11 @@
       "default": 0,
       "description": "Wallet bonus (NGN) credited to a new user after their first real funding. 0 for normal discount codes"
     },
+    "qualifyingFundingAmount": {
+      "type": "number",
+      "default": 1000,
+      "description": "Verified wallet funding amount required before a signup bonus is credited"
+    },
     "minimumTransaction": {
       "type": "number",
       "default": 0

@@ -15,7 +15,7 @@ const SERVICE_SLUGS = ['airtime', 'data', 'electricity', 'cable', 'betting', 'ed
 function PromoForm({ onSaved }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ code: '', description: '', discountType: 'percentage', discountValue: '', signupBonus: '', minimumTransaction: '0', maximumDiscount: '', expiresAt: '', totalUsageLimit: '', perUserLimit: '1', restrictedToService: 'any', newUsersOnly: false });
+  const [form, setForm] = useState({ code: '', description: '', discountType: 'percentage', discountValue: '', signupBonus: '', qualifyingFundingAmount: '1000', minimumTransaction: '0', maximumDiscount: '', expiresAt: '', totalUsageLimit: '', perUserLimit: '1', restrictedToService: 'any', newUsersOnly: false });
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -29,6 +29,7 @@ function PromoForm({ onSaved }) {
         discountType: form.discountType,
         discountValue: Number(form.discountValue) || 0,
         signupBonus: form.signupBonus === '' ? 0 : Number(form.signupBonus) || 0,
+        qualifyingFundingAmount: Number(form.qualifyingFundingAmount) || 1000,
         minimumTransaction: Number(form.minimumTransaction) || 0,
         maximumDiscount: form.maximumDiscount === '' ? null : Number(form.maximumDiscount),
         expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
@@ -73,6 +74,7 @@ function PromoForm({ onSaved }) {
             <div className="space-y-2"><Label>Max Discount (₦, for %)</Label><Input type="number" value={form.maximumDiscount} onChange={e => set('maximumDiscount', e.target.value)} placeholder="No cap" /></div>
             <div className="space-y-2"><Label>Per-User Limit</Label><Input type="number" value={form.perUserLimit} onChange={e => set('perUserLimit', e.target.value)} /></div>
             <div className="space-y-2"><Label>Signup Bonus (₦)</Label><Input type="number" value={form.signupBonus} onChange={e => set('signupBonus', e.target.value)} placeholder="0 — none" /></div>
+            <div className="space-y-2"><Label>Qualifying Funding (₦)</Label><Input type="number" value={form.qualifyingFundingAmount} onChange={e => set('qualifyingFundingAmount', e.target.value)} /></div>
             <div className="space-y-2"><Label>Total Usage Limit</Label><Input type="number" value={form.totalUsageLimit} onChange={e => set('totalUsageLimit', e.target.value)} placeholder="Unlimited" /></div>
             <div className="space-y-2"><Label>Expires</Label><Input type="date" value={form.expiresAt} onChange={e => set('expiresAt', e.target.value)} /></div>
           </div>

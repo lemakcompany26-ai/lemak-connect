@@ -76,7 +76,7 @@ export const TEMPLATES = {
       title: 'Welcome to Lemak Connect 🎉',
       intro: `<p>Hi <b>${esc(name || d.name || 'there')}</b>,</p>
         <p>Your account is ready and your wallet has been created with a starting balance of <b>₦0.00</b>.</p>
-        <p>Fund your wallet to enjoy instant airtime, data, bills, virtual numbers and more.</p>`,
+        <p>Fund your wallet and explore Airtime, Data, Electricity, Cable TV, Betting, Education/ePIN, Broadband, Virtual Numbers &amp; OTP, Email Verification, Digital Marketing/SMM, Marketplace and Refer &amp; Earn.</p>`,
       ctaText: 'Open your dashboard', ctaPath: '/app'
     })
   },

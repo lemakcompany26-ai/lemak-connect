@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { isAdminEmail, isStaffRole, notifyUser, notifyAdmins, creditWallet, computeMarketplaceFees, round2 } from '../../shared/lemak.ts';
+import { isAdminEmail, isStaffRole, notifyUser, notifyAdmins, creditWallet, debitWallet, computeMarketplaceFees, round2, generateTransactionId } from '../../shared/lemak.ts';
 
 // Admin-only actions, each one audited. Roles are verified server-side
 // from the profile — never trusted from the frontend.
@@ -18,7 +18,8 @@ const ACTIONS = {
   refund_marketplace_order: 'order',
   resolve_dispute: 'dispute',
   update_user_status: 'profile',
-  update_user_role: 'profile'
+  update_user_role: 'profile',
+  freeze_promo_funds: 'promo'
 };
 
 export default async function(req: Request): Promise<Response> {
@@ -145,6 +146,41 @@ export default async function(req: Request): Promise<Response> {
       }
       await audit('UserProfile', targetId, data || {});
       return Response.json({ ok: true });
+    }
+
+    if (entityKind === 'promo') {
+      const ledgerId = String(targetId || '').trim();
+      const reason = String((data || {}).reason || '').trim().slice(0, 1000);
+      if (!ledgerId || !reason) return Response.json({ error: 'A promotional ledger entry and freeze reason are required' }, { status: 400 });
+      const ledgers = await service.entities.WalletLedger.filter({ id: ledgerId }, '-created_date', 1);
+      const ledger = ledgers && ledgers[0];
+      if (!ledger || ledger.type !== 'promo' || Number(ledger.amount || 0) <= 0) {
+        return Response.json({ error: 'Only positive promotional credits can be frozen' }, { status: 400 });
+      }
+      const existing = await service.entities.PromoFundFreeze.filter({ walletLedgerId: ledger.id }, '-created_date', 1);
+      if (existing && existing[0]) return Response.json({ ok: true, alreadyFrozen: true, freeze: existing[0] });
+      const amount = round2(ledger.amount);
+      const transactionId = generateTransactionId();
+      const debit = await debitWallet(service, {
+        userId: ledger.userId, transactionId, type: 'adjustment', amount,
+        reference: ledger.transactionId || ledger.id,
+        description: `Promotional funds frozen: ${reason}`,
+        idempotencyKey: `promo-freeze-${ledger.id}`
+      });
+      if (debit.duplicated) return Response.json({ ok: true, alreadyFrozen: true });
+      const freeze = await service.entities.PromoFundFreeze.create({
+        userId: ledger.userId, walletLedgerId: ledger.id, transactionId, amount,
+        reason, frozenAt: new Date().toISOString(), frozenBy: user.email
+      });
+      await service.entities.Transaction.create({
+        transactionId, userId: ledger.userId, type: 'adjustment', service: 'Promotional funds freeze',
+        provider: 'LEMAK', amount, fee: 0, providerCost: 0, customerPrice: amount,
+        status: 'successful', providerReference: ledger.transactionId || ledger.id,
+        metadata: { sourceLedgerId: ledger.id, reason, action: 'freeze_promo_funds' },
+        completedAt: new Date().toISOString(), idempotencyKey: `promo-freeze-${ledger.id}`
+      });
+      await audit('WalletLedger', ledger.id, { action: 'freeze_promo_funds', amount, reason, transactionId });
+      return Response.json({ ok: true, freeze, wallet: debit.wallet });
     }
 
     if (entityKind === 'charges') {

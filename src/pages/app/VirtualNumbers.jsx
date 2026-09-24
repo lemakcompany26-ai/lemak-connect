@@ -247,7 +247,9 @@ export default function VirtualNumbers() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-base font-extrabold text-white">Server {server.id === 'a' ? '1' : '2'}</div>
-                  <div className="mt-1 text-xs font-semibold text-slate-400">Provider: {server.provider}</div>
+                  <div className="mt-1 text-xs font-semibold text-slate-400">
+                    {server.id === 'a' ? 'Social OTP, email verification and number renting' : 'Virtual-number OTP and rental services'}
+                  </div>
                 </div>
                 {selectedServer === server.id && <CheckCircle2 className="h-5 w-5 shrink-0 text-amber-400" />}
               </div>

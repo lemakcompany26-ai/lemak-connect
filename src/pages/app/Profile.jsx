@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { UserCircle, Loader2, Save, Settings as SettingsIcon } from 'lucide-react';
+import { UserCircle, Loader2, Save, Settings as SettingsIcon, Copy, Share2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,24 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [referral, setReferral] = useState(null);
+  const [referralMessage, setReferralMessage] = useState('');
+
+  useEffect(() => {
+    base44.functions.invoke('referrals', {}).then(res => setReferral(res.data || res)).catch(() => setReferral(null));
+  }, []);
+
+  const copyReferralLink = async () => {
+    if (!referral?.link) return;
+    await navigator.clipboard.writeText(referral.link);
+    setReferralMessage('Referral link copied.');
+  };
+
+  const shareReferralLink = async () => {
+    if (!referral?.link) return;
+    if (navigator.share) await navigator.share({ title: 'LEMAK Connect Refer & Earn', url: referral.link });
+    else await copyReferralLink();
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -73,6 +91,30 @@ export default function Profile() {
             <div className="font-semibold mt-0.5">{formatDate(profile.created_date)}</div>
           </div>
         </div>
+      </div>
+
+      <div className="rounded-3xl border border-border bg-card p-6 space-y-4">
+        <div>
+          <h3 className="font-heading font-bold text-sm">Refer &amp; Earn</h3>
+          <p className="text-xs text-muted-foreground mt-1">Earn ₦100 when a new user completes registration through your link.</p>
+        </div>
+        {referral ? (
+          <>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-xl bg-muted/60 p-3"><div className="text-xs text-muted-foreground">Referral code</div><div className="font-mono font-bold mt-1 break-all">{referral.code}</div></div>
+              <div className="rounded-xl bg-muted/60 p-3"><div className="text-xs text-muted-foreground">Total referrals</div><div className="font-bold mt-1">{referral.totalReferrals || 0}</div></div>
+              <div className="rounded-xl bg-muted/60 p-3"><div className="text-xs text-muted-foreground">Successful registrations</div><div className="font-bold mt-1">{referral.successfulRegistrations || 0}</div></div>
+              <div className="rounded-xl bg-muted/60 p-3"><div className="text-xs text-muted-foreground">Referral earnings</div><div className="font-bold mt-1">₦{Number(referral.totalReferralEarnings || 0).toLocaleString()}</div></div>
+            </div>
+            <div className="rounded-xl border border-border p-3 text-xs break-all">{referral.link}</div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={copyReferralLink}><Copy className="w-4 h-4 mr-2" /> Copy Link</Button>
+              <Button type="button" className="flex-1" onClick={shareReferralLink}><Share2 className="w-4 h-4 mr-2" /> Share Link</Button>
+            </div>
+            {referralMessage && <p className="text-xs text-emerald-600">{referralMessage}</p>}
+            <Link to="/app/referrals" className="text-xs font-semibold text-primary hover:underline">View referral history</Link>
+          </>
+        ) : <div className="text-xs text-muted-foreground">Loading referral details…</div>}
       </div>
 
       <form onSubmit={handleSave} className="rounded-3xl border border-border bg-card p-6 space-y-4">

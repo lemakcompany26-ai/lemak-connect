@@ -1,0 +1,20 @@
+{
+  "name": "PromoFundFreeze",
+  "type": "object",
+  "properties": {
+    "userId": { "type": "string" },
+    "walletLedgerId": { "type": "string" },
+    "transactionId": { "type": "string" },
+    "amount": { "type": "number" },
+    "reason": { "type": "string", "maxLength": 1000 },
+    "frozenAt": { "type": "string", "format": "date-time" },
+    "frozenBy": { "type": "string" }
+  },
+  "required": ["userId", "walletLedgerId", "transactionId", "amount", "reason", "frozenAt", "frozenBy"],
+  "rls": {
+    "create": false,
+    "read": { "user_condition": { "role": "admin" } },
+    "update": false,
+    "delete": false
+  }
+}

@@ -36,6 +36,10 @@
     "sentEmail": {
       "type": "boolean",
       "default": false
+      },
+      "idempotencyKey": {
+        "type": "string",
+        "description": "Optional server-owned key preventing duplicate event notifications"
     },
     "description": {
       "type": "string",

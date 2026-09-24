@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { validatePromo, calculatePrice } from '../../shared/lemak.ts';
+import { validatePromo, calculatePrice, ensureNeyoIbadanPromo, normalizeSignupPromo } from '../../shared/lemak.ts';
 
 // Server-side promo validation. The frontend only shows the green check
 // when this returns valid: true. Never trusts frontend validation.
@@ -20,8 +20,9 @@ export default async function(req: Request): Promise<Response> {
     // Signup bonus code: is this code live and usable right now?
     if (forSignup) {
       const clean = String(code).trim().toUpperCase();
+      if (clean === 'NEYOIBADAN1') await ensureNeyoIbadanPromo(service);
       const promos = await service.entities.PromoCode.filter({ code: clean }, '-created_date', 10);
-      const promo = promos && promos[0];
+      const promo = await normalizeSignupPromo(service, promos && promos[0]);
       if (!promo) return Response.json({ valid: false, reason: 'This promo code is invalid' });
       if (!promo.isActive) return Response.json({ valid: false, reason: 'This promo code is not active' });
       if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) {

@@ -1,9 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /app/
-Disallow: /admin/
-Disallow: /oauth/
-Disallow: /complete-profile
-Disallow: /reset-password
-
-Sitemap: https://www.lemakconnect.com.ng/sitemap.xml

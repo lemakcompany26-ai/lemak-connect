@@ -1,7 +1,5 @@
 import React from "react";
-
-export default function App() {
-  return (
+export default function Landing() {
     <div className="min-h-screen bg-white text-gray-900 font-sans">
       {/* SEO FOR GOOGLE */}
       <title>Lemak Connect - Cheapest Data & VTU in Nigeria</title>

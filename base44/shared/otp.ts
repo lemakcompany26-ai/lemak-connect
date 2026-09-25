@@ -118,7 +118,7 @@ export async function otpServerRequest(path, options) {
 // Server B speaks the SMSPool API (https://api.smspool.net): form-encoded
 // POSTs with the key in the body. Prices are USD and are converted to NGN
 // at a conservative fixed rate. SMSPool has no email OTP product.
-const SMSPOOL_COUNTRY = 'US';
+const SMSPOOL_COUNTRY = '';
 const SMSPOOL_USD_NGN = Number(secrets.get('SMSPOOL_USD_NGN_RATE')) || 0;
 let smspoolServicesCache = null;
 
@@ -279,7 +279,7 @@ export async function getSmsPrice(server, serviceName, country) {
     const exactName = await smspoolExactName(server, serviceName);
     if (!exactName) throw smspoolUnavailable('That service is not available on this server.');
     const data = await smspoolPost(server, '/request/price', {
-      service: exactName.name, country: (country || SMSPOOL_COUNTRY).toUpperCase()
+      service: exactName.name, country: String(country || SMSPOOL_COUNTRY).trim().toUpperCase()
     });
     const usd = Number(data && (data.price || (data.data && data.data.price))) || 0;
     if (!usd) throw smspoolUnavailable('No price available for this service right now.');
@@ -293,12 +293,12 @@ export async function buySmsNumber(server, serviceName, country) {
     const exactName = await smspoolExactName(server, serviceName);
     if (!exactName) throw smspoolUnavailable('That service is not available on this server.');
     const data = await smspoolPost(server, '/purchase/sms', {
-      service: exactName.name, country: (country || SMSPOOL_COUNTRY).toUpperCase()
+      service: exactName.name, country: String(country || SMSPOOL_COUNTRY).trim().toUpperCase()
     });
     const result = data && data.data && typeof data.data === 'object' ? data.data : data;
     return {
-      number: result.phone_number || result.number || result.phone,
-      phone: result.phone_number || result.number || result.phone,
+      number: result.phonenumber || result.phonenumber || result.phone_number || result.number || result.phone,
+      phone: result.phonenumber || result.phonenumber || result.phone_number || result.number || result.phone,
       id: result.order_id || result.orderid || result.id,
       requestId: result.order_id || result.orderid || result.id,
       expires_in: Number(result.expires_in || result.expire_in) || 0,

@@ -521,7 +521,7 @@ export default async function(req: Request): Promise<Response> {
     // Unified catalogue: only services genuinely available from a configured
     // provider are listed. No provider names, no server ids, no fake data.
     if (action === 'unified_catalogue') {
-      const servers = getOtpServers().filter(s => s.url && s.key);
+      const servers = getOtpServers().filter(s => s.provider === 'fleexa' && s.url && s.key);
       const smsSet = new Set();
       const emailSet = new Set();
       let online = 0;
@@ -957,7 +957,7 @@ export default async function(req: Request): Promise<Response> {
       const autoRenew = !!body.autoRenew;
       const countryCode = String(body.country || 'NG').trim().toUpperCase().slice(0, 2);
       const explicit = body.serverId ? getOtpServer(body.serverId) : null;
-      const candidates = explicit ? [explicit] : getOtpServers().filter(s => s.url && s.key);
+      const candidates = explicit ? [explicit] : getOtpServers().filter(s => s.provider === 'fleexa' && s.url && s.key);
 
       let chosen = null;
       let providerCost = 0;

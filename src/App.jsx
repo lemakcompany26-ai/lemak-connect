@@ -10,6 +10,7 @@ import ScrollToTop from './components/ScrollToTop';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { GADS_CONVERSION_ID } from '@/lib/ads';
 import AppShell from '@/components/app/AppShell';
+import Landing from "@/pages/Landing";
 import AdminShell from '@/components/admin/AdminShell';
 
 // Pages are lazy-loaded (React.lazy + Suspense) so each route ships as its
@@ -135,6 +136,7 @@ const AuthenticatedApp = () => {
     <Suspense fallback={<RouteFallback />}>
     <div className="page-transition" key={location.key}>
     <Routes>
+      <Route path="/" element={<Landing />} />
       {/* Login-first: no public landing page. Terms/Privacy stay public for
           compliance links. */}
       <Route path="/" element={<EntryRedirect />} />

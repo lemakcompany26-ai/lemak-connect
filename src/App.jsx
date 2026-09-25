@@ -139,7 +139,6 @@ const AuthenticatedApp = () => {
       <Route path="/" element={<Landing />} />
       {/* Login-first: no public landing page. Terms/Privacy stay public for
           compliance links. */}
-      <Route path="/" element={<EntryRedirect />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />
 

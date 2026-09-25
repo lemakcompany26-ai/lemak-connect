@@ -48,6 +48,36 @@ async function vtuRequest(config, path, opts) {
   return { status: res.status, ok: res.ok, data, error: null };
 }
 
+async function bettingRequest(config, path, opts) {
+  const method = (opts && opts.method) || 'GET';
+  const body = opts && opts.body;
+  const url = `${providerBase(config.apiUrl)}${path}`;
+
+  const res = await fetch(url, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.apiKey}`
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+
+  let data = null;
+  const text = await res.text();
+
+  if (text) {
+    try { data = JSON.parse(text); }
+    catch (e) { data = null; }
+  }
+
+  return {
+    status: res.status,
+    ok: res.ok,
+    data,
+    error: null
+  };
+}
+
 export async function vtuDiagnosticRequest(path, opts) {
   const config = getVtuConfig();
   if (!config.configured) return { status: 503, ok: false, data: { error: 'Bigisubs is not configured' } };
@@ -255,7 +285,7 @@ export const BETTING_PROVIDERS = [
 export async function validateBettingCustomer(opts) {
   const { billerCode, customerId } = opts;
   const config = getVtuConfig();
-  return vtuRequest(config, '/api/v2/betting/validate/', {
+  return bettingRequest(config, '/api/v2/betting/validate', {
     method: 'POST',
     body: { biller_code: billerCode, customer_id: customerId }
   });
@@ -271,7 +301,7 @@ export function extractProviderError(response, fallback) {
 export async function fundBettingViaProvider(opts) {
   const { billerCode, customerId, amount } = opts;
   const config = getVtuConfig();
-  return vtuRequest(config, '/api/v2/betting/fund/', {
+  return bettingRequest(config, '/api/v2/betting/fund', {
     method: 'POST',
     body: { biller_code: billerCode, customer_id: customerId, amount, pin_code: config.pin }
   });

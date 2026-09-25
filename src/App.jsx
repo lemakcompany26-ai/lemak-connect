@@ -10,7 +10,7 @@ import ScrollToTop from './components/ScrollToTop';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { GADS_CONVERSION_ID } from '@/lib/ads';
 import AppShell from '@/components/app/AppShell';
-import  Landing from "./pages/Landing.jsx";
+import  Landing from "./pages/Landing";
 import AdminShell from '@/components/admin/AdminShell';
 
 // Pages are lazy-loaded (React.lazy + Suspense) so each route ships as its

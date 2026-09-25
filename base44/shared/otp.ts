@@ -297,8 +297,8 @@ export async function buySmsNumber(server, serviceName, country) {
     });
     const result = data && data.data && typeof data.data === 'object' ? data.data : data;
     return {
-      number: result.phonenumber || result.phonenumber || result.phone_number || result.number || result.phone,
-      phone: result.phonenumber || result.phonenumber || result.phone_number || result.number || result.phone,
+      number: result.phonenumber || result.phonenumber || result.phonenumber || result.phone_number || result.number || result.phone,
+      phone: result.phonenumber || result.phonenumber || result.phonenumber || result.phone_number || result.number || result.phone,
       id: result.order_id || result.orderid || result.id,
       requestId: result.order_id || result.orderid || result.id,
       expires_in: Number(result.expires_in || result.expire_in) || 0,

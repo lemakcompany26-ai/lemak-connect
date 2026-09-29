@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 
 const ADS = [
   { bg: "#E8F2FF", icon: "📱", title: "Airtime", sub: "Buy airtime for all networks", color: "#2563EB", link: "/app/airtime", btn: "Buy" },
@@ -28,18 +29,36 @@ export default function AdSlider() {
   return (
     <div style={{ margin: 12 }}>
       <div style={{ background: ad.bg, borderRadius: 16, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <div style={{ width: 44, height: 44, background: "#fff", borderRadius: 22, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>{ad.icon}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+            {ad.icon}
+          </div>
           <div>
-            <div style={{ fontWeight: "bold", fontSize: 14 }}>{ad.title}</div>
-            <div style={{ fontSize: 11, color: "#555" }}>{ad.sub}</div>
+            <div style={{ fontWeight: 700, color: ad.color, fontSize: 15 }}>{ad.title}</div>
+            <div style={{ fontSize: 12, color: "#475569" }}>{ad.sub}</div>
           </div>
         </div>
-        <a href={ad.link} style={{ background: ad.color, color: "#fff", padding: "8px 16px", borderRadius: 20, fontSize: 11, fontWeight: "bold", textDecoration: "none" }}>{ad.btn}</a>
+        <Link
+          to={ad.link}
+          style={{ background: ad.color, color: "#fff", borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}
+        >
+          {ad.btn}
+        </Link>
       </div>
-      <div style={{ display: "flex", justifyContent: "center", gap: 4, marginTop: 8 }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 10 }}>
         {ADS.map((_, i) => (
-          <div key={i} style={{ width: i === current? 20 : 6, height: 6, borderRadius: 10, background: i === current? "#00B875" : "#ccc" }}></div>
+          <span
+            key={i}
+            onClick={() => setCurrent(i)}
+            style={{
+              width: i === current ? 18 : 6,
+              height: 6,
+              borderRadius: 999,
+              background: i === current ? "#2563EB" : "#CBD5E1",
+              cursor: "pointer",
+              transition: "all .3s",
+            }}
+          />
         ))}
       </div>
     </div>

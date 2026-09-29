@@ -1,4 +1,4 @@
-import AdSlider from "../components/AdSlider"
+import AdSlider from "@/components/AdSlider";
 import React from "react";
 import { Link } from "react-router-dom";
 

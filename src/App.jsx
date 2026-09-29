@@ -145,6 +145,8 @@ const AuthenticatedApp = () => {
           <Route path="/app/referrals" element={<Referrals />} />
           <Route path="/app/marketplace" element={<Marketplace />} />
           <Route path="/app/marketplace/listing/:listingId" element={<ListingDetail />} />
+          <Route path="/rentals" element={<Rentals />} />
+<Route path="/rentals/:id" element={<RentalDetails />} />
           <Route path="/app/analytics" element={<AppAnalytics />} />
         </Route>
         <Route element={<AdminShell />}>

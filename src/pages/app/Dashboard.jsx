@@ -1,6 +1,116 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
+export default function Dashboard(){
+  const SLIDES = [
+    {
+      title: 'LEMAK CONNECT SERVICES',
+      bg: 'bg-[#F0F7FF]',
+      items: [
+        { icon:'📱', name:'Airtime', desc:'MTN, Airtel, Glo, 9mobile' },
+        { icon:'🌐', name:'Data', desc:'Affordable bundles' },
+        { icon:'⚡', name:'Electricity', desc:'PHCN & DISCOs' },
+        { icon:'📺', name:'Cable TV', desc:'DStv, GOtv, Startimes' },
+      ]
+    },
+    {
+      title: 'DIGITAL & VERIFICATION',
+      bg: 'bg-[#FFF5F5]',
+      items: [
+        { icon:'📲', name:'Virtual Numbers', desc:'International OTP' },
+        { icon:'💬', name:'OTP Service', desc:'Global platforms' },
+        { icon:'🎮', name:'Betting', desc:'Fund wallet' },
+        { icon:'🎬', name:'Subscriptions', desc:'Netflix, Spotify' },
+      ]
+    },
+    {
+      title: 'GROWTH & MARKETPLACE',
+      bg: 'bg-[#F0FFF4]',
+      items: [
+        { icon:'📈', name:'SMM Growth', desc:'Likes, followers' },
+        { icon:'🛒', name:'Marketplace', desc:'Escrow safe' },
+        { icon:'🎉', name:'Party Rentals', desc:'Chairs, Canopies, Sound' },
+        { icon:'⊞', name:'More Services', desc:'Coming soon' },
+      ]
+    },
+  ];
+
+  const [current, setCurrent] = useState(0);
+  useEffect(()=>{
+    const t = setInterval(()=> setCurrent(s => (s+1)%SLIDES.length), 5000);
+    return ()=> clearInterval(t);
+  },[]);
+
+  const slide = SLIDES[current];
+
+  return (
+    <div className="min-h-screen bg-[#EAF4FF] flex flex-col">
+      {/* Header */}
+      <div className="px-4 py-3 flex justify-between items-center bg-white">
+        <div className="flex items-center gap-2">
+          <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-black">L</div>
+          <p className="font-black text-blue-600 leading-none">Lemak<br/>Connect</p>
+        </div>
+        <Link to="/app/more" className="bg-slate-100 px-4 py-2 rounded-full text-[11px] font-bold">All Services</Link>
+      </div>
+
+      {/* FULL ADVERT DESIGN */}
+      <div className="flex-1 px-3 mt-3 pb-5">
+        <div className={`w-full rounded-[24px] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)] border border-white transition-all duration-700 ${slide.bg}`}>
+
+          {/* Top Title */}
+          <div className="flex justify-between items-center">
+            <h1 className="font-black text-[16px] text-slate-900 tracking-tight">{slide.title}</h1>
+            <span className="bg-black text-white text-[9px] px-3 py-1 rounded-full font-bold">ADVERT • 5s</span>
+          </div>
+          <p className="text-[11px] text-slate-500 mt-1">Tap any service to use instantly</p>
+
+          {/* 2x2 Grid like your flyer photo */}
+          <div className="grid grid-cols-2 gap-3 mt-5">
+            {slide.items.map((it)=>(
+              <Link key={it.name} to="/app/services" className="bg-white rounded-[18px] p-4 flex gap-3 items-center shadow-sm">
+                <div className="w-12 h-12 bg-[#EAF4FF] rounded-[12px] flex items-center justify-center text-xl">{it.icon}</div>
+                <div>
+                  <p className="font-extrabold text-[12px]">{it.name}</p>
+                  <p className="text-[10px] text-slate-500 leading-tight">{it.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          {/* CTA */}
+          <Link to="/app/airtime" className="mt-6 bg-blue-600 text-white w-full py-4 rounded-full flex justify-center items-center font-bold text-[14px] gap-2">
+            Use Lemak Connect Now <span>→</span>
+          </Link>
+
+          <p className="text-center text-[10px] text-slate-400 mt-3">Trusted by 10,000+ Nigerians • Fast & Secure</p>
+        </div>
+
+        {/* Dots */}
+        <div className="flex justify-center gap-2 mt-5">
+          {SLIDES.map((_, i)=>(
+            <div key={i} className={`h-2.5 rounded-full transition-all duration-500 ${i===current?'w-10 bg-blue-600':'w-2.5 bg-slate-300'}`}></div>
+          ))}
+        </div>
+
+        <p className="text-center text-[11px] text-slate-400 mt-3">{current+1} / {SLIDES.length} • Auto changes every 5 seconds</p>
+
+        {/* Full List below advert */}
+        <div className="mt-8 bg-white rounded-[20px] p-4">
+          <p className="font-black text-[13px]">ALL SERVICES IN ONE APP</p>
+          <div className="mt-3 space-y-2.5">
+            <p className="text-[12px]">📱 Airtime • 🌐 Data • ⚡ Electricity • 📺 Cable TV</p>
+            <p className="text-[12px]">🎮 Betting • 🎬 Subscriptions • 📲 Virtual Numbers</p>
+            <p className="text-[12px]">💬 OTP Service • 📈 SMM Growth • 🛒 Marketplace</p>
+            <p className="text-[12px]">🎉 Party Rentals - Chairs, Tables, Canopies, Sound, Lighting</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+
 function AdSlider(){
   const ADS = [
     { title:'Airtime', sub:'Buy airtime for all networks (MTN, Airtel, Glo, 9mobile).', bg:'bg-[#E8F2FF]', icon:'📱', dot:'bg-blue-600', btn:'bg-blue-600', link:'/app/airtime' },

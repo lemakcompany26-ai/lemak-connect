@@ -23,11 +23,8 @@ import AdminShell from "@/components/admin/AdminShell";
 import Landing from "./pages/Landing.jsx";
 
 import Events from "./pages/Events";
-import EventDetails from "./pages/EventDetails";
+import EventDetails from "./pages/EventsDetails";
 import AdminEvents from "./pages/admin/AdminEvents";
-
-import Rentals from "./pages/Rentals";
-import RentalDetails from "./pages/RentalDetails";
 
 const PageNotFound = lazy(() => import("./lib/PageNotFound"));
 
@@ -497,18 +494,6 @@ const AuthenticatedApp = () => {
               <Route
                 path="/app/analytics"
                 element={<AppAnalytics />}
-              />
-
-              {/* RENTALS */}
-
-              <Route
-                path="/rentals"
-                element={<Rentals />}
-              />
-
-              <Route
-                path="/rentals/:id"
-                element={<RentalDetails />}
               />
 
             </Route>

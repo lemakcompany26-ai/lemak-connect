@@ -12,9 +12,12 @@ import AppShell from '@/components/app/AppShell';
 import Landing from "./pages/Landing.jsx";
 import AdminShell from '@/components/admin/AdminShell';
 // YOUR CUSTOM PAGES - ALL IMPORTS ON TOP
-import Rentals from "./pages/Rentals";
-import RentalDetails from "./pages/RentalDetails";
-import AdminRentals from "./pages/AdminRentals";
+import Events from './pages/Events';
+import EventDetails from './pages/EventDetails';
+import AdminEvents from './pages/admin/AdminEvents';
+<Route path="/events" element={<Events />} />
+<Route path="/events/:id" element={<EventDetails />} />
+<Route path="/admin/events" element={<AdminEvents />} />
 import BottomNav from "./components/BottomNav";
 const PageNotFound = lazy(() => import('./lib/PageNotFound'));
 const Terms = lazy(() => import('@/pages/Terms'));
@@ -155,7 +158,7 @@ const AuthenticatedApp = () => {
               <Route path="/admin/settings" element={<AdminSettings />} />
               <Route path="/admin/system-health" element={<AdminSystemHealth />} />
               <Route path="/admin/profit-calculator" element={<AdminProfitCalculator />} />
-              <Route path="/admin/rentals" element={<AdminRentals />} />
+              <Route path="/admin/events" element={<AdminEvents/>} />
             </Route>
           </Route>
           <Route path="*" element={<PageNotFound />} />

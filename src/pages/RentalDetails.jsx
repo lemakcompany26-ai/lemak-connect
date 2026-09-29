@@ -1,3 +1,4 @@
+import VideoUploader from "../components/VideoUploader";
 import LiveAdPlayer from "../components/LiveAdPlayer";
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -30,7 +31,11 @@ export default function RentalDetails(){
           ))}
         </div>
       </div>
-
+{/* Only you see this - for uploading */}
+<div className="mt-6 border-t pt-4">
+  <p className="text-xs font-bold text-gray-400">ADMIN ONLY</p>
+  <VideoUploader onUpload={(url)=> console.log("New video url:", url)} />
+</div>
       <motion.div initial={{y:20, opacity:0}} animate={{y:0, opacity:1}} className="p-5 -mt-6 bg-white rounded-t-[24px] relative">
         <h1 className="text-[22px] font-bold">{rental.title}</h1>
         <p className="text-gray-500 mt-1">{rental.location} • {rental.type}</p>

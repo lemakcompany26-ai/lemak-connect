@@ -1,3 +1,4 @@
+import AdminVideoAds from "./pages/admin/AdminVideoAds";
 import BottomNav from "./components/BottomNav";
 import AdminRentals from "./pages/AdminRentals";
 import Rentals from "./pages/Rentals";
@@ -165,6 +166,7 @@ const AuthenticatedApp = () => {
           <Route path="/admin/settings" element={<AdminSettings />} />
           <Route path="/admin/system-health" element={<AdminSystemHealth />} />
           <Route path="/admin/profit-calculator" element={<AdminProfitCalculator />} />
+<Route path="/admin/video-ads" element={<AdminVideoAds />} />
           <BottomNav />
         </Route>
       </Route>

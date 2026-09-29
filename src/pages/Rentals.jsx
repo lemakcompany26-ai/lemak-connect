@@ -5,6 +5,11 @@ import OpayBottomSheet from '@/components/OpayBottomSheet';
 import ShimmerCard from '@/components/ShimmerCard';
 
 export default function Rentals() {
+  const [localRentals, setLocalRentals] = useState([]);
+useEffect(()=>{
+  const saved = JSON.parse(localStorage.getItem("lemak_rentals") || "[]");
+  setLocalRentals(saved);
+},[]);
   const [rentals, setRentals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');

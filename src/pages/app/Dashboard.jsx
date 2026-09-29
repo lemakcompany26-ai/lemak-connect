@@ -1,247 +1,513 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
-export default function Dashboard(){
-  const SLIDES = [
-    {
-      title: 'LEMAK CONNECT SERVICES',
-      bg: 'bg-[#F0F7FF]',
-      items: [
-        { icon:'📱', name:'Airtime', desc:'MTN, Airtel, Glo, 9mobile' },
-        { icon:'🌐', name:'Data', desc:'Affordable bundles' },
-        { icon:'⚡', name:'Electricity', desc:'PHCN & DISCOs' },
-        { icon:'📺', name:'Cable TV', desc:'DStv, GOtv, Startimes' },
-      ]
-    },
-    {
-      title: 'DIGITAL & VERIFICATION',
-      bg: 'bg-[#FFF5F5]',
-      items: [
-        { icon:'📲', name:'Virtual Numbers', desc:'International OTP' },
-        { icon:'💬', name:'OTP Service', desc:'Global platforms' },
-        { icon:'🎮', name:'Betting', desc:'Fund wallet' },
-        { icon:'🎬', name:'Subscriptions', desc:'Netflix, Spotify' },
-      ]
-    },
-    {
-      title: 'GROWTH & MARKETPLACE',
-      bg: 'bg-[#F0FFF4]',
-      items: [
-        { icon:'📈', name:'SMM Growth', desc:'Likes, followers' },
-        { icon:'🛒', name:'Marketplace', desc:'Escrow safe' },
-        { icon:'🎉', name:'Party Rentals', desc:'Chairs, Canopies, Sound' },
-        { icon:'⊞', name:'More Services', desc:'Coming soon' },
-      ]
-    },
-  ];
+const ADS = [
+  {
+    title: "Airtime",
+    description:
+      "Recharge MTN, Airtel, Glo and 9mobile.",
+    icon: "📱",
+    link: "/app/airtime",
+    background: "bg-blue-50",
+    button: "bg-blue-600",
+  },
+  {
+    title: "Data",
+    description:
+      "Get affordable data bundles for all networks.",
+    icon: "🌐",
+    link: "/app/data",
+    background: "bg-purple-50",
+    button: "bg-purple-600",
+  },
+  {
+    title: "Electricity",
+    description:
+      "Pay supported electricity bills quickly.",
+    icon: "⚡",
+    link: "/app/electricity",
+    background: "bg-amber-50",
+    button: "bg-amber-500",
+  },
+  {
+    title: "Cable TV",
+    description:
+      "Renew DStv, GOtv, StarTimes and more.",
+    icon: "📺",
+    link: "/app/cable",
+    background: "bg-pink-50",
+    button: "bg-pink-600",
+  },
+  {
+    title: "Virtual Numbers",
+    description:
+      "Get available international numbers and OTP services.",
+    icon: "📲",
+    link: "/app/virtual-numbers",
+    background: "bg-violet-50",
+    button: "bg-violet-600",
+  },
+  {
+    title: "Social Growth",
+    description:
+      "Grow your social media presence with supported services.",
+    icon: "📈",
+    link: "/app/social-growth",
+    background: "bg-emerald-50",
+    button: "bg-emerald-600",
+  },
+  {
+    title: "Betting",
+    description:
+      "Fund supported betting accounts securely.",
+    icon: "🏆",
+    link: "/app/betting",
+    background: "bg-red-50",
+    button: "bg-red-600",
+  },
+  {
+    title: "Marketplace",
+    description:
+      "Explore the LEMAK Connect marketplace.",
+    icon: "🛍️",
+    link: "/app/marketplace",
+    background: "bg-cyan-50",
+    button: "bg-cyan-600",
+  },
+];
 
+const SERVICES = [
+  {
+    title: "Airtime",
+    icon: "📱",
+    link: "/app/airtime",
+    color: "bg-blue-600",
+  },
+  {
+    title: "Data",
+    icon: "🌐",
+    link: "/app/data",
+    color: "bg-green-600",
+  },
+  {
+    title: "Electricity",
+    icon: "⚡",
+    link: "/app/electricity",
+    color: "bg-amber-500",
+  },
+  {
+    title: "Cable TV",
+    icon: "📺",
+    link: "/app/cable",
+    color: "bg-purple-600",
+  },
+  {
+    title: "Betting",
+    icon: "🏆",
+    link: "/app/betting",
+    color: "bg-red-600",
+  },
+  {
+    title: "Education",
+    icon: "🎓",
+    link: "/app/education",
+    color: "bg-sky-600",
+  },
+  {
+    title: "ePIN",
+    icon: "🎟️",
+    link: "/app/epin",
+    color: "bg-orange-500",
+  },
+  {
+    title: "Broadband",
+    icon: "📡",
+    link: "/app/broadband",
+    color: "bg-emerald-600",
+  },
+  {
+    title: "Virtual Numbers",
+    icon: "📲",
+    link: "/app/virtual-numbers",
+    color: "bg-violet-600",
+  },
+];
+
+const QUICK_ACTIONS = [
+  {
+    title: "Wallet",
+    description: "Fund and manage your balance",
+    icon: "💳",
+    link: "/app/wallet",
+  },
+  {
+    title: "Transactions",
+    description: "View your transaction history",
+    icon: "🧾",
+    link: "/app/transactions",
+  },
+  {
+    title: "Marketplace",
+    description: "Buy and sell",
+    icon: "🛍️",
+    link: "/app/marketplace",
+  },
+  {
+    title: "Support",
+    description: "Get help from LEMAK",
+    icon: "💬",
+    link: "/app/support",
+  },
+];
+
+function AdSlider() {
   const [current, setCurrent] = useState(0);
-  useEffect(()=>{
-    const t = setInterval(()=> setCurrent(s => (s+1)%SLIDES.length), 5000);
-    return ()=> clearInterval(t);
-  },[]);
 
-  const slide = SLIDES[current];
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrent((previous) =>
+        (previous + 1) % ADS.length
+      );
+    }, 5000);
 
-  return (
-    <div className="min-h-screen bg-[#EAF4FF] flex flex-col">
-      {/* Header */}
-      <div className="px-4 py-3 flex justify-between items-center bg-white">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-black">L</div>
-          <p className="font-black text-blue-600 leading-none">Lemak<br/>Connect</p>
-        </div>
-        <Link to="/app/more" className="bg-slate-100 px-4 py-2 rounded-full text-[11px] font-bold">All Services</Link>
-      </div>
-
-      {/* FULL ADVERT DESIGN */}
-      <div className="flex-1 px-3 mt-3 pb-5">
-        <div className={`w-full rounded-[24px] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)] border border-white transition-all duration-700 ${slide.bg}`}>
-
-          {/* Top Title */}
-          <div className="flex justify-between items-center">
-            <h1 className="font-black text-[16px] text-slate-900 tracking-tight">{slide.title}</h1>
-            <span className="bg-black text-white text-[9px] px-3 py-1 rounded-full font-bold">ADVERT • 5s</span>
-          </div>
-          <p className="text-[11px] text-slate-500 mt-1">Tap any service to use instantly</p>
-
-          {/* 2x2 Grid like your flyer photo */}
-          <div className="grid grid-cols-2 gap-3 mt-5">
-            {slide.items.map((it)=>(
-              <Link key={it.name} to="/app/services" className="bg-white rounded-[18px] p-4 flex gap-3 items-center shadow-sm">
-                <div className="w-12 h-12 bg-[#EAF4FF] rounded-[12px] flex items-center justify-center text-xl">{it.icon}</div>
-                <div>
-                  <p className="font-extrabold text-[12px]">{it.name}</p>
-                  <p className="text-[10px] text-slate-500 leading-tight">{it.desc}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-
-          {/* CTA */}
-          <Link to="/app/airtime" className="mt-6 bg-blue-600 text-white w-full py-4 rounded-full flex justify-center items-center font-bold text-[14px] gap-2">
-            Use Lemak Connect Now <span>→</span>
-          </Link>
-
-          <p className="text-center text-[10px] text-slate-400 mt-3">Trusted by 10,000+ Nigerians • Fast & Secure</p>
-        </div>
-
-        {/* Dots */}
-        <div className="flex justify-center gap-2 mt-5">
-          {SLIDES.map((_, i)=>(
-            <div key={i} className={`h-2.5 rounded-full transition-all duration-500 ${i===current?'w-10 bg-blue-600':'w-2.5 bg-slate-300'}`}></div>
-          ))}
-        </div>
-
-        <p className="text-center text-[11px] text-slate-400 mt-3">{current+1} / {SLIDES.length} • Auto changes every 5 seconds</p>
-
-        {/* Full List below advert */}
-        <div className="mt-8 bg-white rounded-[20px] p-4">
-          <p className="font-black text-[13px]">ALL SERVICES IN ONE APP</p>
-          <div className="mt-3 space-y-2.5">
-            <p className="text-[12px]">📱 Airtime • 🌐 Data • ⚡ Electricity • 📺 Cable TV</p>
-            <p className="text-[12px]">🎮 Betting • 🎬 Subscriptions • 📲 Virtual Numbers</p>
-            <p className="text-[12px]">💬 OTP Service • 📈 SMM Growth • 🛒 Marketplace</p>
-            <p className="text-[12px]">🎉 Party Rentals - Chairs, Tables, Canopies, Sound, Lighting</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-
-function AdSlider(){
-  const ADS = [
-    { title:'Airtime', sub:'Buy airtime for all networks (MTN, Airtel, Glo, 9mobile).', bg:'bg-[#E8F2FF]', icon:'📱', dot:'bg-blue-600', btn:'bg-blue-600', link:'/app/airtime' },
-    { title:'Data', sub:'Affordable data for all networks', bg:'bg-[#F3E8FF]', icon:'🌐', dot:'bg-purple-600', btn:'bg-purple-600', link:'/app/data' },
-    { title:'Electricity', sub:'Pay your electricity bill (PHCN & DISCOs)', bg:'bg-[#FFF8E1]', icon:'⚡', dot:'bg-amber-500', btn:'bg-amber-500', link:'/app/electricity' },
-    { title:'Cable TV', sub:'Renew DStv, GOtv, Startimes and more', bg:'bg-[#FFE4EC]', icon:'📺', dot:'bg-pink-600', btn:'bg-pink-600', link:'/app/cable' },
-    { title:'Betting', sub:'Fund your betting wallet and place bets', bg:'bg-[#E6F9E6]', icon:'🎮', dot:'bg-green-600', btn:'bg-green-600', link:'/app/betting' },
-    { title:'Subscriptions', sub:'Netflix, Spotify, YouTube & more', bg:'bg-[#E8F0FF]', icon:'🗓️', dot:'bg-blue-700', btn:'bg-blue-700', link:'/app/education' },
-    { title:'Virtual Numbers', sub:'Get international numbers for OTP', bg:'bg-[#F5E8FF]', icon:'📲', dot:'bg-violet-600', btn:'bg-violet-600', link:'/app/virtual-rental' },
-    { title:'OTP Service', sub:'Receive OTPs from global platforms', bg:'bg-[#E0F5F0]', icon:'💬', dot:'bg-teal-600', btn:'bg-teal-600', link:'/app/otp' },
-    { title:'SMM / Digital Growth', sub:'Likes, views, followers & engagement', bg:'bg-[#FFE8EC]', icon:'📈', dot:'bg-red-500', btn:'bg-red-500', link:'/app/marketing' },
-    { title:'Social Marketplace', sub:'Buy and sell safely with escrow', bg:'bg-[#E6F2FF]', icon:'🛍️', dot:'bg-blue-500', btn:'bg-blue-500', link:'/app/more' },
-    { title:'Rental Services', sub:'Houses, events, water, power, fumigation', bg:'bg-[#EDE8FF]', icon:'🏠', dot:'bg-purple-700', btn:'bg-purple-700', link:'/rentals' },
-    { title:'More Services', sub:'Check app for more coming soon', bg:'bg-[#E6F9E6]', icon:'⊞', dot:'bg-[#00B875]', btn:'bg-[#00B875]', link:'/app/more' },
-  ];
-
-  const [current, setCurrent] = useState(0);
-  useEffect(()=>{
-    const t = setInterval(()=> setCurrent(p => (p+1)%ADS.length), 5000);
-    return ()=> clearInterval(t);
-  },[]);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const ad = ADS[current];
 
   return (
     <div className="w-full">
-      <Link to={ad.link} className={`w-full rounded-[16px] p-4 flex justify-between items-center transition-all duration-700 ${ad.bg} border border-white shadow-sm`}>
-        <div className="flex gap-3 items-center">
-          <div className="w-12 h-12 bg-white rounded-[12px] flex items-center justify-center text-xl shadow-sm">{ad.icon}</div>
-          <div>
-            <p className="font-extrabold text-[13px] text-slate-900">{ad.title}</p>
-            <p className="text-[11px] text-slate-600 leading-tight mt-0.5">{ad.sub}</p>
+      <Link
+        to={ad.link}
+        className={`
+          block rounded-[24px]
+          ${ad.background}
+          border border-white
+          p-5
+          shadow-[0_8px_30px_rgba(0,0,0,0.06)]
+          transition-all duration-500
+        `}
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-14 h-14 shrink-0 bg-white rounded-2xl flex items-center justify-center text-2xl shadow-sm">
+              {ad.icon}
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-[0.18em] font-black text-slate-400">
+                LEMAK CONNECT
+              </p>
+
+              <h2 className="text-[18px] font-black text-slate-900 mt-1">
+                {ad.title}
+              </h2>
+
+              <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                {ad.description}
+              </p>
+            </div>
           </div>
+
+          <span
+            className={`
+              ${ad.button}
+              shrink-0
+              text-white
+              text-[11px]
+              font-black
+              px-4
+              py-2.5
+              rounded-full
+            `}
+          >
+            Open
+          </span>
         </div>
-        <div className={`${ad.btn} text-white text-[11px] px-4 py-2 rounded-full font-bold`}>Go</div>
+
+        <div className="mt-5 flex items-center justify-between">
+          <span className="text-[10px] font-bold text-slate-400">
+            {current + 1} / {ADS.length}
+          </span>
+
+          <span className="text-[10px] font-bold text-slate-400">
+            Auto-changing
+          </span>
+        </div>
       </Link>
-      <div className="flex justify-center gap-1.5 mt-2">
-        {ADS.map((_, i)=>(
-          <div key={i} className={`h-1.5 rounded-full transition-all ${i===current?'w-6 bg-blue-600':'w-1.5 bg-slate-300'}`}></div>
+
+      <div className="flex justify-center gap-1.5 mt-3">
+        {ADS.map((_, index) => (
+          <button
+            key={index}
+            type="button"
+            aria-label={`Show advert ${index + 1}`}
+            onClick={() => setCurrent(index)}
+            className={`
+              h-1.5
+              rounded-full
+              transition-all
+              ${
+                index === current
+                  ? "w-7 bg-blue-600"
+                  : "w-1.5 bg-slate-300"
+              }
+            `}
+          />
         ))}
-      </div>
-    </div>
-  )
-}
-
-export default function Dashboard() {
-  const mainServices = [
-    { to: '/app/airtime', label: 'Airtime', icon: '📱', color: 'bg-blue-500' },
-    { to: '/app/data', label: 'Data', icon: '📶', color: 'bg-green-500' },
-    { to: '/app/electricity', label: 'Electricity', icon: '⚡', color: 'bg-amber-500' },
-    { to: '/app/cable', label: 'Cable TV', icon: '📺', color: 'bg-purple-500' },
-    { to: '/app/betting', label: 'Betting', icon: '🏆', color: 'bg-red-500' },
-    { to: '/app/education', label: 'Education', icon: '🎓', color: 'bg-sky-500' },
-    { to: '/app/epin', label: 'ePIN', icon: '🎟️', color: 'bg-orange-500' },
-    { to: '/app/broadband', label: 'Broadband', icon: '🌐', color: 'bg-emerald-500' },
-  ];
-
-  const virtualServices = [
-    { to: '/app/otp', label: 'OTP Verification', desc: 'Receive OTP instantly', icon: '🛡️', color: 'bg-blue-600' },
-    { to: '/app/social-otp', label: 'Social Media OTP', desc: 'Get codes for social platforms', icon: '💬', color: 'bg-sky-500' },
-    { to: '/app/email-otp', label: 'Email Verification', desc: 'Verify your email address', icon: '✉️', color: 'bg-pink-500' },
-    { to: '/app/temporary', label: 'Temporary Numbers', desc: 'Use for a short period', icon: '⏱️', color: 'bg-amber-500' },
-    { to: '/app/virtual-rental', label: 'Virtual Number Rental', desc: 'Rent a number long-term', icon: '📅', color: 'bg-emerald-500' },
-  ];
-
-  const digitalServices = [
-    { to: '/app/marketing', label: 'Digital Marketing', desc: 'Grow your audience across social platforms', icon: '🚀', color: 'bg-blue-600' },
-    { to: '/app/tiktok', label: 'TikTok', icon: '🎵', color: 'bg-pink-500' },
-    { to: '/app/instagram', label: 'Instagram', icon: '📸', color: 'bg-purple-500' },
-    { to: '/app/facebook', label: 'Facebook', icon: '📘', color: 'bg-blue-500' },
-    { to: '/app/youtube', label: 'YouTube', icon: '▶️', color: 'bg-red-500' },
-    { to: '/rentals', label: 'Rentals', desc: 'Houses & Services', icon: '🏠', color: 'bg-violet-600' },
-    { to: '/app/more', label: 'More', icon: '🏪', color: 'bg-blue-600' },
-  ];
-
-  return (
-    <div className="min-h-screen bg-[#EAF4FF] pb-[100px]">
-      <div className="px-4 py-3 flex justify-between items-center sticky top-0 z-20 bg-[#EAF4FF]">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-black">L</div>
-          <div className="leading-none">
-            <p className="font-black text-[16px] text-blue-600">Lemak</p>
-            <p className="font-black text-[16px] -mt-1">Connect</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm">🛡️</div>
-          <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm">🔔</div>
-          <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">L</div>
-        </div>
-      </div>
-
-      {/* REMOVED VIDEO - NOW YOUR ANIMATED AD */}
-      <div className="px-3">
-        <AdSlider />
-      </div>
-
-      <div className="px-3 mt-4 grid grid-cols-3 gap-3">
-        {mainServices.map((s) => (
-          <Link key={s.to} to={s.to} className="bg-white rounded-[18px] h-[108px] flex flex-col items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-white">
-            <div className={`w-[48px] h-[48px] ${s.color} rounded-[14px] flex items-center justify-center text-white text-[20px]`}>{s.icon}</div>
-            <p className="text-[12px] font-bold mt-2 text-slate-800">{s.label}</p>
-          </Link>
-        ))}
-      </div>
-
-      <div className="px-4 mt-7">
-        <h2 className="text-[11px] font-extrabold tracking-widest text-slate-500 mb-3">VIRTUAL NUMBERS & OTP</h2>
-        <div className="grid grid-cols-3 gap-3">
-          {virtualServices.map((s) => (
-            <Link key={s.to} to={s.to} className="bg-white rounded-[18px] p-3 flex flex-col items-center text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)] min-h-[135px] justify-center border border-white">
-              <div className={`w-[46px] h-[46px] ${s.color} rounded-[13px] flex items-center justify-center text-white text-[18px]`}>{s.icon}</div>
-              <p className="text-[11px] font-extrabold mt-2 leading-tight text-slate-800">{s.label}</p>
-              <p className="text-[9px] text-slate-500 mt-1 leading-tight">{s.desc}</p>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      <div className="px-4 mt-7">
-        <h2 className="text-[11px] font-extrabold tracking-widest text-slate-500 mb-3">DIGITAL GROWTH</h2>
-        <div className="grid grid-cols-3 gap-3">
-          {digitalServices.map((s) => (
-            <Link key={s.to} to={s.to} className="bg-white rounded-[18px] p-3 flex flex-col items-center text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)] min-h-[125px] justify-center border border-white">
-              <div className={`w-[46px] h-[46px] ${s.color} rounded-[13px] flex items-center justify-center text-white text-[18px]`}>{s.icon}</div>
-              <p className="text-[11px] font-extrabold mt-2 leading-tight text-slate-800">{s.label}</p>
-              {s.desc && <p className="text-[9px] text-slate-500 mt-1 leading-tight">{s.desc}</p>}
-            </Link>
-          ))}
-        </div>
       </div>
     </div>
   );
-            }
+}
+
+export default function Dashboard() {
+  return (
+    <div className="min-h-screen bg-[#EAF4FF] pb-24">
+
+      {/* HEADER */}
+
+      <header className="sticky top-0 z-30 bg-[#EAF4FF]/95 backdrop-blur-md border-b border-white">
+        <div className="px-4 py-4 flex items-center justify-between">
+
+          <Link
+            to="/app"
+            className="flex items-center gap-3"
+          >
+            <div className="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-xl font-black shadow-sm">
+              L
+            </div>
+
+            <div className="leading-none">
+              <p className="text-[17px] font-black text-blue-600">
+                LEMAK
+              </p>
+
+              <p className="text-[17px] font-black text-slate-900">
+                CONNECT
+              </p>
+            </div>
+          </Link>
+
+          <div className="flex items-center gap-2">
+
+            <Link
+              to="/app/notifications"
+              className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm"
+              aria-label="Notifications"
+            >
+              🔔
+            </Link>
+
+            <Link
+              to="/app/profile"
+              className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-black shadow-sm"
+              aria-label="Profile"
+            >
+              L
+            </Link>
+
+          </div>
+        </div>
+      </header>
+
+      {/* CONTENT */}
+
+      <main className="px-3 pt-4">
+
+        {/* ADVERTISEMENT */}
+
+        <AdSlider />
+
+        {/* SERVICES */}
+
+        <section className="mt-7">
+
+          <div className="flex items-end justify-between px-1 mb-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.18em] font-black text-blue-600">
+                Explore
+              </p>
+
+              <h2 className="text-[19px] font-black text-slate-900">
+                Our Services
+              </h2>
+            </div>
+
+            <Link
+              to="/app/services"
+              className="text-[11px] font-black text-blue-600"
+            >
+              View all →
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+
+            {SERVICES.map((service) => (
+              <Link
+                key={service.link}
+                to={service.link}
+                className="
+                  bg-white
+                  rounded-[20px]
+                  p-3
+                  min-h-[125px]
+                  flex
+                  flex-col
+                  items-center
+                  justify-center
+                  text-center
+                  shadow-[0_3px_12px_rgba(0,0,0,0.04)]
+                  border border-white
+                  active:scale-95
+                  transition-transform
+                "
+              >
+                <div
+                  className={`
+                    w-12
+                    h-12
+                    rounded-[15px]
+                    ${service.color}
+                    flex
+                    items-center
+                    justify-center
+                    text-xl
+                    shadow-sm
+                  `}
+                >
+                  {service.icon}
+                </div>
+
+                <p className="text-[11px] font-black text-slate-800 mt-2 leading-tight">
+                  {service.title}
+                </p>
+              </Link>
+            ))}
+
+          </div>
+
+        </section>
+
+        {/* QUICK ACTIONS */}
+
+        <section className="mt-8">
+
+          <div className="px-1 mb-3">
+            <p className="text-[10px] uppercase tracking-[0.18em] font-black text-blue-600">
+              Quick access
+            </p>
+
+            <h2 className="text-[19px] font-black text-slate-900">
+              Manage your account
+            </h2>
+          </div>
+
+          <div className="space-y-3">
+
+            {QUICK_ACTIONS.map((action) => (
+              <Link
+                key={action.link}
+                to={action.link}
+                className="
+                  bg-white
+                  rounded-[20px]
+                  p-4
+                  flex
+                  items-center
+                  gap-4
+                  shadow-[0_3px_12px_rgba(0,0,0,0.04)]
+                  border border-white
+                  active:scale-[0.99]
+                  transition-transform
+                "
+              >
+
+                <div className="
+                  w-12
+                  h-12
+                  rounded-2xl
+                  bg-[#EAF4FF]
+                  flex
+                  items-center
+                  justify-center
+                  text-xl
+                ">
+                  {action.icon}
+                </div>
+
+                <div className="flex-1">
+
+                  <p className="text-[13px] font-black text-slate-900">
+                    {action.title}
+                  </p>
+
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    {action.description}
+                  </p>
+
+                </div>
+
+                <span className="text-slate-300 text-xl">
+                  →
+                </span>
+
+              </Link>
+            ))}
+
+          </div>
+
+        </section>
+
+        {/* BRAND MESSAGE */}
+
+        <section className="
+          mt-8
+          rounded-[24px]
+          bg-blue-600
+          p-5
+          text-white
+          shadow-[0_10px_35px_rgba(37,99,235,0.22)]
+        ">
+
+          <p className="text-[10px] uppercase tracking-[0.2em] font-black text-blue-100">
+            LEMAK CONNECT
+          </p>
+
+          <h2 className="text-[22px] font-black mt-2">
+            Everything you need,
+            <br />
+            in one place.
+          </h2>
+
+          <p className="text-[11px] text-blue-100 mt-2 leading-relaxed">
+            Access digital services, payments,
+            virtual numbers, marketplace services
+            and more from one account.
+          </p>
+
+          <Link
+            to="/app/services"
+            className="
+              inline-flex
+              mt-4
+              bg-white
+              text-blue-600
+              px-5
+              py-3
+              rounded-full
+              text-[11px]
+              font-black
+            "
+          >
+            Explore services →
+          </Link>
+
+        </section>
+
+      </main>
+    </div>
+  );
+  }

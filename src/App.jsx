@@ -1,3 +1,4 @@
+import AdminRentals from "./pages/AdminRentals";
 import Rentals from "./pages/Rentals";
 import RentalDetails from "./pages/RentalDetails";
 import { Suspense, lazy, useEffect } from "react";
@@ -149,6 +150,7 @@ const AuthenticatedApp = () => {
           <Route path="/app/marketplace/listing/:listingId" element={<ListingDetail />} />
                 <Route path="/rentals" element={<Rentals />} />
       <Route path="/rentals/:id" element={<RentalDetails />} />
+          <Route path="/admin/rentals" element={<AdminRentals />} />
           <Route path="/app/analytics" element={<AppAnalytics />} />
         </Route>
         <Route element={<AdminShell />}>

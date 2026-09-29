@@ -1,10 +1,10 @@
 import { createClient } from '@base44/sdk';
 import { appParams } from '@/lib/app-params';
-import { supabase } from './fallback-backend';
 
 const { appId, token, functionsVersion, appBaseUrl } = appParams;
 
-let client;
+let client = null;
+let error = null;
 
 try {
   client = createClient({
@@ -15,25 +15,23 @@ try {
     appBaseUrl
   });
 } catch (e) {
-  console.error("Base44 init failed, using supabase fallback");
+  console.warn("Base44 down - using fallback mode", e);
+  error = e;
   client = null;
 }
 
-// SAFE wrapper - never brakes
-export const base44 = new Proxy(client || {}, {
-  get(target, prop) {
-    if (target && target[prop]) return target[prop];
-
-    // Fallback to supabase if base44 fails
-    console.warn(`Using fallback for ${prop}`);
-    return supabase;
-  }
-});
-
-// Export a hook to check status
-export const useBackendStatus = () => {
-  return {
-    isBase44:!!client,
-    isFallback:!client
-  }
+// Safe export - app never brakes
+export const base44 = client || {
+  auth: {
+    me: async () => null,
+    logout: async () => {}
+  },
+  entities: {},
+  functions: {},
+  integrations: {}
 };
+
+export const isBase44Active = !!client;
+export const base44Error = error;
+
+export default base44;

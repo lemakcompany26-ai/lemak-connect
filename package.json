@@ -11,7 +11,7 @@
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview"
   },
-  "dependencies": {
+  "dependencies": {"framer-motion": "^10.16.0",
     "@base44/sdk": "^0.8.52",
     "@base44/vite-plugin": "^1.0.44",
     "@hello-pangea/dnd": "^17.0.0",

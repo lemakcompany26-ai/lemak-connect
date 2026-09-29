@@ -1,3 +1,5 @@
+import Rentals from "./pages/Rentals";
+import RentalDetails from "./pages/RentalDetails";
 import { Suspense, lazy, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'

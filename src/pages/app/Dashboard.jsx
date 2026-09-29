@@ -1,4 +1,4 @@
-import ServiceVideoAds from "../components/ServiceVideoAds";
+import ServiceVideoAds from "@/components/ServiceVideoAds";
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Smartphone, Wifi, Zap, Tv, Gamepad2, MoreHorizontal } from 'lucide-react';

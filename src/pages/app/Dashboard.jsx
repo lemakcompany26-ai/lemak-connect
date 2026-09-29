@@ -1,7 +1,7 @@
 import AdSlider from "@/components/AdSlider";
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-
+import { Link } from "react-router-dom";// import AdSlider from '../components/AdSlider';
+// <AdSlider />
 const ADS = [
   {
     title: "Airtime",

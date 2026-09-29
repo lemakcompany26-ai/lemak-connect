@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 
 export default function ServiceVideoAds(){
   const [current, setCurrent] = useState(0);
-
+const [adminAds, setAdminAds] = useState([]);
+useEffect(()=>{
+  const saved = JSON.parse(localStorage.getItem("lemak_video_ads") || "[]");
+  setAdminAds(saved);
+},[]);
   // All your 12 services from flyer
   const services = [
     { tag: "AIRTIME", title: "Airtime", offer: "Buy airtime for all networks MTN, Airtel, Glo, 9mobile", color: "bg-blue-500", icon: "📱", video: "https://sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4", thumb: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800" },
@@ -18,7 +22,7 @@ export default function ServiceVideoAds(){
     { tag: "RENTAL", title: "Rental Services", offer: "Book houses, events, water, power, fumigation", color: "bg-purple-800", icon: "🏠", video: "https://sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4", thumb: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800" },
     { tag: "MORE", title: "More Services", offer: "Check the app for more services coming soon", color: "bg-green-700", icon: "⚙️", video: "https://sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4", thumb: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800" },
   ];
-
+const services = adminAds.length > 0? adminAds : [...default 12... ]
   useEffect(()=>{
     const t = setInterval(()=> setCurrent(c=>(c+1)%services.length), 3500);
     return ()=> clearInterval(t);

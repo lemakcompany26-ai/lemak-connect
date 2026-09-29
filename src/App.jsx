@@ -1,10 +1,3 @@
-import AdminVideoAds from "./pages/admin/AdminVideoAds";
-
-<Route path="/admin/video-ads" element={<AdminVideoAds />} />
-import BottomNav from "./components/BottomNav";
-import AdminRentals from "./pages/AdminRentals";
-import Rentals from "./pages/Rentals";
-import RentalDetails from "./pages/RentalDetails";
 import { Suspense, lazy, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -18,6 +11,13 @@ import { GADS_CONVERSION_ID } from '@/lib/ads';
 import AppShell from '@/components/app/AppShell';
 import Landing from "./pages/Landing.jsx";
 import AdminShell from '@/components/admin/AdminShell';
+
+// YOUR CUSTOM PAGES - ALL IMPORTS ON TOP
+import Rentals from "./pages/Rentals";
+import RentalDetails from "./pages/RentalDetails";
+import AdminRentals from "./pages/AdminRentals";
+import AdminVideoAds from "./pages/admin/AdminVideoAds";
+import BottomNav from "./components/BottomNav";
 
 const PageNotFound = lazy(() => import('./lib/PageNotFound'));
 const Terms = lazy(() => import('@/pages/Terms'));
@@ -73,7 +73,6 @@ const PUBLIC_PATHS = ["/", "/terms", "/privacy", "/login", "/register", "/signup
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
   const location = useLocation();
-
   const isPublicPath = PUBLIC_PATHS.includes(location.pathname) || location.pathname === "/";
 
   useEffect(() => {
@@ -89,10 +88,7 @@ const AuthenticatedApp = () => {
       if (!window.gtag) { if (tries++ < 20) setTimeout(fire, 250); return; }
       if (localStorage.getItem(key)) return;
       localStorage.setItem(key, '1');
-      window.gtag('event', 'conversion', {
-        send_to: 'AW-18458743728/q8gECLiox_scELCn6OFE',
-        transaction_id: user.id,
-      });
+      window.gtag('event', 'conversion', { send_to: 'AW-18458743728/q8gECLiox_scELCn6OFE', transaction_id: user.id });
     };
     fire();
   }, [user]);
@@ -106,75 +102,70 @@ const AuthenticatedApp = () => {
   }
 
   if (!isPublicPath && authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      navigateToLogin();
-      return null;
-    }
+    if (authError.type === 'user_not_registered') return <UserNotRegisteredError />;
+    else if (authError.type === 'auth_required') { navigateToLogin(); return null; }
   }
 
   return (
     <Suspense fallback={<RouteFallback />}>
-    <div className="page-transition" key={location.key}>
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/terms" element={<Terms />} />
-      <Route path="/privacy" element={<Privacy />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/signup" element={<Register />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/oauth/consent" element={<OAuthConsent />} />
-      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
-        <Route path="/complete-profile" element={<CompleteProfile />} />
-        <Route element={<AppShell />}>
-          <Route path="/app" element={<Dashboard />} />
-          <Route path="/app/services" element={<AppServices />} />
-          <Route path="/app/airtime" element={<Airtime />} />
-          <Route path="/app/data" element={<Data />} />
-          <Route path="/app/electricity" element={<Electricity />} />
-          <Route path="/app/cable" element={<Cable />} />
-          <Route path="/app/betting" element={<Betting />} />
-          <Route path="/app/education" element={<Education />} />
-          <Route path="/app/epin" element={<Epin />} />
-          <Route path="/app/broadband" element={<Broadband />} />
-          <Route path="/app/virtual-numbers" element={<VirtualNumbers />} />
-          <Route path="/app/virtual-numbers/order/:orderId" element={<VirtualNumberOrder />} />
-          <Route path="/app/social-growth" element={<SocialGrowth />} />
-          <Route path="/app/wallet" element={<WalletPage />} />
-          <Route path="/app/transactions" element={<Transactions />} />
-          <Route path="/app/notifications" element={<Notifications />} />
-          <Route path="/app/support" element={<AppSupport />} />
-          <Route path="/app/profile" element={<Profile />} />
-          <Route path="/app/settings" element={<AppSettings />} />
-          <Route path="/app/referrals" element={<Referrals />} />
-          <Route path="/app/marketplace" element={<Marketplace />} />
-          <Route path="/app/marketplace/listing/:listingId" element={<ListingDetail />} />
-                <Route path="/rentals" element={<Rentals />} />
-      <Route path="/rentals/:id" element={<RentalDetails />} />
-          <Route path="/admin/rentals" element={<AdminRentals />} />
-          <Route path="/app/analytics" element={<AppAnalytics />} />
-        </Route>
-        <Route element={<AdminShell />}>
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/users" element={<AdminUsers />} />
-          <Route path="/admin/transactions" element={<AdminTransactions />} />
-          <Route path="/admin/pricing" element={<AdminPricing />} />
-          <Route path="/admin/promos" element={<AdminPromos />} />
-          <Route path="/admin/marketplace" element={<AdminMarketplace />} />
-          <Route path="/admin/virtual-numbers" element={<AdminVirtualNumbers />} />
-          <Route path="/admin/settings" element={<AdminSettings />} />
-          <Route path="/admin/system-health" element={<AdminSystemHealth />} />
-          <Route path="/admin/profit-calculator" element={<AdminProfitCalculator />} />
-<Route path="/admin/video-ads" element={<AdminVideoAds />} />
-          <BottomNav />
-        </Route>
-      </Route>
-      <Route path="*" element={<PageNotFound />} />
-    </Routes>
-    </div>
+      <div className="page-transition" key={location.key}>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/signup" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/oauth/consent" element={<OAuthConsent />} />
+          <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
+            <Route path="/complete-profile" element={<CompleteProfile />} />
+            <Route element={<AppShell />}>
+              <Route path="/app" element={<Dashboard />} />
+              <Route path="/app/services" element={<AppServices />} />
+              <Route path="/app/airtime" element={<Airtime />} />
+              <Route path="/app/data" element={<Data />} />
+              <Route path="/app/electricity" element={<Electricity />} />
+              <Route path="/app/cable" element={<Cable />} />
+              <Route path="/app/betting" element={<Betting />} />
+              <Route path="/app/education" element={<Education />} />
+              <Route path="/app/epin" element={<Epin />} />
+              <Route path="/app/broadband" element={<Broadband />} />
+              <Route path="/app/virtual-numbers" element={<VirtualNumbers />} />
+              <Route path="/app/virtual-numbers/order/:orderId" element={<VirtualNumberOrder />} />
+              <Route path="/app/social-growth" element={<SocialGrowth />} />
+              <Route path="/app/wallet" element={<WalletPage />} />
+              <Route path="/app/transactions" element={<Transactions />} />
+              <Route path="/app/notifications" element={<Notifications />} />
+              <Route path="/app/support" element={<AppSupport />} />
+              <Route path="/app/profile" element={<Profile />} />
+              <Route path="/app/settings" element={<AppSettings />} />
+              <Route path="/app/referrals" element={<Referrals />} />
+              <Route path="/app/marketplace" element={<Marketplace />} />
+              <Route path="/app/marketplace/listing/:listingId" element={<ListingDetail />} />
+              <Route path="/rentals" element={<Rentals />} />
+              <Route path="/rentals/:id" element={<RentalDetails />} />
+              <Route path="/app/analytics" element={<AppAnalytics />} />
+            </Route>
+            <Route element={<AdminShell />}>
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/users" element={<AdminUsers />} />
+              <Route path="/admin/transactions" element={<AdminTransactions />} />
+              <Route path="/admin/pricing" element={<AdminPricing />} />
+              <Route path="/admin/promos" element={<AdminPromos />} />
+              <Route path="/admin/marketplace" element={<AdminMarketplace />} />
+              <Route path="/admin/virtual-numbers" element={<AdminVirtualNumbers />} />
+              <Route path="/admin/settings" element={<AdminSettings />} />
+              <Route path="/admin/system-health" element={<AdminSystemHealth />} />
+              <Route path="/admin/profit-calculator" element={<AdminProfitCalculator />} />
+              <Route path="/admin/rentals" element={<AdminRentals />} />
+              <Route path="/admin/video-ads" element={<AdminVideoAds />} />
+            </Route>
+          </Route>
+          <Route path="*" element={<PageNotFound />} />
+        </Routes>
+      </div>
     </Suspense>
   );
 };
@@ -191,16 +182,7 @@ function App() {
         try {
           const args = Array.prototype.slice.call(arguments);
           const cmd = args[0];
-          window.parent.postMessage({
-            type: 'base44_gtag_event',
-            event: {
-              source: 'gtag',
-              timestamp: new Date().toLocaleTimeString(),
-              command: cmd,
-              params: args.slice(1),
-              type: cmd === 'event'? (args[1] || 'event') : cmd,
-            },
-          }, '*');
+          window.parent.postMessage({ type: 'base44_gtag_event', event: { source: 'gtag', timestamp: new Date().toLocaleTimeString(), command: cmd, params: args.slice(1), type: cmd === 'event'? (args[1] || 'event') : cmd } }, '*');
         } catch (_e) {}
       }
     };
@@ -225,4 +207,4 @@ function App() {
   )
 }
 
-export default App
+export default App;

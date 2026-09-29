@@ -2,6 +2,49 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 const ADS = [
+  {
+  id: 6,
+  bg: 'bg-[#E8F0FF]',
+  icon: '🎬',
+  title: 'Subscriptions',
+  sub: 'Pay for Netflix, Spotify, YouTube & more.',
+  btn: 'Subscribe',
+  link: '/app/services',
+  color: 'bg-blue-700'
+},
+
+{
+  id: 8,
+  bg: 'bg-[#E0F5F0]',
+  icon: '💬',
+  title: 'OTP Service',
+  sub: 'Receive OTPs from global platforms (chat-only).',
+  btn: 'Get OTP',
+  link: '/app/virtual-numbers',
+  color: 'bg-teal-600'
+},
+
+{
+  id: 9,
+  bg: 'bg-[#FFE8EC]',
+  icon: '📈',
+  title: 'SMM / Digital Growth',
+  sub: 'Get likes, views, followers & engagement.',
+  btn: 'Grow Now',
+  link: '/app/social-growth',
+  color: 'bg-red-500'
+},
+
+{
+  id: 11,
+  bg: 'bg-[#EDE8FF]',
+  icon: '🏠',
+  title: 'Rental Services',
+  sub: 'Book houses, events, water, power, fumigation & more.',
+  btn: 'Book',
+  link: '/rentals',
+  color: 'bg-violet-600'
+}
   { id:1, bg:'bg-[#E8F2FF]', icon:'📱', title:'Airtime', sub:'Buy airtime for all networks (MTN, Airtel, Glo, 9mobile).', btn:'Buy', link:'/app/airtime', color:'bg-blue-600' },
   { id:2, bg:'bg-[#F3E8FF]', icon:'🌐', title:'Data', sub:'Affordable data for all networks (MTN, Airtel, Glo, 9mobile).', btn:'Get Data', link:'/app/data', color:'bg-purple-600' },
   { id:3, bg:'bg-[#FFF4CC]', icon:'⚡', title:'Electricity', sub:'Pay your electricity bill (PHCN & DISCOs) instantly.', btn:'Pay Bill', link:'/app/electricity', color:'bg-yellow-500' },

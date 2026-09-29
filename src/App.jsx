@@ -11,14 +11,11 @@ import { GADS_CONVERSION_ID } from '@/lib/ads';
 import AppShell from '@/components/app/AppShell';
 import Landing from "./pages/Landing.jsx";
 import AdminShell from '@/components/admin/AdminShell';
-
 // YOUR CUSTOM PAGES - ALL IMPORTS ON TOP
 import Rentals from "./pages/Rentals";
 import RentalDetails from "./pages/RentalDetails";
 import AdminRentals from "./pages/AdminRentals";
-import AdminVideoAds from "./pages/admin/AdminVideoAds";
 import BottomNav from "./components/BottomNav";
-
 const PageNotFound = lazy(() => import('./lib/PageNotFound'));
 const Terms = lazy(() => import('@/pages/Terms'));
 const Privacy = lazy(() => import('@/pages/Privacy'));
@@ -61,7 +58,6 @@ const AdminVirtualNumbers = lazy(() => import('@/pages/admin/AdminVirtualNumbers
 const AdminSettings = lazy(() => import('@/pages/admin/AdminSettings'));
 const AdminSystemHealth = lazy(() => import('@/pages/admin/AdminSystemHealth'));
 const AdminProfitCalculator = lazy(() => import('@/pages/admin/AdminProfitCalculator'));
-
 const RouteFallback = () => (
   <div className="fixed inset-0 flex items-center justify-center">
     <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -160,7 +156,6 @@ const AuthenticatedApp = () => {
               <Route path="/admin/system-health" element={<AdminSystemHealth />} />
               <Route path="/admin/profit-calculator" element={<AdminProfitCalculator />} />
               <Route path="/admin/rentals" element={<AdminRentals />} />
-              <Route path="/admin/video-ads" element={<AdminVideoAds />} />
             </Route>
           </Route>
           <Route path="*" element={<PageNotFound />} />

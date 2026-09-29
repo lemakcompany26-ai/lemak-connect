@@ -1,4 +1,6 @@
 import AdminVideoAds from "./pages/admin/AdminVideoAds";
+
+<Route path="/admin/video-ads" element={<AdminVideoAds />} />
 import BottomNav from "./components/BottomNav";
 import AdminRentals from "./pages/AdminRentals";
 import Rentals from "./pages/Rentals";

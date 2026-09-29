@@ -3,9 +3,7 @@ import { appParams } from '@/lib/app-params';
 
 const { appId, token, functionsVersion, appBaseUrl } = appParams;
 
-let client = null;
-let error = null;
-
+let client;
 try {
   client = createClient({
     appId,
@@ -15,23 +13,14 @@ try {
     appBaseUrl
   });
 } catch (e) {
-  console.warn("Base44 down - using fallback mode", e);
-  error = e;
+  console.log("Base44 down, fallback active");
   client = null;
 }
 
-// Safe export - app never brakes
 export const base44 = client || {
-  auth: {
-    me: async () => null,
-    logout: async () => {}
-  },
-  entities: {},
-  functions: {},
-  integrations: {}
+  auth: { me: async () => null, logout: async () => {} },
+  entities: new Proxy({}, { get: () => ({ list: async () => [], get: async () => null, create: async () => null }) }),
+  functions: new Proxy({}, { get: () => async () => ({ data: null }) })
 };
 
-export const isBase44Active = !!client;
-export const base44Error = error;
-
-export default base44;
+export const isBase44Down = !client;

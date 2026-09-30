@@ -9,12 +9,11 @@ import {
   Navigate,
   useLocation,
 } from "react-router-dom";
-
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
 import ScrollToTop from "./components/ScrollToTop";
 import ProtectedRoute from "@/components/ProtectedRoute";
-
+import TestEmail from "./components/TestEmail";
 import { GADS_CONVERSION_ID } from "@/lib/ads";
 
 import AppShell from "@/components/app/AppShell";
@@ -272,7 +271,6 @@ const AuthenticatedApp = () => {
     !isPublicPath &&
     (isLoadingPublicSettings || isLoadingAuth)
   ) {
-    return (
       <div className="fixed inset-0 flex items-center justify-center bg-[#EAF4FF]">
         <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
       </div>
@@ -651,20 +649,20 @@ function App() {
     );
   }, []);
 
-  return (
+    return (
     <AuthProvider>
-      <QueryClientProvider
-        client={queryClientInstance}
-      >
+      <QueryClientProvider client={queryClientInst}>
         <Router>
           <ScrollToTop />
+          <div style={{ position: 'fixed', top: '10px', right: '10px', zIndex: 9999 }}>
+            <TestEmail />
+          </div>
           <AuthenticatedApp />
         </Router>
-
         <Toaster />
       </QueryClientProvider>
     </AuthProvider>
   );
-}
+
 
 export default App;

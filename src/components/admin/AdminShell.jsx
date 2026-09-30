@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import PromoManager from '../components/admin/PromoManager'
 import { Outlet, useNavigate, NavLink } from 'react-router-dom';
 import { LayoutDashboard, Users, ReceiptText, BadgePercent, Ticket, Store, Settings, Activity, ShieldCheck, Phone, Calculator } from 'lucide-react';
 import { base44 } from '@/api/base44Client';

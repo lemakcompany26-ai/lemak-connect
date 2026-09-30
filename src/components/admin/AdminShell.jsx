@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import PromoManager from '../components/admin/PromoManager'
 import { Outlet, useNavigate, NavLink } from 'react-router-dom';
 import { LayoutDashboard, Users, ReceiptText, BadgePercent, Ticket, Store, Settings, Activity, ShieldCheck, Phone, Calculator } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
@@ -55,7 +54,7 @@ export default function AdminShell() {
     return () => { mounted = false; };
   }, []);
 
-  if (checking || !authorized) {
+  if (checking ||!authorized) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -71,7 +70,7 @@ export default function AdminShell() {
           <div className="flex items-center gap-2 text-xs font-semibold text-white/70">
             <ShieldCheck className="w-4 h-4 text-blue-300" /> Admin Panel
           </div>
-          <div className="mt-1 text-[11px] text-white/40 capitalize">{profile ? profile.role.replace('_', ' ') : ''}</div>
+          <div className="mt-1 text-[11px] text-white/40 capitalize">{profile? profile.role.replace('_', ' ') : ''}</div>
         </div>
         <nav className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-1">
           {NAV.map(item => (
@@ -81,7 +80,7 @@ export default function AdminShell() {
               end={item.to === '/admin'}
               className={({ isActive }) => cn(
                 'flex items-center gap-3 rounded-xl px-3.5 h-11 text-sm transition-colors',
-                isActive ? 'bg-primary text-white font-semibold shadow-md shadow-primary/30' : 'text-white/75 hover:bg-white/10'
+                isActive? 'bg-primary text-white font-semibold shadow-md shadow-primary/30' : 'text-white/75 hover:bg-white/10'
               )}
             >
               <item.icon className="w-5 h-5 shrink-0" />
@@ -100,7 +99,7 @@ export default function AdminShell() {
           <div className="safe-top lg:hidden px-4 py-3 border-b border-border flex items-center gap-2 overflow-x-auto">
           {NAV.map(item => (
             <NavLink key={item.to} to={item.to} end={item.to === '/admin'}
-              className={({ isActive }) => cn('shrink-0 text-xs font-semibold px-3 py-2 rounded-full', isActive ? 'bg-primary text-white' : 'bg-muted text-muted-foreground')}>
+              className={({ isActive }) => cn('shrink-0 text-xs font-semibold px-3 py-2 rounded-full', isActive? 'bg-primary text-white' : 'bg-muted text-muted-foreground')}>
               {item.label}
             </NavLink>
           ))}
@@ -111,4 +110,4 @@ export default function AdminShell() {
       </div>
     </div>
   );
-}
+   }

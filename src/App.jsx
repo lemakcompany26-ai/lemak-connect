@@ -759,16 +759,6 @@ function App() {
       >
         <Router>
           <ScrollToTop />
-          <div
-            style={{
-              position: "fixed",
-              top: "10px",
-              right: "10px",
-              zIndex: 9999,
-            }}
-          >
-          </div>
-
           <AuthenticatedApp />
         </Router>
 

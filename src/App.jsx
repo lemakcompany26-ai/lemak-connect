@@ -14,14 +14,10 @@ import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
 import ScrollToTop from "./components/ScrollToTop";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import TestEmail from "./components/TestEmail";
 import { GADS_CONVERSION_ID } from "@/lib/ads";
-
 import AppShell from "@/components/app/AppShell";
 import AdminShell from "@/components/admin/AdminShell";
-
 import Landing from "./pages/Landing.jsx";
-
 import Events from "./pages/Events";
 import EventDetails from "./pages/EventsDetails";
 import AdminEvents from "./pages/admin/AdminEvents";
@@ -763,8 +759,6 @@ function App() {
       >
         <Router>
           <ScrollToTop />
-
-          {/* Temporary email testing component */}
           <div
             style={{
               position: "fixed",
@@ -773,7 +767,6 @@ function App() {
               zIndex: 9999,
             }}
           >
-            <TestEmail />
           </div>
 
           <AuthenticatedApp />

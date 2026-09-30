@@ -9,6 +9,7 @@ import {
   Navigate,
   useLocation,
 } from "react-router-dom";
+
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import UserNotRegisteredError from "@/components/UserNotRegisteredError";
 import ScrollToTop from "./components/ScrollToTop";
@@ -24,6 +25,10 @@ import Landing from "./pages/Landing.jsx";
 import Events from "./pages/Events";
 import EventDetails from "./pages/EventsDetails";
 import AdminEvents from "./pages/admin/AdminEvents";
+
+// ============================================================
+// LAZY LOADED PAGES
+// ============================================================
 
 const PageNotFound = lazy(() => import("./lib/PageNotFound"));
 
@@ -132,6 +137,10 @@ const AppAnalytics = lazy(() =>
   import("@/pages/app/Analytics")
 );
 
+// ============================================================
+// ADMIN PAGES
+// ============================================================
+
 const AdminDashboard = lazy(() =>
   import("@/pages/admin/AdminDashboard")
 );
@@ -172,11 +181,19 @@ const AdminProfitCalculator = lazy(() =>
   import("@/pages/admin/AdminProfitCalculator")
 );
 
+// ============================================================
+// LOADING FALLBACK
+// ============================================================
+
 const RouteFallback = () => (
   <div className="fixed inset-0 flex items-center justify-center bg-[#EAF4FF]">
     <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
   </div>
 );
+
+// ============================================================
+// PUBLIC ROUTES
+// ============================================================
 
 const PUBLIC_PATHS = [
   "/",
@@ -188,7 +205,12 @@ const PUBLIC_PATHS = [
   "/forgot-password",
   "/reset-password",
   "/oauth/consent",
+  "/events",
 ];
+
+// ============================================================
+// AUTHENTICATED APPLICATION
+// ============================================================
 
 const AuthenticatedApp = () => {
   const {
@@ -201,9 +223,17 @@ const AuthenticatedApp = () => {
 
   const location = useLocation();
 
+  // ----------------------------------------------------------
+  // Determine whether current route is public
+  // ----------------------------------------------------------
+
   const isPublicPath =
     PUBLIC_PATHS.includes(location.pathname) ||
-    location.pathname === "/";
+    location.pathname.startsWith("/events/");
+
+  // ----------------------------------------------------------
+  // Google Ads signup conversion
+  // ----------------------------------------------------------
 
   useEffect(() => {
     if (
@@ -218,10 +248,14 @@ const AuthenticatedApp = () => {
       user.created_date || ""
     );
 
+    if (!createdDate) {
+      return;
+    }
+
     const createdDateUtc =
       /(?:Z|[+-]\d{2}:?\d{2})$/.test(createdDate)
         ? createdDate
-        : createdDate + "Z";
+        : `${createdDate}Z`;
 
     const createdAtMs = Date.parse(createdDateUtc);
 
@@ -243,11 +277,17 @@ const AuthenticatedApp = () => {
 
     let tries = 0;
 
-    const fire = () => {
-      if (!window.gtag) {
+    const fireConversion = () => {
+      if (
+        typeof window.gtag !== "function"
+      ) {
         if (tries++ < 20) {
-          setTimeout(fire, 250);
+          window.setTimeout(
+            fireConversion,
+            250
+          );
         }
+
         return;
       }
 
@@ -264,18 +304,27 @@ const AuthenticatedApp = () => {
       });
     };
 
-    fire();
+    fireConversion();
   }, [user]);
+
+  // ----------------------------------------------------------
+  // Authentication/public settings loading
+  // ----------------------------------------------------------
 
   if (
     !isPublicPath &&
     (isLoadingPublicSettings || isLoadingAuth)
   ) {
+    return (
       <div className="fixed inset-0 flex items-center justify-center bg-[#EAF4FF]">
         <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
       </div>
     );
   }
+
+  // ----------------------------------------------------------
+  // Authentication errors
+  // ----------------------------------------------------------
 
   if (!isPublicPath && authError) {
     if (
@@ -284,11 +333,17 @@ const AuthenticatedApp = () => {
       return <UserNotRegisteredError />;
     }
 
-    if (authError.type === "auth_required") {
+    if (
+      authError.type === "auth_required"
+    ) {
       navigateToLogin();
       return null;
     }
   }
+
+  // ----------------------------------------------------------
+  // Application routes
+  // ----------------------------------------------------------
 
   return (
     <Suspense fallback={<RouteFallback />}>
@@ -298,7 +353,9 @@ const AuthenticatedApp = () => {
       >
         <Routes>
 
-          {/* PUBLIC ROUTES */}
+          {/* ==================================================
+              PUBLIC ROUTES
+              ================================================== */}
 
           <Route
             path="/"
@@ -345,7 +402,9 @@ const AuthenticatedApp = () => {
             element={<OAuthConsent />}
           />
 
-          {/* PUBLIC EVENTS */}
+          {/* ==================================================
+              PUBLIC EVENTS
+              ================================================== */}
 
           <Route
             path="/events"
@@ -357,7 +416,9 @@ const AuthenticatedApp = () => {
             element={<EventDetails />}
           />
 
-          {/* PROTECTED APPLICATION */}
+          {/* ==================================================
+              PROTECTED APPLICATION
+              ================================================== */}
 
           <Route
             element={
@@ -372,10 +433,16 @@ const AuthenticatedApp = () => {
             }
           >
 
+            {/* COMPLETE PROFILE */}
+
             <Route
               path="/complete-profile"
               element={<CompleteProfile />}
             />
+
+            {/* ==================================================
+                USER APPLICATION
+                ================================================== */}
 
             <Route element={<AppShell />}>
 
@@ -496,7 +563,9 @@ const AuthenticatedApp = () => {
 
             </Route>
 
-            {/* ADMIN */}
+            {/* ==================================================
+                ADMIN APPLICATION
+                ================================================== */}
 
             <Route element={<AdminShell />}>
 
@@ -559,7 +628,9 @@ const AuthenticatedApp = () => {
 
           </Route>
 
-          {/* 404 */}
+          {/* ==================================================
+              404
+              ================================================== */}
 
           <Route
             path="*"
@@ -572,7 +643,15 @@ const AuthenticatedApp = () => {
   );
 };
 
+// ============================================================
+// MAIN APP
+// ============================================================
+
 function App() {
+  // ----------------------------------------------------------
+  // Google Ads initialization
+  // ----------------------------------------------------------
+
   useEffect(() => {
     if (
       typeof window === "undefined" ||
@@ -593,6 +672,10 @@ function App() {
         return true;
       }
     })();
+
+    // --------------------------------------------------------
+    // Google gtag function
+    // --------------------------------------------------------
 
     window.gtag = function gtag() {
       window.dataLayer.push(arguments);
@@ -623,9 +706,15 @@ function App() {
             },
             "*"
           );
-        } catch (_e) {}
+        } catch (_error) {
+          // Ignore iframe communication errors.
+        }
       }
     };
+
+    // --------------------------------------------------------
+    // Load Google Ads script
+    // --------------------------------------------------------
 
     const script =
       document.createElement("script");
@@ -638,6 +727,10 @@ function App() {
 
     document.head.appendChild(script);
 
+    // --------------------------------------------------------
+    // Initialize Google Analytics / Ads
+    // --------------------------------------------------------
+
     window.gtag("js", new Date());
 
     window.gtag(
@@ -647,22 +740,49 @@ function App() {
         send_page_view: false,
       }
     );
+
+    // --------------------------------------------------------
+    // Cleanup
+    // --------------------------------------------------------
+
+    return () => {
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
   }, []);
 
-    return (
+  // ----------------------------------------------------------
+  // Application providers
+  // ----------------------------------------------------------
+
+  return (
     <AuthProvider>
-      <QueryClientProvider client={queryClientInst}>
+      <QueryClientProvider
+        client={queryClientInstance}
+      >
         <Router>
           <ScrollToTop />
-          <div style={{ position: 'fixed', top: '10px', right: '10px', zIndex: 9999 }}>
+
+          {/* Temporary email testing component */}
+          <div
+            style={{
+              position: "fixed",
+              top: "10px",
+              right: "10px",
+              zIndex: 9999,
+            }}
+          >
             <TestEmail />
           </div>
+
           <AuthenticatedApp />
         </Router>
+
         <Toaster />
       </QueryClientProvider>
     </AuthProvider>
   );
-
+}
 
 export default App;

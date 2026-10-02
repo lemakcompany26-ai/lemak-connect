@@ -1,4 +1,25 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
+import { getProviderCatalog, getSmsPrice } from "../shared/otp.ts";
+import { calculateCustomerPrice } from "../shared/pricing.ts";
+
+Deno.serve(async (req)=>{
+  const { action, serverId, country, services } = await req.json();
+
+  if(action==='provider_catalog'){
+    const data = await getProviderCatalog();
+    return new Response(JSON.stringify(data), { headers:{"Content-Type":"application/json"} });
+  }
+
+  if(action==='quote'){
+    const prices:any = {};
+    for(const s of services){
+      const p = await getSmsPrice(serverId, country, s);
+      // add your admin fee
+      const customerPrice = p.providerPrice * 1.35; // 35% fee
+      prices[s] = { available:true, providerPrice:p.providerPrice, customerPrice };
+    }
+    return new Response(JSON.stringify({ prices }), { headers:{"Content-Type":"application/json"} });
+  }
+});import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import {
   generateTransactionId, debitWallet, creditWallet,
   computeMarketplaceFees, notifyUser, calculatePrice, isAdminEmail, isStaffRole

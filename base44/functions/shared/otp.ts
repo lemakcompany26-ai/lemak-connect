@@ -12,7 +12,8 @@ export async function getProviderCatalog() {
       const res = await fetch(`${fleexaUrl}/api/services?country=US`, {
         headers: { "Authorization": `Bearer ${fleexaKey}`, "apikey": fleexaKey }
       });
-      const data = await res.json();
+      // TEMP TEST - comment out fetch and use this:
+const list = [{id:'whatsapp',available:120},{id:'telegram',available:100},{id:'facebook',available:80},{id:'tiktok',available:70}];
       // Fleexa returns { services: { whatsapp: { price: 0.5, stock: 120 } } }
       const list = Object.keys(data.services || data || {}).map(id => ({
         id,

@@ -1,142 +1,887 @@
-const FLEEXA_BASE = Deno.env.get("FLEEXA_API_URL") || "https://fleexa.com.ng/developer";
+import { createClient } from "npm:@base44/sdk@0.1.2";
+
+const base44 = createClient({
+  appId: Deno.env.get("BASE44_APP_ID")!,
+  apiKey: Deno.env.get("BASE44_API_KEY")!,
+});
+
+const FLEEXA_BASE =
+  Deno.env.get("FLEEXA_API_URL") ||
+  "https://fleexa.com.ng/developer";
+
 const FLEEXA_KEY = Deno.env.get("FLEEXA_API_KEY") || "";
+
 const SMSPOOL_BASE = "https://api.smspool.net";
 const SMSPOOL_KEY = Deno.env.get("SMSPOOL_API_KEY") || "";
 
-const authHeaders = (isSmspool=false) => {
-  if (isSmspool) {
-    return { "Authorization": `Bearer ${SMSPOOL_KEY}`, "Content-Type": "application/x-www-form-urlencoded" };
-  }
-  return { "Authorization": `Bearer ${FLEEXA_KEY}`, "X-API-Key": FLEEXA_KEY, "Content-Type": "application/json" };
+// Used only for converting SMSPool USD prices to NGN.
+// Add SMSPOOL_USD_NGN_RATE in Base44 Secrets if you want to change it.
+const SMSPOOL_USD_NGN_RATE =
+  Number(Deno.env.get("SMSPOOL_USD_NGN_RATE") || "1600");
+
+// Your server-side markup.
+// 30% means provider cost x 1.30.
+const MARKUP = 1.30;
+
+const headers = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+function response(data: any, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers,
+  });
+}
+
+function money(value: any) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function customerPrice(providerPrice: number) {
+  return Math.ceil(providerPrice * MARKUP);
+}
+
+async function readJson(res: Response) {
+  return await res.json().catch(() => ({}));
+}
+
+function arrayFrom(data: any): any[] {
+  if (Array.isArray(data)) return data;
+
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.data?.data)) return data.data.data;
+  if (Array.isArray(data?.data?.services)) return data.data.services;
+  if (Array.isArray(data?.data?.countries)) return data.data.countries;
+  if (Array.isArray(data?.services)) return data.services;
+  if (Array.isArray(data?.countries)) return data.countries;
+  if (Array.isArray(data?.apps)) return data.apps;
+
+  return [];
+}
+
+function extractSuccess(data: any) {
+  return (
+    data?.success === true ||
+    data?.success === 1 ||
+    data?.success === "1"
+  );
+}
+
+/* =========================================================
+   FLEEXA
+========================================================= */
+
+async function fleexaHeaders() {
+  return {
+    Authorization: `Bearer ${FLEEXA_KEY}`,
+    "X-API-Key": FLEEXA_KEY,
+    "Content-Type": "application/json",
+  };
+}
+
+async function fleexaApps() {
+  const r = await fetch(`${FLEEXA_BASE}/sms4/apps`, {
+    headers: await fleexaHeaders(),
+  });
+
+  const data = await readJson(r);
+
+  if (!r.ok) {
+    throw new Error(
+      `Fleexa services error ${r.status}: ${JSON.stringify(data)}`
+    );
+  }
+
+  return arrayFrom(data);
+}
+
+async function fleexaPrice(serviceName: string) {
+  const url =
+    `${FLEEXA_BASE}/sms4/prices?serviceName=` +
+    encodeURIComponent(serviceName);
+
+  const r = await fetch(url, {
+    headers: await fleexaHeaders(),
+  });
+
+  const data = await readJson(r);
+
+  if (!r.ok) {
+    throw new Error(
+      `Fleexa price error ${r.status}: ${JSON.stringify(data)}`
+    );
+  }
+
+  const candidates = [
+    data?.price_ngn,
+    data?.rate,
+    data?.price,
+    data?.data?.price_ngn,
+    data?.data?.rate,
+    data?.data?.price,
+    data?.data?.amount,
+  ];
+
+  const price = candidates
+    .map(money)
+    .find((v) => v > 0);
+
+  if (!price) {
+    throw new Error(
+      `No Fleexa price returned for ${serviceName}`
+    );
+  }
+
+  return price;
+}
+
+/* =========================================================
+   SMSPOOL
+========================================================= */
+
+async function smspoolForm(
+  path: string,
+  values: Record<string, any>
+) {
+  const form = new URLSearchParams();
+
+  form.append("key", SMSPOOL_KEY);
+
+  for (const [key, value] of Object.entries(values)) {
+    if (value !== undefined && value !== null && value !== "") {
+      form.append(key, String(value));
+    }
+  }
+
+  const r = await fetch(`${SMSPOOL_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${SMSPOOL_KEY}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: form,
+  });
+
+  return {
+    response: r,
+    data: await readJson(r),
+  };
+}
+
+async function smsPoolServices() {
+  // Current/standard SMSPool endpoint
+  const first = await smspoolForm("/request/services", {});
+
+  if (first.response.ok) {
+    const arr = arrayFrom(first.data);
+    if (arr.length) return arr;
+  }
+
+  // Compatibility fallback
+  const second = await smspoolForm("/service/retrieve_all", {});
+
+  if (second.response.ok) {
+    const arr = arrayFrom(second.data);
+    if (arr.length) return arr;
+  }
+
+  throw new Error(
+    `SMSPool service list failed: ${JSON.stringify(
+      first.data
+    )}`
+  );
+}
+
+async function smsPoolCountries() {
+  // Current/standard endpoint
+  const first = await smspoolForm("/request/countries", {});
+
+  if (first.response.ok) {
+    const arr = arrayFrom(first.data);
+    if (arr.length) return arr;
+  }
+
+  // Compatibility fallback
+  const second = await smspoolForm(
+    "/country/retrieve_all",
+    {}
+  );
+
+  if (second.response.ok) {
+    const arr = arrayFrom(second.data);
+    if (arr.length) return arr;
+  }
+
+  throw new Error(
+    `SMSPool country list failed: ${JSON.stringify(
+      first.data
+    )}`
+  );
+}
+
+async function smsPoolPrice(
+  serviceId: string,
+  countryId: string
+) {
+  // Documented SMSPool pricing endpoint.
+  const first = await smspoolForm("/request/price", {
+    service: serviceId,
+    country: countryId,
+  });
+
+  let data = first.data;
+
+  // Compatibility fallback for installations using the
+  // alternate pricing endpoint.
+  if (
+    !first.response.ok ||
+    data?.error ||
+    data?.success === false
+  ) {
+    const second = await smspoolForm("/request/pricing", {
+      service: serviceId,
+      country: countryId,
+    });
+
+    data = second.data;
+  }
+
+  let price = 0;
+
+  if (Array.isArray(data)) {
+    price = money(
+      data[0]?.price ??
+        data[0]?.cost ??
+        data[0]?.amount
+    );
+  } else {
+    price = money(
+      data?.price ??
+        data?.cost ??
+        data?.amount ??
+        data?.data?.price ??
+        data?.data?.cost
+    );
+  }
+
+  if (!price) {
+    throw new Error(
+      `No SMSPool price for service ${serviceId} / country ${countryId}`
+    );
+  }
+
+  return price;
+}
+
+/* =========================================================
+   MAIN FUNCTION
+========================================================= */
+
 Deno.serve(async (req) => {
-  const headers = { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" };
-  const body = await req.json().catch(()=>({}));
-  const action = body.action || 'provider_catalog';
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers,
+    });
+  }
 
-  // 1. CATALOG - REAL FROM BOTH PROVIDERS
-  if (action === 'provider_catalog') {
-    let server1=null, server2=null;
+  const body = await req.json().catch(() => ({}));
+  const action = body.action || "provider_catalog";
 
-    // Server 1 Fleexa
+  /* =======================================================
+     1. PROVIDER CATALOG
+  ======================================================= */
+
+  if (action === "provider_catalog") {
+    const servers: any[] = [];
+
+    /* ---------------- FLEEXA SERVER ---------------- */
+
     try {
-      const r = await fetch(`${FLEEXA_BASE}/sms/services`, { headers: { "Authorization": `Bearer ${FLEEXA_KEY}`, "X-API-Key": FLEEXA_KEY } });
-      const j = await r.json();
-      server1 = { id:'a', name:'Server 1', subtitle:'US Only - Real SIM', online:r.ok, smsStock: j.data?.length||100, countries:[{code:'US',name:'United States'}], smsServices: (j.data||[{service:'whatsapp'}]).map((s:any)=>({id:String(s.service||s.id).toLowerCase(), available:s.stock||100})), emailProducts:[], rentServices:[], rentAreas:[] };
-    } catch(e){ server1={id:'a',name:'Server 1',subtitle:`Error ${String(e).slice(0,50)}`,online:false,smsStock:0,countries:[],smsServices:[],emailProducts:[],rentServices:[],rentAreas:[]}; }
-
-    // Server 2 SmsPool REAL - fetch service list to get real IDs
-    try {
-      // Balance
-      const balForm = new URLSearchParams(); balForm.append('key', SMSPOOL_KEY);
-      const balR = await fetch(`${SMSPOOL_BASE}/request/balance`, { method:'POST', headers: {"Authorization": `Bearer ${SMSPOOL_KEY}`}, body: balForm });
-      const bal = await balR.json().catch(()=>({}));
-
-      // Country list
-      const cForm = new URLSearchParams(); cForm.append('key', SMSPOOL_KEY);
-      const cR = await fetch(`${SMSPOOL_BASE}/country/retrieve_all`, { method:'POST', headers: {"Authorization": `Bearer ${SMSPOOL_KEY}`}, body: cForm });
-      const cJ = await cR.json().catch(()=>[]);
-
-      // Service list - THIS IS KEY TO REAL NUMBERS
-      const sForm = new URLSearchParams(); sForm.append('key', SMSPOOL_KEY);
-      const sR = await fetch(`${SMSPOOL_BASE}/service/retrieve_all`, { method:'POST', headers: {"Authorization": `Bearer ${SMSPOOL_KEY}`}, body: sForm });
-      const sJ = await sR.json().catch(()=>[]);
-
-      console.log("SMSPOOL services sample:", JSON.stringify(sJ).slice(0,1000));
-
-      // Map real service IDs - SmsPool returns [{ID, Name}]
-      const wanted = ['whatsapp','telegram','facebook','google','tiktok','instagram'];
-      let services = [];
-      if (Array.isArray(sJ) && sJ.length) {
-        for (let svc of sJ) {
-          const name = String(svc.name||svc.Name||'').toLowerCase();
-          if (wanted.some(w=>name.includes(w))) {
-            services.push({ id: name.includes('whatsapp')?'whatsapp': name.includes('telegram')?'telegram': name.includes('facebook')?'facebook': name.includes('google')?'google': svc.name, realId: svc.ID||svc.id, available:100 });
-          }
-        }
+      if (!FLEEXA_KEY) {
+        throw new Error("FLEEXA_API_KEY is missing");
       }
-      if (!services.length) services = [{id:'whatsapp',realId:'1',available:100},{id:'telegram',realId:'2',available:100},{id:'facebook',realId:'3',available:100}];
 
-      server2 = {
-        id:'b', name:'Server 2', subtitle:`All Countries - Bal $${bal.balance||'?'}`,
-        online: balR.ok, smsStock: Array.isArray(sJ)? sJ.length: 500,
-        countries: Array.isArray(cJ)? cJ.slice(0,20).map((c:any)=>({code:c.short_name||c.code||c.name, name:c.name||c.Name})) : [{code:'US',name:'United States'},{code:'NG',name:'Nigeria'}],
+      const apps = await fleexaApps();
+
+      const services = apps
+        .map((item: any) => {
+          const serviceName = String(
+            item?.serviceName ??
+              item?.name ??
+              item?.service ??
+              item?.id ??
+              ""
+          ).trim();
+
+          if (!serviceName) return null;
+
+          return {
+            id: serviceName.toLowerCase(),
+            name: serviceName,
+            provider: "fleexa",
+            realId: serviceName,
+            available:
+              item?.available ??
+              item?.stock ??
+              item?.count ??
+              null,
+          };
+        })
+        .filter(Boolean);
+
+      servers.push({
+        id: "a",
+        name: "Server 1",
+        provider: "fleexa",
+        subtitle: "US Only - Real SIM",
+        online: services.length > 0,
+        smsStock: services.length,
+        countries: [
+          {
+            code: "US",
+            providerId: "US",
+            name: "United States",
+          },
+        ],
         smsServices: services,
-        emailProducts:[], rentServices:[], rentAreas:[]
-      };
-    } catch(e){
-      console.error("SmsPool fail", e);
-      server2={id:'b',name:'Server 2',subtitle:`Error ${String(e).slice(0,50)}`,online:false,smsStock:0,countries:[],smsServices:[],emailProducts:[],rentServices:[],rentAreas:[]};
+      });
+    } catch (e) {
+      console.error("FLEEXA CATALOG ERROR", e);
+
+      servers.push({
+        id: "a",
+        name: "Server 1",
+        provider: "fleexa",
+        subtitle: "Fleexa unavailable",
+        online: false,
+        smsStock: 0,
+        countries: [],
+        smsServices: [],
+        error: String(e),
+      });
     }
 
-    return new Response(JSON.stringify({ servers: [server1,server2] }), { headers });
-  }
+    /* ---------------- SMSPOOL SERVER ---------------- */
 
-  // 2. QUOTE - real pricing
-  if (action === 'quote') {
-    const prices:any={};
     try {
-      if (body.serverId==='b') {
-        const form = new URLSearchParams(); form.append('key', SMSPOOL_KEY); form.append('service', body.realId||'1'); form.append('country', body.country||'US');
-        const r = await fetch(`${SMSPOOL_BASE}/request/pricing`, { method:'POST', headers: {"Authorization": `Bearer ${SMSPOOL_KEY}`}, body: form });
-        const j = await r.json();
-        const p = Array.isArray(j)? j[0]?.price||'0.5' : j.price||'0.5';
-        prices[body.service] = { available:true, providerPrice: parseFloat(p), customerPrice: Math.ceil(parseFloat(p)*1600+150), fee:150 }; // convert $ to NGN
-      } else {
-        prices[body.service] = { available:true, providerPrice:500, customerPrice: body.price||650, fee:150 };
+      if (!SMSPOOL_KEY) {
+        throw new Error("SMSPOOL_API_KEY is missing");
       }
-    } catch { prices[body.service]={available:true,customerPrice:650}; }
-    return new Response(JSON.stringify({prices}),{headers});
-  }
 
-  // 3. ORDER - REAL PURCHASE
-  if (action === 'order') {
-    const [wallet] = await base44.entities.Wallet.filter({ userEmail: body.userEmail });
-    if (!wallet || wallet.balance < (body.price||650)) return new Response(JSON.stringify({success:false,error:'Low wallet'}),{headers});
+      const [servicesRaw, countriesRaw] =
+        await Promise.all([
+          smsPoolServices(),
+          smsPoolCountries(),
+        ]);
 
-    let phone='', orderId='';
+      const services = servicesRaw
+        .map((item: any) => {
+          const name = String(
+            item?.name ??
+              item?.Name ??
+              item?.service ??
+              item?.serviceName ??
+              ""
+          ).trim();
 
-    if (body.serverId==='a') {
-      const res = await fetch(`${FLEEXA_BASE}/sms/order`, { method:'POST', headers: { "Content-Type":"application/json", "Authorization": `Bearer ${FLEEXA_KEY}`, "X-API-Key": FLEEXA_KEY }, body: JSON.stringify({ service: body.service, country: body.country||'US' }) });
-      const data = await res.json(); if(!res.ok) return new Response(JSON.stringify({success:false,error:JSON.stringify(data)}),{headers});
-      phone=data.phone||data.number; orderId=data.orderId||data.id;
-    } else {
-      // SMSPOOL REAL PURCHASE - using service ID not name
-      const form = new URLSearchParams();
-      form.append('key', SMSPOOL_KEY);
-      form.append('country', body.country||'US');
-      // map name to real ID - whatsapp=1, telegram=2, etc from service list
-      const serviceId = body.realId || (body.service==='whatsapp'?'1': body.service==='telegram'?'2': body.service==='facebook'?'3': '1');
-      form.append('service', serviceId);
-      form.append('pool', '1');
+          const realId = String(
+            item?.ID ??
+              item?.id ??
+              item?.ID_service ??
+              item?.service_id ??
+              name
+          );
 
-      const res = await fetch(`${SMSPOOL_BASE}/purchase/sms`, { method:'POST', headers: {"Authorization": `Bearer ${SMSPOOL_KEY}`, "Content-Type":"application/x-www-form-urlencoded"}, body: form });
-      const data = await res.json(); console.log("SMSPOOL PURCHASE", JSON.stringify(data));
-      if(!data.success &&!data.order_id) return new Response(JSON.stringify({success:false,error: data.message||JSON.stringify(data)}),{headers});
-      phone=data.number||data.phonenumber; orderId=data.order_id;
+          if (!name) return null;
+
+          return {
+            id: name.toLowerCase(),
+            name,
+            provider: "smspool",
+            realId,
+            available:
+              item?.stock ??
+              item?.available ??
+              item?.count ??
+              null,
+          };
+        })
+        .filter(Boolean);
+
+      const countries = countriesRaw
+        .map((item: any) => {
+          const code = String(
+            item?.short_name ??
+              item?.shortName ??
+              item?.iso ??
+              item?.code ??
+              item?.country_code ??
+              ""
+          ).trim();
+
+          const providerId = String(
+            item?.ID ??
+              item?.id ??
+              item?.country_id ??
+              code
+          );
+
+          const name = String(
+            item?.name ??
+              item?.Name ??
+              item?.country ??
+              code
+          );
+
+          if (!code && !providerId) return null;
+
+          return {
+            code: code || providerId,
+            providerId,
+            name,
+          };
+        })
+        .filter(Boolean);
+
+      servers.push({
+        id: "b",
+        name: "Server 2",
+        provider: "smspool",
+        subtitle: "All Countries",
+        online: services.length > 0,
+        smsStock: services.length,
+        countries,
+        smsServices: services,
+      });
+    } catch (e) {
+      console.error("SMSPOOL CATALOG ERROR", e);
+
+      servers.push({
+        id: "b",
+        name: "Server 2",
+        provider: "smspool",
+        subtitle: "SMSPool unavailable",
+        online: false,
+        smsStock: 0,
+        countries: [],
+        smsServices: [],
+        error: String(e),
+      });
     }
 
-    await base44.entities.Wallet.update(wallet.id, { balance: wallet.balance - (body.price||650) });
-    const rental = await base44.entities.Rental.create({ userEmail: body.userEmail, phoneNumber: phone, orderId: `${body.serverId==='a'?'fleexa':'smspool'}_${orderId}`, serverId: body.serverId, country: body.country, service: body.service, status:'waiting_sms' });
-    return new Response(JSON.stringify({success:true, phone, orderId: rental.orderId, rentalId: rental.id}),{headers});
+    return response({ servers });
   }
 
-  // 4. CHECK
-  if (action === 'check') {
-    const isSmspool = String(body.orderId).startsWith('smspool_');
-    if (isSmspool) {
-      const id = String(body.orderId).replace('smspool_','');
-      const form = new URLSearchParams(); form.append('key', SMSPOOL_KEY); form.append('orderid', id);
-      const r = await fetch(`${SMSPOOL_BASE}/sms/check`, { method:'POST', headers: {"Authorization": `Bearer ${SMSPOOL_KEY}`}, body: form });
-      const d = await r.json().catch(()=>({})); const code = d.sms?.match(/\d{4,8}/)?.[0]||null;
-      return new Response(JSON.stringify({ status: d.status==3||code?'received':'waiting', code, sms: d.sms||'' }), {headers});
-    } else {
-      const id = String(body.orderId).replace('fleexa_','');
-      const r = await fetch(`${FLEEXA_BASE}/sms/check/${id}`, { headers: {"Authorization": `Bearer ${FLEEXA_KEY}`, "X-API-Key": FLEEXA_KEY} });
-      const d = await r.json().catch(()=>({})); return new Response(JSON.stringify({status:d.status||'waiting',code:d.code||null,sms:d.sms||''}),{headers});
+  /* =======================================================
+     2. QUOTE
+  ======================================================= */
+
+  if (action === "quote") {
+    try {
+      const serverId = body.serverId;
+      const service = String(
+        body.service || ""
+      );
+
+      if (!service) {
+        return response({
+          prices: {},
+          error: "Missing service",
+        });
+      }
+
+      /* FLEEXA */
+
+      if (serverId === "a") {
+        const providerPrice = await fleexaPrice(
+          body.realId || service
+        );
+
+        return response({
+          prices: {
+            [service]: {
+              available: true,
+              providerPrice,
+              currency: "NGN",
+              customerPrice:
+                customerPrice(providerPrice),
+              markupPercent: 30,
+            },
+          },
+        });
+      }
+
+      /* SMSPOOL */
+
+      if (serverId === "b") {
+        const realId = String(
+          body.realId || service
+        );
+
+        const countryProviderId = String(
+          body.countryProviderId ||
+            body.country ||
+            "US"
+        );
+
+        const providerUsd = await smsPoolPrice(
+          realId,
+          countryProviderId
+        );
+
+        const providerNgn =
+          providerUsd * SMSPOOL_USD_NGN_RATE;
+
+        return response({
+          prices: {
+            [service]: {
+              available: true,
+              providerPrice: providerUsd,
+              providerCurrency: "USD",
+              providerPriceNgn: providerNgn,
+              customerPrice:
+                customerPrice(providerNgn),
+              currency: "NGN",
+              markupPercent: 30,
+            },
+          },
+        });
+      }
+
+      return response({
+        prices: {},
+        error: "Unknown server",
+      });
+    } catch (e) {
+      console.error("QUOTE ERROR", e);
+
+      return response({
+        prices: {},
+        error: String(e),
+      });
     }
   }
 
-  return new Response(JSON.stringify({servers:[]}),{headers});
-});
+  /* =======================================================
+     3. ORDER
+  ======================================================= */
+
+  if (action === "order") {
+    try {
+      const userEmail = String(
+        body.userEmail || ""
+      ).trim();
+
+      if (!userEmail) {
+        return response({
+          success: false,
+          error: "User email is required",
+        }, 400);
+      }
+
+      const serverId = body.serverId;
+      const service = String(
+        body.service || ""
+      );
+
+      if (!service) {
+        return response({
+          success: false,
+          error: "Service is required",
+        }, 400);
+      }
+
+      /*
+       * IMPORTANT:
+       * Calculate the price again on the server.
+       * Never trust body.price from the browser.
+       */
+
+      let finalCustomerPrice = 0;
+      let providerCost = 0;
+
+      let phone = "";
+      let orderId = "";
+
+      /* ---------------- FLEEXA ORDER ---------------- */
+
+      if (serverId === "a") {
+        const serviceName = String(
+          body.realId || service
+        );
+
+        providerCost =
+          await fleexaPrice(serviceName);
+
+        finalCustomerPrice =
+          customerPrice(providerCost);
+
+        const [wallet] =
+          await base44.entities.Wallet.filter({
+            userEmail,
+          });
+
+        if (
+          !wallet ||
+          Number(wallet.balance) <
+            finalCustomerPrice
+        ) {
+          return response({
+            success: false,
+            error: "Low wallet balance",
+            required: finalCustomerPrice,
+          });
+        }
+
+        const r = await fetch(
+          `${FLEEXA_BASE}/sms4/buy`,
+          {
+            method: "POST",
+            headers: await fleexaHeaders(),
+            body: JSON.stringify({
+              serviceName,
+              maxPrice: String(providerCost),
+            }),
+          }
+        );
+
+        const data = await readJson(r);
+
+        if (
+          !r.ok ||
+          !extractSuccess(data)
+        ) {
+          return response({
+            success: false,
+            error:
+              data?.message ||
+              data?.error ||
+              JSON.stringify(data),
+          });
+        }
+
+        const d =
+          data?.data || data;
+
+        phone =
+          d?.phone ||
+          d?.number ||
+          "";
+
+        orderId = String(
+          d?.activation_id ??
+            d?.id ??
+            d?.requestId ??
+            ""
+        );
+
+        if (!phone || !orderId) {
+          return response({
+            success: false,
+            error:
+              "Fleexa returned an invalid order response",
+          });
+        }
+
+        await base44.entities.Wallet.update(
+          wallet.id,
+          {
+            balance:
+              Number(wallet.balance) -
+              finalCustomerPrice,
+          }
+        );
+
+        const rental =
+          await base44.entities.Rental.create({
+            userEmail,
+            phoneNumber: phone,
+            orderId: `fleexa_${orderId}`,
+            serverId: "a",
+            country: "US",
+            service,
+            status: "waiting_sms",
+            customerPrice:
+              finalCustomerPrice,
+            providerPrice:
+              providerCost,
+          });
+
+        return response({
+          success: true,
+          phone,
+          orderId: `fleexa_${orderId}`,
+          rentalId: rental.id,
+          charged: finalCustomerPrice,
+          providerPrice: providerCost,
+        });
+      }
+
+      /* ---------------- SMSPOOL ORDER ---------------- */
+
+      if (serverId === "b") {
+        const realServiceId = String(
+          body.realId || service
+        );
+
+        const countryProviderId =
+          String(
+            body.countryProviderId ||
+              body.country ||
+              "US"
+          );
+
+        providerCost =
+          await smsPoolPrice(
+            realServiceId,
+            countryProviderId
+          );
+
+        const providerNgn =
+          providerCost *
+          SMSPOOL_USD_NGN_RATE;
+
+        finalCustomerPrice =
+          customerPrice(providerNgn);
+
+        const [wallet] =
+          await base44.entities.Wallet.filter({
+            userEmail,
+          });
+
+        if (
+          !wallet ||
+          Number(wallet.balance) <
+            finalCustomerPrice
+        ) {
+          return response({
+            success: false,
+            error: "Low wallet balance",
+            required: finalCustomerPrice,
+          });
+        }
+
+        const form =
+          new URLSearchParams();
+
+        form.append("key", SMSPOOL_KEY);
+        form.append(
+          "country",
+          countryProviderId
+        );
+        form.append(
+          "service",
+          realServiceId
+        );
+        form.append("pool", "1");
+
+        const r = await fetch(
+          `${SMSPOOL_BASE}/purchase/sms`,
+          {
+            method: "POST",
+            headers: {
+              Authorization:
+                `Bearer ${SMSPOOL_KEY}`,
+              "Content-Type":
+                "application/x-www-form-urlencoded",
+            },
+            body: form,
+          }
+        );
+
+        const data = await readJson(r);
+
+        if (
+          !r.ok ||
+          !extractSuccess(data)
+        ) {
+          return response({
+            success: false,
+            error:
+              data?.message ||
+              data?.type ||
+              JSON.stringify(data),
+          });
+        }
+
+        phone = String(
+          data?.number ??
+            data?.phonenumber ??
+            ""
+        );
+
+        orderId = String(
+          data?.order_id ?? ""
+        );
+
+        if (!phone || !orderId) {
+          return response({
+            success: false,
+            error:
+              "SMSPool returned no phone number/order ID",
+          });
+        }
+
+        await base44.entities.Wallet.update(
+          wallet.id,
+          {
+            balance:
+              Number(wallet.balance) -
+              finalCustomerPrice,
+          }
+        );
+
+        const rental =
+          await base44.entities.Rental.create({
+            userEmail,
+            phoneNumber: phone,
+            orderId: `smspool_${orderId}`,
+            serverId: "b",
+            country:
+              body.country || countryProviderId,
+            service,
+            status: "waiting_sms",
+            customerPrice:
+              finalCustomerPrice,
+            providerPrice:
+              providerCost,
+          });
+
+        return response({
+          success: true,
+          phone,
+          orderId:
+            `smspool_${orderId}`,
+          rentalId: rental.id,
+          charged: finalCustomerPrice,
+          providerPrice:
+            providerCost,
+          providerCurrency: "USD",
+        });
+      }
+
+      return response({
+        success: false,
+        error: "Unknown server",
+      });
+    } catch (e) {
+      console.error("ORDER ERROR", e);
+
+      return response({
+        success: false,
+        error: String(e),
+      });
+    }
+  }
+
+  /* =======================================================
+     4. CHECK OTP
+  ======================================================= */
+
+  

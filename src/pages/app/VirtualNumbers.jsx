@@ -84,15 +84,31 @@ export default function VirtualNumbers() {
   };
 
   const callBackend = useCallback(
-    async (payload) => {
+  async (payload) => {
+    console.log(
+      "VIRTUAL NUMBERS REQUEST:",
+      payload
+    );
+
+    try {
       const result =
         await base44.functions.invoke(
           "virtualNumbers",
           payload
         );
 
+      console.log(
+        "VIRTUAL NUMBERS RAW RESPONSE:",
+        result
+      );
+
       const data =
         result?.data ?? result;
+
+      console.log(
+        "VIRTUAL NUMBERS RESPONSE DATA:",
+        data
+      );
 
       if (!data) {
         throw new Error(
@@ -104,14 +120,44 @@ export default function VirtualNumbers() {
         throw new Error(
           data.error ||
             data.message ||
-            "Virtual-number request failed."
+            `Virtual-number request failed for action: ${
+              payload?.action || "unknown"
+            }`
         );
       }
 
       return data;
-    },
-    []
-  );
+    } catch (error) {
+      console.error(
+        "VIRTUAL NUMBERS FUNCTION ERROR:",
+        {
+          payload,
+          error,
+          response: error?.response,
+          responseData:
+            error?.response?.data,
+          data: error?.data,
+          message: error?.message
+        }
+      );
+
+      const backendMessage =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error?.data?.error ||
+        error?.data?.message ||
+        error?.message;
+
+      throw new Error(
+        backendMessage ||
+          `Virtual-number request failed for action: ${
+            payload?.action || "unknown"
+          }`
+      );
+    }
+  },
+  []
+);
 
   /*
    * -------------------------------------------------------

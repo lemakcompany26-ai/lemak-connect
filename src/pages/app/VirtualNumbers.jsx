@@ -27,6 +27,9 @@ import {
 
 import { Button } from "@/components/ui/button";
 
+import PurchasedNumberCard from "@/components/vnum/PurchasedNumberCard";
+import ServiceOptions from "@/components/vnum/ServiceOptions";
+
 export default function VirtualNumbers() {
   const [server, setServer] = useState(null);
 
@@ -940,4 +943,308 @@ export default function VirtualNumbers() {
             type="button"
             onClick={() => {
               if (server) {
-          
+                if (server.id === "a") {
+                  loadFleexaServices();
+                } else if (
+                  selectedCountry
+                ) {
+                  loadServicePrices(
+                    "b",
+                    services,
+                    selectedCountry.providerId ||
+                      selectedCountry.id
+                  );
+                }
+              } else {
+                loadServers();
+              }
+            }}
+            className="rounded-xl p-2 hover:bg-slate-100"
+            disabled={
+              loading ||
+              loadingServices ||
+              loadingPrices
+            }
+          >
+            <RefreshCw
+              size={20}
+              className={
+                loading ||
+                loadingServices ||
+                loadingPrices
+                  ? "animate-spin"
+                  : ""
+              }
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* BODY */}
+
+      <div className="mx-auto max-w-6xl px-4 py-6">
+        {/* ERROR */}
+
+        {error ? (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <X
+              size={16}
+              className="mt-0.5 shrink-0"
+            />
+
+            <span>{error}</span>
+          </div>
+        ) : null}
+
+        {/* SERVER SELECTION */}
+
+        {!server ? (
+          loading ? (
+            <div className="flex items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white p-10 text-slate-500">
+              <Loader2
+                size={20}
+                className="animate-spin"
+              />
+
+              <span className="text-sm">
+                Loading virtual-number servers…
+              </span>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {serverOptions.map(
+                (option) => {
+                  const OptionIcon =
+                    option.icon;
+
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() =>
+                        selectServer(
+                          option
+                        )
+                      }
+                      className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-xl bg-blue-100 p-2.5 text-blue-600">
+                          <OptionIcon
+                            size={20}
+                          />
+                        </div>
+
+                        <div>
+                          <p className="font-semibold">
+                            {
+                              option.name
+                            }
+                          </p>
+
+                          <p className="text-xs text-slate-500">
+                            {
+                              option.provider
+                            }
+                          </p>
+                        </div>
+                      </div>
+
+                      <p className="mt-3 text-sm text-slate-600">
+                        {
+                          option.description
+                        }
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-400">
+                        {option.country}
+                      </p>
+                    </button>
+                  );
+                }
+              )}
+            </div>
+          )
+        ) : (
+          <div className="space-y-6">
+            {/* SELECTED SERVER */}
+
+            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="rounded-xl bg-blue-100 p-2.5 text-blue-600">
+                <Server size={20} />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">
+                  {server.name}
+                </p>
+
+                <p className="text-xs text-slate-500">
+                  {server.provider} •{" "}
+                  {server.description}
+                </p>
+              </div>
+
+              <ShieldCheck
+                size={18}
+                className="shrink-0 text-green-600"
+              />
+            </div>
+
+            {/* COUNTRY (SMSPool) */}
+
+            {server.id === "b" ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowCountryMenu(
+                      !showCountryMenu
+                    )
+                  }
+                  className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                >
+                  <span className="text-sm">
+                    {selectedCountry
+                      ? selectedCountry.name
+                      : loadingCountries
+                      ? "Loading countries…"
+                      : "Select a country"}
+                  </span>
+
+                  <ChevronDown
+                    size={18}
+                    className="text-slate-400"
+                  />
+                </button>
+
+                {showCountryMenu ? (
+                  <div className="scrollbar-thin absolute z-30 mt-2 max-h-64 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-lg">
+                    {loadingCountries ? (
+                      <div className="flex items-center justify-center gap-2 p-4 text-sm text-slate-500">
+                        <Loader2
+                          size={16}
+                          className="animate-spin"
+                        />
+
+                        <span>
+                          Loading…
+                        </span>
+                      </div>
+                    ) : countries.length ===
+                      0 ? (
+                      <p className="p-4 text-sm text-slate-500">
+                        No countries
+                        available.
+                      </p>
+                    ) : (
+                      countries.map(
+                        (country) => {
+                          const isActive =
+                            selectedCountry?.id ===
+                            country.id;
+
+                          return (
+                            <button
+                              key={
+                                country.id
+                              }
+                              type="button"
+                              onClick={() =>
+                                selectCountry(
+                                  country
+                                )
+                              }
+                              className="flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-slate-50"
+                            >
+                              <span>
+                                {
+                                  country.name
+                                }
+                              </span>
+
+                              {isActive ? (
+                                <Check
+                                  size={
+                                    16
+                                  }
+                                  className="text-blue-600"
+                                />
+                              ) : null}
+                            </button>
+                          );
+                        }
+                      )
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* SERVICES */}
+
+            <ServiceOptions
+              loadingServices={
+                loadingServices
+              }
+              loadingPrices={loadingPrices}
+              services={visibleServices}
+              prices={prices}
+              selectedService={selectedService}
+              emptyHint={
+                server.id === "b" &&
+                !selectedCountry
+                  ? "Select a country to see available services."
+                  : ""
+              }
+              onSelect={selectService}
+            />
+
+            {/* BUY */}
+
+            {selectedService ? (
+              <Button
+                onClick={handleBuy}
+                disabled={buying}
+                className="w-full"
+                size="lg"
+              >
+                {buying ? (
+                  <>
+                    <Loader2
+                      size={16}
+                      className="animate-spin"
+                    />
+                    Purchasing from
+                    provider…
+                  </>
+                ) : (
+                  <>
+                    <Phone size={16} />
+                    Buy{" "}
+                    {selectedService.name ||
+                      selectedService.id}
+                  </>
+                )}
+              </Button>
+            ) : null}
+
+            {/* PURCHASED NUMBER */}
+
+            <PurchasedNumberCard
+              purchasedNumber={
+                purchasedNumber
+              }
+              otp={otp}
+              otpMessage={otpMessage}
+              checkingOtp={checkingOtp}
+              copied={copied}
+              onCopy={copyNumber}
+              onCheckOtp={checkOtp}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

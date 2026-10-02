@@ -954,4 +954,363 @@ export default function VirtualNumbers() {
             disabled={
               loading ||
               loadingServices ||
-        
+              loadingCountries ||
+              loadingPrices
+            }
+            className="rounded-xl p-2 hover:bg-slate-100"
+          >
+            <RefreshCw
+              size={18}
+              className={
+                loading ||
+                loadingServices ||
+                loadingCountries ||
+                loadingPrices
+                  ? "animate-spin"
+                  : ""
+              }
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* BODY */}
+
+      <div className="mx-auto max-w-6xl px-4 py-6 space-y-4">
+        {/* ERROR */}
+
+        {error && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {error}
+          </div>
+        )}
+
+        {/* SERVER SELECTION */}
+
+        {!server ? (
+          loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {serverOptions.map(
+                (option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() =>
+                      selectServer(option)
+                    }
+                    className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-blue-400 hover:shadow-md"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-xl bg-blue-50 p-3 text-blue-600">
+                        <option.icon
+                          size={22}
+                        />
+                      </div>
+
+                      <div className="min-w-0">
+                        <h2 className="font-semibold text-slate-900">
+                          {option.name}
+                        </h2>
+
+                        <p className="text-xs text-slate-500">
+                          {
+                            option.description
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                )
+              )}
+            </div>
+          )
+        ) : (
+          <>
+            {/* COUNTRY SELECTOR (SERVER 2) */}
+
+            {server.id === "b" && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowCountryMenu(
+                      !showCountryMenu
+                    )
+                  }
+                  className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium shadow-sm"
+                >
+                  <span>
+                    {selectedCountry
+                      ? selectedCountry.name
+                      : "Select a country"}
+                  </span>
+
+                  <ChevronDown
+                    size={16}
+                    className="text-slate-400"
+                  />
+                </button>
+
+                {showCountryMenu && (
+                  <div className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg scrollbar-thin">
+                    {loadingCountries ? (
+                      <div className="flex items-center justify-center py-6">
+                        <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                      </div>
+                    ) : (
+                      countries.map(
+                        (country) => (
+                          <button
+                            key={
+                              country?.id ||
+                              country?.name
+                            }
+                            type="button"
+                            onClick={() =>
+                              selectCountry(
+                                country
+                              )
+                            }
+                            className="block w-full px-4 py-2.5 text-left text-sm hover:bg-slate-100"
+                          >
+                            {country?.name ||
+                              country?.id}
+                          </button>
+                        )
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* SERVICES */}
+
+            {loadingServices ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+              </div>
+            ) : services.length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                No services are currently
+                available on this server.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {services.map(
+                  (service) => {
+                    const serviceId =
+                      service?.realId ||
+                      service?.id;
+
+                    const priceData =
+                      prices[serviceId];
+
+                    const isSelected =
+                      selectedService?.id ===
+                      service.id;
+
+                    return (
+                      <button
+                        key={
+                          service.id ||
+                          serviceId
+                        }
+                        type="button"
+                        onClick={() =>
+                          selectService(
+                            service
+                          )
+                        }
+                        className={
+                          "flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition " +
+                          (isSelected
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-slate-200 bg-white hover:border-blue-300")
+                        }
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span
+                            className={
+                              "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border " +
+                              (isSelected
+                                ? "border-blue-600 bg-blue-600 text-white"
+                                : "border-slate-300")
+                            }
+                          >
+                            {isSelected && (
+                              <Check
+                                size={12}
+                              />
+                            )}
+                          </span>
+
+                          <span className="truncate text-sm font-medium text-slate-900">
+                            {service.name ||
+                              service.id}
+                          </span>
+                        </div>
+
+                        <div className="shrink-0 text-right">
+                          {loadingPrices &&
+                          !priceData ? (
+                            <Loader2 className="ml-auto h-4 w-4 animate-spin text-slate-400" />
+                          ) : priceData?.customerPrice ? (
+                            <span className="text-sm font-bold text-slate-900">
+                              {formatNaira(
+                                priceData.customerPrice
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium text-rose-500">
+                              Unavailable
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  }
+                )}
+              </div>
+            )}
+
+            {/* BUY BUTTON */}
+
+            <Button
+              className="w-full h-12 text-base font-bold"
+              disabled={
+                buying ||
+                loadingPrices ||
+                !selectedService ||
+                (selectedService &&
+                  !prices[
+                    selectedService.realId ||
+                      selectedService.id
+                  ]?.customerPrice)
+              }
+              onClick={handleBuy}
+            >
+              {buying ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <Phone className="w-4 h-4" />
+                  {selectedService
+                    ? `Buy ${
+                        prices[
+                          selectedService.realId ||
+                            selectedService.id
+                        ]?.customerPrice
+                          ? formatNaira(
+                              prices[
+                                selectedService
+                                  .realId ||
+                                  selectedService
+                                    .id
+                              ]
+                                .customerPrice
+                            )
+                          : ""
+                      }`
+                    : "Select a service"}
+                </>
+              )}
+            </Button>
+
+            {/* PURCHASED NUMBER */}
+
+            {purchasedNumber && (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck
+                    size={18}
+                    className="text-emerald-600"
+                  />
+
+                  <h3 className="font-bold text-emerald-800">
+                    Number purchased
+                  </h3>
+                </div>
+
+                <div className="rounded-xl bg-white p-4 space-y-1">
+                  <div className="text-xs text-slate-500">
+                    {purchasedNumber.service}{" "}
+                    • {purchasedNumber.country}{" "}
+                    • {purchasedNumber.server}
+                  </div>
+
+                  <div className="text-lg font-extrabold font-mono text-slate-900 break-all">
+                    {purchasedNumber.phone}
+                  </div>
+
+                  <div className="text-sm font-bold text-slate-700">
+                    Paid{" "}
+                    {formatNaira(
+                      purchasedNumber.price
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={copyNumber}
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        Copy Number
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    className="flex-1"
+                    disabled={
+                      checkingOtp ||
+                      !purchasedNumber.orderId
+                    }
+                    onClick={checkOtp}
+                  >
+                    {checkingOtp ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <MessageSquare className="w-4 h-4" />
+                        Check OTP
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {(otp || otpMessage) && (
+                  <div className="rounded-xl bg-white p-3 text-sm">
+                    {otp ? (
+                      <span className="font-mono font-extrabold text-lg text-emerald-700">
+                        {otp}
+                      </span>
+                    ) : (
+                      <span className="text-slate-600">
+                        {otpMessage}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,16 +1,3 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import {
-  ArrowLeft,
-  Ban,
-  CalendarClock,
-  Check,
-  Copy,
-  Loader2,
-  ShieldCheck,
-  Timer,
-} from 'lucide-react';
-
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';

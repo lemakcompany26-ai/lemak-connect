@@ -270,7 +270,7 @@ export default function VirtualNumbers() {
 
       if (selected.id === "a") {
         /*
-         * Fleexa Server 1 is US-only.
+         * Server 1 is US-only.
          */
         setSelectedCountry({
           id: "US",

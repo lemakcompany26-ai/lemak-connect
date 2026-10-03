@@ -70,10 +70,12 @@ const NAV = [
 
   // ==========================================================
   // LEMAK EXPERT PRODUCT
+  // IMPORTANT:
+  // This MUST match the route in App.jsx
   // ==========================================================
 
   {
-    to: '/admin/lemak-expert-product',
+    to: '/admin/expert-product-management',
     label: 'Lemak Expert Product',
     icon: BriefcaseBusiness
   },
@@ -113,20 +115,15 @@ export default function AdminShell() {
           {}
         );
 
-        const d = res.data || res;
-
-        const p = d.profile;
+        const d = res?.data || res;
+        const p = d?.profile;
 
         const email = (
-          d.user &&
-          d.user.email
-            ? d.user.email
-            : ''
+          d?.user?.email || ''
         ).toLowerCase();
 
         const isStaff =
-          (p &&
-            STAFF_ROLES.includes(p.role)) ||
+          (p && STAFF_ROLES.includes(p.role)) ||
           ADMIN_EMAILS.includes(email);
 
         if (!mounted) return;
@@ -139,8 +136,12 @@ export default function AdminShell() {
           setProfile(p);
           setAuthorized(true);
         }
-
       } catch (e) {
+        console.error(
+          'Admin authorization error:',
+          e
+        );
+
         if (mounted) {
           navigate('/app', {
             replace: true
@@ -158,10 +159,6 @@ export default function AdminShell() {
     };
   }, [navigate]);
 
-  // ==========================================================
-  // LOADING / AUTHORIZATION
-  // ==========================================================
-
   if (checking || !authorized) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
@@ -175,20 +172,15 @@ export default function AdminShell() {
 
       {/* ======================================================
           DESKTOP SIDEBAR
-          ====================================================== */}
+      ====================================================== */}
 
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-64 z-40 bg-secondary flex-col">
-
-        {/* Logo */}
 
         <div className="px-5 py-5 border-b border-white/10">
           <Logo light />
         </div>
 
-        {/* Admin identity */}
-
         <div className="px-5 py-3 border-b border-white/10">
-
           <div className="flex items-center gap-2 text-xs font-semibold text-white/70">
             <ShieldCheck className="w-4 h-4 text-blue-300" />
             Admin Panel
@@ -199,10 +191,7 @@ export default function AdminShell() {
               ? profile.role.replace('_', ' ')
               : ''}
           </div>
-
         </div>
-
-        {/* Navigation */}
 
         <nav className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-1">
 
@@ -214,7 +203,6 @@ export default function AdminShell() {
               className={({ isActive }) =>
                 cn(
                   'flex items-center gap-3 rounded-xl px-3.5 h-11 text-sm transition-colors',
-
                   isActive
                     ? 'bg-primary text-white font-semibold shadow-md shadow-primary/30'
                     : 'text-white/75 hover:bg-white/10'
@@ -231,30 +219,24 @@ export default function AdminShell() {
 
         </nav>
 
-        {/* Sign out */}
-
         <div className="p-3 border-t border-white/10">
-
           <button
             onClick={() => logout()}
             className="w-full flex items-center gap-3 rounded-xl px-3.5 h-11 text-sm text-white/80 hover:bg-white/10"
           >
             Sign out
           </button>
-
         </div>
 
       </aside>
 
       {/* ======================================================
           MAIN ADMIN AREA
-          ====================================================== */}
+      ====================================================== */}
 
       <div className="lg:pl-64">
 
-        {/* ====================================================
-            MOBILE ADMIN NAVIGATION
-            ==================================================== */}
+        {/* MOBILE NAVIGATION */}
 
         <div className="safe-top lg:hidden px-4 py-3 border-b border-border flex items-center gap-2 overflow-x-auto">
 
@@ -278,9 +260,7 @@ export default function AdminShell() {
 
         </div>
 
-        {/* ====================================================
-            ADMIN PAGE CONTENT
-            ==================================================== */}
+        {/* PAGE CONTENT */}
 
         <main className="safe-inline mx-auto max-w-6xl px-4 py-6">
           <Outlet />
@@ -290,4 +270,4 @@ export default function AdminShell() {
 
     </div>
   );
-}
+    }

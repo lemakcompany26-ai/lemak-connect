@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClientInstance } from "@/lib/query-client";
+
 import {
   BrowserRouter as Router,
   Route,
@@ -11,31 +12,32 @@ import {
 } from "react-router-dom";
 
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
-import UserNotRegisteredError from "@/components/UserNotRegisteredError";
-import ScrollToTop from "./components/ScrollToTop";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import { GADS_CONVERSION_ID } from "@/lib/ads";
-import AppShell from "@/components/app/AppShell";
-import AdminShell from "@/components/admin/AdminShell";
+import { UserNotRegisteredError } from "@/lib/app-params";
+import { ScrollToTop } from "@/components/ScrollToTop";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { GADS_CONVERSION_ID } from "@/lib/google-ads";
+
+import AppShell from "@/components/AppShell";
+import AdminShell from "@/components/AdminShell";
+
 import Landing from "./pages/Landing.jsx";
 import Events from "./pages/Events";
 import EventDetails from "./pages/EventsDetails";
 import AdminEvents from "./pages/admin/AdminEvents";
 
-// ============================================================
-// LAZY LOADED PAGES
-// ============================================================
+// --------------------------------------------------
+// Lazy loaded pages
+// --------------------------------------------------
 
-const PageNotFound = lazy(() => import("./lib/PageNotFound"));
+const PageNotFound = lazy(() => import("./pages/PageNotFound"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Privacy = lazy(() => import("./pages/Privacy"));
 
-const Terms = lazy(() => import("@/pages/Terms"));
-const Privacy = lazy(() => import("@/pages/Privacy"));
-
-const Login = lazy(() => import("@/pages/Login"));
-const Register = lazy(() => import("@/pages/Register"));
-const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
-const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
-const OAuthConsent = lazy(() => import("@/pages/OAuthConsent"));
+const Login = lazy(() => import("./pages/auth/Login"));
+const Register = lazy(() => import("./pages/auth/Register"));
+const ForgotPassword = lazy(() => import("./pages/auth/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/auth/ResetPassword"));
+const OAuthConsent = lazy(() => import("./pages/auth/OAuthConsent"));
 
 const CompleteProfile = lazy(() =>
   import("@/pages/app/CompleteProfile")
@@ -45,7 +47,7 @@ const Dashboard = lazy(() =>
   import("@/pages/app/Dashboard")
 );
 
-const AppServices = lazy(() =>
+const Services = lazy(() =>
   import("@/pages/app/Services")
 );
 
@@ -93,7 +95,7 @@ const VirtualNumberOrder = lazy(() =>
   import("@/pages/app/VirtualNumberOrder")
 );
 
-const WalletPage = lazy(() =>
+const Wallet = lazy(() =>
   import("@/pages/app/Wallet")
 );
 
@@ -105,7 +107,7 @@ const Notifications = lazy(() =>
   import("@/pages/app/Notifications")
 );
 
-const AppSupport = lazy(() =>
+const Support = lazy(() =>
   import("@/pages/app/Support")
 );
 
@@ -113,7 +115,7 @@ const Profile = lazy(() =>
   import("@/pages/app/Profile")
 );
 
-const AppSettings = lazy(() =>
+const Settings = lazy(() =>
   import("@/pages/app/Settings")
 );
 
@@ -129,21 +131,17 @@ const ListingDetail = lazy(() =>
   import("@/pages/app/ListingDetail")
 );
 
-const AppAnalytics = lazy(() =>
+const Analytics = lazy(() =>
   import("@/pages/app/Analytics")
 );
-
-// ============================================================
-// LEMAK EXPERT PRODUCT
-// ============================================================
 
 const LemakExpertProduct = lazy(() =>
   import("@/pages/app/lemak-expert-product")
 );
 
-// ============================================================
-// ADMIN PAGES
-// ============================================================
+// --------------------------------------------------
+// Admin pages
+// --------------------------------------------------
 
 const AdminDashboard = lazy(() =>
   import("@/pages/admin/AdminDashboard")
@@ -182,25 +180,37 @@ const AdminSystemHealth = lazy(() =>
 );
 
 const AdminProfitCalculator = lazy(() =>
-  import("@/pages/admin/AdminProfitCalculator") 
+  import("@/pages/admin/AdminProfitCalculator")
 );
+
+// --------------------------------------------------
+// LEMAK EXPERT PRODUCT MANAGEMENT
+// --------------------------------------------------
+
 const LemakExpertProductManagement = lazy(() =>
-  import("@/pages/admin/LemakExpertProductManagement"
+  import("@/pages/admin/LemakExpertProductManagement")
 );
 
-// ============================================================
-// LOADING FALLBACK
-// ============================================================
+// --------------------------------------------------
+// Loading fallback
+// --------------------------------------------------
 
-const RouteFallback = () => (
-  <div className="fixed inset-0 flex items-center justify-center bg-[#EAF4FF]">
-    <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
-  </div>
-);
+function RouteFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4" />
+        <p className="text-sm text-muted-foreground">
+          Loading...
+        </p>
+      </div>
+    </div>
+  );
+}
 
-// ============================================================
-// PUBLIC ROUTES
-// ============================================================
+// --------------------------------------------------
+// Public routes
+// --------------------------------------------------
 
 const PUBLIC_PATHS = [
   "/",
@@ -215,580 +225,382 @@ const PUBLIC_PATHS = [
   "/events",
 ];
 
-// ============================================================
-// AUTHENTICATED APPLICATION
-// ============================================================
+// --------------------------------------------------
+// Authenticated App
+// --------------------------------------------------
 
-const AuthenticatedApp = () => {
-  const {
-    isLoadingAuth,
-    isLoadingPublicSettings,
-    authError,
-    navigateToLogin,
-    user,
-  } = useAuth();
-
+function AuthenticatedApp() {
+  const { user, isLoading, authError } = useAuth();
   const location = useLocation();
 
-  // ----------------------------------------------------------
-  // Determine whether current route is public
-  // ----------------------------------------------------------
-
-  const isPublicPath =
-    PUBLIC_PATHS.includes(location.pathname) ||
-    location.pathname.startsWith("/events/");
-
-  // ----------------------------------------------------------
-  // Google Ads signup conversion
-  // ----------------------------------------------------------
-
   useEffect(() => {
-    if (
-      typeof window === "undefined" ||
-      !user ||
-      !user.id
-    ) {
-      return;
+    if (typeof window === "undefined") return;
+
+    if (!GADS_CONVERSION_ID) return;
+
+    if (!window.gtag) {
+      window.gtag = function () {
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push(arguments);
+      };
     }
 
-    const createdDate = String(
-      user.created_date || ""
-    );
+    window.gtag("config", GADS_CONVERSION_ID);
+  }, []);
 
-    if (!createdDate) {
-      return;
+  if (isLoading) {
+    return <RouteFallback />;
+  }
+
+  if (authError instanceof UserNotRegisteredError) {
+    return <Navigate to="/register" replace />;
+  }
+
+  const isPublicPath = PUBLIC_PATHS.some((path) => {
+    if (path === "/") {
+      return location.pathname === "/";
     }
 
-    const createdDateUtc =
-      /(?:Z|[+-]\d{2}:?\d{2})$/.test(createdDate)
-        ? createdDate
-        : `${createdDate}Z`;
-
-    const createdAtMs = Date.parse(createdDateUtc);
-
-    const isNewSignup =
-      Number.isFinite(createdAtMs) &&
-      Date.now() - createdAtMs <
-        24 * 60 * 60 * 1000;
-
-    const key =
-      "_aw_signup_fired_AW-18458743728/q8gECLiox_scELCn6OFE_" +
-      user.id;
-
-    if (
-      !isNewSignup ||
-      localStorage.getItem(key)
-    ) {
-      return;
-    }
-
-    let tries = 0;
-
-    const fireConversion = () => {
-      if (
-        typeof window.gtag !== "function"
-      ) {
-        if (tries++ < 20) {
-          window.setTimeout(
-            fireConversion,
-            250
-          );
-        }
-
-        return;
-      }
-
-      if (localStorage.getItem(key)) {
-        return;
-      }
-
-      localStorage.setItem(key, "1");
-
-      window.gtag("event", "conversion", {
-        send_to:
-          "AW-18458743728/q8gECLiox_scELCn6OFE",
-        transaction_id: user.id,
-      });
-    };
-
-    fireConversion();
-  }, [user]);
-
-  // ----------------------------------------------------------
-  // Authentication/public settings loading
-  // ----------------------------------------------------------
-
-  if (
-    !isPublicPath &&
-    (isLoadingPublicSettings || isLoadingAuth)
-  ) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-[#EAF4FF]">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
-      </div>
+      location.pathname === path ||
+      location.pathname.startsWith(`${path}/`)
     );
+  });
+
+  if (!user && !isPublicPath) {
+    return <Navigate to="/login" replace />;
   }
-
-  // ----------------------------------------------------------
-  // Authentication errors
-  // ----------------------------------------------------------
-
-  if (!isPublicPath && authError) {
-    if (
-      authError.type === "user_not_registered"
-    ) {
-      return <UserNotRegisteredError />;
-    }
-
-    if (
-      authError.type === "auth_required"
-    ) {
-      navigateToLogin();
-      return null;
-    }
-  }
-
-  // ----------------------------------------------------------
-  // APPLICATION ROUTES
-  // ----------------------------------------------------------
 
   return (
     <Suspense fallback={<RouteFallback />}>
-      <div
-        className="page-transition"
-        key={location.key}
-      >
-        <Routes>
+      <Routes>
 
-          {/* ==================================================
-              PUBLIC ROUTES
-              ================================================== */}
+        {/* --------------------------------------------------
+            PUBLIC ROUTES
+        -------------------------------------------------- */}
 
-          <Route
-            path="/"
-            element={<Landing />}
-          />
+        <Route path="/" element={<Landing />} />
 
-          <Route
-            path="/terms"
-            element={<Terms />}
-          />
+        <Route path="/terms" element={<Terms />} />
 
-          <Route
-            path="/privacy"
-            element={<Privacy />}
-          />
+        <Route path="/privacy" element={<Privacy />} />
 
-          <Route
-            path="/login"
-            element={<Login />}
-          />
+        <Route path="/login" element={<Login />} />
 
-          <Route
-            path="/register"
-            element={<Register />}
-          />
+        <Route path="/register" element={<Register />} />
 
-          <Route
-            path="/signup"
-            element={<Register />}
-          />
+        <Route path="/signup" element={<Register />} />
 
-          <Route
-            path="/forgot-password"
-            element={<ForgotPassword />}
-          />
+        <Route
+          path="/forgot-password"
+          element={<ForgotPassword />}
+        />
 
-          <Route
-            path="/reset-password"
-            element={<ResetPassword />}
-          />
+        <Route
+          path="/reset-password"
+          element={<ResetPassword />}
+        />
 
-          <Route
-            path="/oauth/consent"
-            element={<OAuthConsent />}
-          />
+        <Route
+          path="/oauth/consent"
+          element={<OAuthConsent />}
+        />
 
-          {/* ==================================================
-              PUBLIC EVENTS
-              ================================================== */}
+        <Route path="/events" element={<Events />} />
 
-          <Route
-            path="/events"
-            element={<Events />}
-          />
+        <Route
+          path="/events/:eventId"
+          element={<EventDetails />}
+        />
 
-          <Route
-            path="/events/:id"
-            element={<EventDetails />}
-          />
+        {/* --------------------------------------------------
+            PROTECTED USER APP
+        -------------------------------------------------- */}
 
-          {/* ==================================================
-              PROTECTED APPLICATION
-              ================================================== */}
+        <Route
+          element={
+            <ProtectedRoute
+              unauthenticatedElement={
+                <Navigate to="/login" replace />
+              }
+            />
+          }
+        >
 
-          <Route
-            element={
-              <ProtectedRoute
-                unauthenticatedElement={
-                  <Navigate
-                    to="/login"
-                    replace
-                  />
-                }
-              />
-            }
-          >
-
-            {/* ==================================================
-                COMPLETE PROFILE
-                ================================================== */}
+          <Route path="/app" element={<AppShell />}>
 
             <Route
-              path="/complete-profile"
+              index
+              element={<Dashboard />}
+            />
+
+            <Route
+              path="complete-profile"
               element={<CompleteProfile />}
             />
 
-            {/* ==================================================
-                USER APPLICATION
-                ================================================== */}
+            <Route
+              path="services"
+              element={<Services />}
+            />
 
-            <Route element={<AppShell />}>
+            <Route
+              path="lemak-expert-product"
+              element={<LemakExpertProduct />}
+            />
 
-              <Route
-                path="/app"
-                element={<Dashboard />}
-              />
+            <Route
+              path="airtime"
+              element={<Airtime />}
+            />
 
-              <Route
-                path="/app/services"
-                element={<AppServices />}
-              />
+            <Route
+              path="data"
+              element={<Data />}
+            />
 
-              {/* ==================================================
-                  LEMAK EXPERT PRODUCT
-                  ================================================== */}
+            <Route
+              path="electricity"
+              element={<Electricity />}
+            />
 
-              <Route
-                path="/app/lemak-expert-product"
-                element={<LemakExpertProduct />}
-              />
+            <Route
+              path="cable"
+              element={<Cable />}
+            />
 
-              <Route
-                path="/app/airtime"
-                element={<Airtime />}
-              />
+            <Route
+              path="betting"
+              element={<Betting />}
+            />
 
-              <Route
-                path="/app/data"
-                element={<Data />}
-              />
+            <Route
+              path="education"
+              element={<Education />}
+            />
 
-              <Route
-                path="/app/electricity"
-                element={<Electricity />}
-              />
+            <Route
+              path="epin"
+              element={<Epin />}
+            />
 
-              <Route
-                path="/app/cable"
-                element={<Cable />}
-              />
+            <Route
+              path="broadband"
+              element={<Broadband />}
+            />
 
-              <Route
-                path="/app/betting"
-                element={<Betting />}
-              />
+            <Route
+              path="social-growth"
+              element={<SocialGrowth />}
+            />
 
-              <Route
-                path="/app/education"
-                element={<Education />}
-              />
+            <Route
+              path="virtual-numbers"
+              element={<VirtualNumbers />}
+            />
 
-              <Route
-                path="/app/epin"
-                element={<Epin />}
-              />
+            <Route
+              path="virtual-numbers/order/:orderId"
+              element={<VirtualNumberOrder />}
+            />
 
-              <Route
-                path="/app/broadband"
-                element={<Broadband />}
-              />
+            <Route
+              path="wallet"
+              element={<Wallet />}
+            />
 
-              <Route
-                path="/app/virtual-numbers"
-                element={<VirtualNumbers />}
-              />
+            <Route
+              path="transactions"
+              element={<Transactions />}
+            />
 
-              <Route
-                path="/app/virtual-numbers/order/:orderId"
-                element={<VirtualNumberOrder />}
-              />
+            <Route
+              path="notifications"
+              element={<Notifications />}
+            />
 
-              <Route
-                path="/app/social-growth"
-                element={<SocialGrowth />}
-              />
+            <Route
+              path="support"
+              element={<Support />}
+            />
 
-              <Route
-                path="/app/wallet"
-                element={<WalletPage />}
-              />
+            <Route
+              path="profile"
+              element={<Profile />}
+            />
 
-              <Route
-                path="/app/transactions"
-                element={<Transactions />}
-              />
+            <Route
+              path="settings"
+              element={<Settings />}
+            />
 
-              <Route
-                path="/app/notifications"
-                element={<Notifications />}
-              />
+            <Route
+              path="referrals"
+              element={<Referrals />}
+            />
 
-              <Route
-                path="/app/support"
-                element={<AppSupport />}
-              />
+            <Route
+              path="marketplace"
+              element={<Marketplace />}
+            />
 
-              <Route
-                path="/app/profile"
-                element={<Profile />}
-              />
+            <Route
+              path="marketplace/listing/:listingId"
+              element={<ListingDetail />}
+            />
 
-              <Route
-                path="/app/settings"
-                element={<AppSettings />}
-              />
-
-              <Route
-                path="/app/referrals"
-                element={<Referrals />}
-              />
-
-              <Route
-                path="/app/marketplace"
-                element={<Marketplace />}
-              />
-
-              <Route
-                path="/app/marketplace/listing/:listingId"
-                element={<ListingDetail />}
-              />
-
-              <Route
-                path="/app/analytics"
-                element={<AppAnalytics />}
-              />
-
-            </Route>
-
-            {/* ==================================================
-                ADMIN APPLICATION
-                ================================================== */}
-
-            <Route element={<AdminShell />}>
-
-              <Route
-                path="/admin"
-                element={<AdminDashboard />}
-              />
-
-              <Route
-                path="/admin/users"
-                element={<AdminUsers />}
-              />
-
-              <Route
-                path="/admin/transactions"
-                element={<AdminTransactions />}
-              />
-
-              <Route
-                path="/admin/pricing"
-                element={<AdminPricing />}
-              />
-
-              <Route
-                path="/admin/promos"
-                element={<AdminPromos />}
-              />
-
-              <Route
-                path="/admin/marketplace"
-                element={<AdminMarketplace />}
-              />
-
-              <Route
-                path="/admin/virtual-numbers"
-                element={<AdminVirtualNumbers />}
-              />
-
-              <Route
-                path="/admin/settings"
-                element={<AdminSettings />}
-              />
-
-              <Route
-                path="/admin/system-health"
-                element={<AdminSystemHealth />}
-              />
-
-              <Route
-                path="/admin/profit-calculator"
-                element={<AdminProfitCalculator />}
-              />
-
-              <Route
-                path="/admin/events"
-                element={<AdminEvents />}
-              />
-
-            </Route>
+            <Route
+              path="analytics"
+              element={<Analytics />}
+            />
 
           </Route>
 
-          {/* ==================================================
-              404
-              ================================================== */}
+          {/* --------------------------------------------------
+              ADMIN ROUTES
+          -------------------------------------------------- */}
 
-          <Route
-            path="*"
-            element={<PageNotFound />}
-          />
+          <Route element={<AdminShell />}>
 
-        </Routes>
-      </div>
+            <Route
+              path="/admin"
+              element={<AdminDashboard />}
+            />
+
+            <Route
+              path="/admin/users"
+              element={<AdminUsers />}
+            />
+
+            <Route
+              path="/admin/transactions"
+              element={<AdminTransactions />}
+            />
+
+            <Route
+              path="/admin/pricing"
+              element={<AdminPricing />}
+            />
+
+            <Route
+              path="/admin/promos"
+              element={<AdminPromos />}
+            />
+
+            <Route
+              path="/admin/marketplace"
+              element={<AdminMarketplace />}
+            />
+
+            <Route
+              path="/admin/virtual-numbers"
+              element={<AdminVirtualNumbers />}
+            />
+
+            <Route
+              path="/admin/settings"
+              element={<AdminSettings />}
+            />
+
+            <Route
+              path="/admin/system-health"
+              element={<AdminSystemHealth />}
+            />
+
+            <Route
+              path="/admin/profit-calculator"
+              element={<AdminProfitCalculator />}
+            />
+
+            <Route
+              path="/admin/events"
+              element={<AdminEvents />}
+            />
+
+            {/* ----------------------------------------------
+                LEMAK EXPERT PRODUCT MANAGEMENT
+            ---------------------------------------------- */}
+
+            <Route
+              path="/admin/expert-product-management"
+              element={<LemakExpertProductManagement />}
+            />
+
+          </Route>
+
+        </Route>
+
+        {/* --------------------------------------------------
+            404
+        -------------------------------------------------- */}
+
+        <Route
+          path="*"
+          element={<PageNotFound />}
+        />
+
+      </Routes>
     </Suspense>
-  );
-};
-
-// ============================================================
-// MAIN APP
-// ============================================================
-
-function App() {
-
-  // ----------------------------------------------------------
-  // Google Ads initialization
-  // ----------------------------------------------------------
-
-  useEffect(() => {
-    if (
-      typeof window === "undefined" ||
-      window.__gads_loaded
-    ) {
-      return;
-    }
-
-    window.__gads_loaded = true;
-
-    window.dataLayer =
-      window.dataLayer || [];
-
-    const inIframe = (() => {
-      try {
-        return window.self !== window.top;
-      } catch {
-        return true;
-      }
-    })();
-
-    // --------------------------------------------------------
-    // Google gtag function
-    // --------------------------------------------------------
-
-    window.gtag = function gtag() {
-      window.dataLayer.push(arguments);
-
-      if (inIframe) {
-        try {
-          const args =
-            Array.prototype.slice.call(
-              arguments
-            );
-
-          const cmd = args[0];
-
-          window.parent.postMessage(
-            {
-              type: "base44_gtag_event",
-              event: {
-                source: "gtag",
-                timestamp:
-                  new Date().toLocaleTimeString(),
-                command: cmd,
-                params: args.slice(1),
-                type:
-                  cmd === "event"
-                    ? args[1] || "event"
-                    : cmd,
-              },
-            },
-            "*"
-          );
-        } catch (_error) {
-          // Ignore iframe communication errors.
-        }
-      }
-    };
-
-    // --------------------------------------------------------
-    // Load Google Ads script
-    // --------------------------------------------------------
-
-    const script =
-      document.createElement("script");
-
-    script.src =
-      "https://www.googletagmanager.com/gtag/js?id=" +
-      GADS_CONVERSION_ID;
-
-    script.async = true;
-
-    document.head.appendChild(script);
-
-    // --------------------------------------------------------
-    // Initialize Google Analytics / Ads
-    // --------------------------------------------------------
-
-    window.gtag("js", new Date());
-
-    window.gtag(
-      "config",
-      GADS_CONVERSION_ID,
-      {
-        send_page_view: false,
-      }
-    );
-
-    // --------------------------------------------------------
-    // Cleanup
-    // --------------------------------------------------------
-
-    return () => {
-      if (script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
-    };
-  }, []);
-
-  // ----------------------------------------------------------
-  // Application providers
-  // ----------------------------------------------------------
-
-  return (
-    <AuthProvider>
-      <QueryClientProvider
-        client={queryClientInstance}
-      >
-        <Router>
-          <ScrollToTop />
-          <AuthenticatedApp />
-        </Router>
-
-        <Toaster />
-      </QueryClientProvider>
-    </AuthProvider>
   );
 }
 
-export default App;
+// --------------------------------------------------
+// Main App
+// --------------------------------------------------
+
+export default function App() {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Google Ads / Analytics
+    if (GADS_CONVERSION_ID) {
+      const existingScript = document.querySelector(
+        `script[src*="googletagmanager.com/gtag/js?id=${GADS_CONVERSION_ID}"]`
+      );
+
+      if (!existingScript) {
+        const script = document.createElement("script");
+
+        script.async = true;
+
+        script.src =
+          `https://www.googletagmanager.com/gtag/js?id=${GADS_CONVERSION_ID}`;
+
+        document.head.appendChild(script);
+      }
+
+      window.dataLayer = window.dataLayer || [];
+
+      window.gtag =
+        window.gtag ||
+        function () {
+          window.dataLayer.push(arguments);
+        };
+
+      window.gtag("js", new Date());
+
+      window.gtag(
+        "config",
+        GADS_CONVERSION_ID
+      );
+    }
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClientInstance}>
+      <Router>
+
+        <ScrollToTop />
+
+        <AuthProvider>
+
+          <AuthenticatedApp />
+
+          <Toaster />
+
+        </AuthProvider>
+
+      </Router>
+    </QueryClientProvider>
+  );
+}

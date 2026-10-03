@@ -229,7 +229,13 @@ const PUBLIC_PATHS = [
 // --------------------------------------------------
 
 function AuthenticatedApp() {
-  const { user, isLoading, authError } = useAuth();
+  const {
+    user,
+    isAuthenticated,
+    isLoadingAuth,
+    authError,
+  } = useAuth();
+
   const location = useLocation();
 
   useEffect(() => {
@@ -247,10 +253,17 @@ function AuthenticatedApp() {
     window.gtag("config", GADS_CONVERSION_ID);
   }, []);
 
-  if (isLoading) {
+  /*
+   * VERY IMPORTANT:
+   * Wait until authentication has been checked.
+   */
+  if (isLoadingAuth) {
     return <RouteFallback />;
   }
 
+  /*
+   * User registration issue.
+   */
   if (authError?.type === "user_not_registered") {
     return <Navigate to="/register" replace />;
   }
@@ -266,13 +279,345 @@ function AuthenticatedApp() {
     );
   });
 
-  if (!user && !isPublicPath) {
+  /*
+   * If authentication has finished and there is no user,
+   * protected pages go back to login.
+   */
+  if (
+    !isAuthenticated &&
+    !user &&
+    !isPublicPath
+  ) {
     return <Navigate to="/login" replace />;
   }
 
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
+
+        {/* PUBLIC ROUTES */}
+
+        <Route
+          path="/"
+          element={<Landing />}
+        />
+
+        <Route
+          path="/terms"
+          element={<Terms />}
+        />
+
+        <Route
+          path="/privacy"
+          element={<Privacy />}
+        />
+
+        <Route
+          path="/login"
+          element={
+            user ? (
+              <Navigate to="/app" replace />
+            ) : (
+              <Login />
+            )
+          }
+        />
+
+        <Route
+          path="/register"
+          element={
+            user ? (
+              <Navigate to="/app" replace />
+            ) : (
+              <Register />
+            )
+          }
+        />
+
+        <Route
+          path="/signup"
+          element={
+            user ? (
+              <Navigate to="/app" replace />
+            ) : (
+              <Register />
+            )
+          }
+        />
+
+        <Route
+          path="/forgot-password"
+          element={<ForgotPassword />}
+        />
+
+        <Route
+          path="/reset-password"
+          element={<ResetPassword />}
+        />
+
+        <Route
+          path="/oauth/consent"
+          element={<OAuthConsent />}
+        />
+
+        <Route
+          path="/events"
+          element={<Events />}
+        />
+
+        <Route
+          path="/events/:eventId"
+          element={<EventDetails />}
+        />
+
+        {/* DASHBOARD ALIAS */}
+
+        <Route
+          path="/dashboard"
+          element={
+            <Navigate
+              to="/app"
+              replace
+            />
+          }
+        />
+
+        {/* PROTECTED USER APP */}
+
+        <Route
+          element={
+            <ProtectedRoute
+              unauthenticatedElement={
+                <Navigate
+                  to="/login"
+                  replace
+                />
+              }
+            />
+          }
+        >
+          <Route
+            path="/app"
+            element={<AppShell />}
+          >
+            <Route
+              index
+              element={<Dashboard />}
+            />
+
+            <Route
+              path="complete-profile"
+              element={<CompleteProfile />}
+            />
+
+            <Route
+              path="services"
+              element={<Services />}
+            />
+
+            <Route
+              path="lemak-expert-product"
+              element={
+                <LemakExpertProduct />
+              }
+            />
+
+            <Route
+              path="airtime"
+              element={<Airtime />}
+            />
+
+            <Route
+              path="data"
+              element={<Data />}
+            />
+
+            <Route
+              path="electricity"
+              element={<Electricity />}
+            />
+
+            <Route
+              path="cable"
+              element={<Cable />}
+            />
+
+            <Route
+              path="betting"
+              element={<Betting />}
+            />
+
+            <Route
+              path="education"
+              element={<Education />}
+            />
+
+            <Route
+              path="epin"
+              element={<Epin />}
+            />
+
+            <Route
+              path="broadband"
+              element={<Broadband />}
+            />
+
+            <Route
+              path="social-growth"
+              element={<SocialGrowth />}
+            />
+
+            <Route
+              path="virtual-numbers"
+              element={
+                <VirtualNumbers />
+              }
+            />
+
+            <Route
+              path="virtual-numbers/order/:orderId"
+              element={
+                <VirtualNumberOrder />
+              }
+            />
+
+            <Route
+              path="wallet"
+              element={<Wallet />}
+            />
+
+            <Route
+              path="transactions"
+              element={<Transactions />}
+            />
+
+            <Route
+              path="notifications"
+              element={<Notifications />}
+            />
+
+            <Route
+              path="support"
+              element={<Support />}
+            />
+
+            <Route
+              path="profile"
+              element={<Profile />}
+            />
+
+            <Route
+              path="settings"
+              element={<Settings />}
+            />
+
+            <Route
+              path="referrals"
+              element={<Referrals />}
+            />
+
+            <Route
+              path="marketplace"
+              element={<Marketplace />}
+            />
+
+            <Route
+              path="marketplace/listing/:listingId"
+              element={<ListingDetail />}
+            />
+
+            <Route
+              path="analytics"
+              element={<Analytics />}
+            />
+          </Route>
+
+          {/* ADMIN */}
+
+          <Route element={<AdminShell />}>
+
+            <Route
+              path="/admin"
+              element={<AdminDashboard />}
+            />
+
+            <Route
+              path="/admin/users"
+              element={<AdminUsers />}
+            />
+
+            <Route
+              path="/admin/transactions"
+              element={<AdminTransactions />}
+            />
+
+            <Route
+              path="/admin/pricing"
+              element={<AdminPricing />}
+            />
+
+            <Route
+              path="/admin/promos"
+              element={<AdminPromos />}
+            />
+
+            <Route
+              path="/admin/marketplace"
+              element={<AdminMarketplace />}
+            />
+
+            <Route
+              path="/admin/virtual-numbers"
+              element={
+                <AdminVirtualNumbers />
+              }
+            />
+
+            <Route
+              path="/admin/settings"
+              element={<AdminSettings />}
+            />
+
+            <Route
+              path="/admin/system-health"
+              element={
+                <AdminSystemHealth />
+              }
+            />
+
+            <Route
+              path="/admin/profit-calculator"
+              element={
+                <AdminProfitCalculator />
+              }
+            />
+
+            <Route
+              path="/admin/events"
+              element={<AdminEvents />}
+            />
+
+            <Route
+              path="/admin/expert-product-management"
+              element={
+                <LemakExpertProductManagement />
+              }
+            />
+
+          </Route>
+        </Route>
+
+        {/* 404 */}
+
+        <Route
+          path="*"
+          element={<PageNotFound />}
+        />
+
+      </Routes>
+    </Suspense>
+  );
+}
 
         {/* --------------------------------------------------
             PUBLIC ROUTES

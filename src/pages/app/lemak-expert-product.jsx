@@ -682,4 +682,203 @@ export default function LemakExpertProduct() {
                         type="button"
                         onClick={decreaseQuantity}
                         disabled={quantity <= 1}
-                        className="p-3 transition hover:bg-slate-100 disabled:cursor
+                        className="p-3 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Decrease quantity"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+
+                      <input
+                        type="number"
+                        min={1}
+                        max={10000}
+                        value={quantity}
+                        onChange={(event) => {
+                          const parsed = parseInt(
+                            event.target.value,
+                            10
+                          );
+                          setQuantity(
+                            Number.isNaN(parsed) || parsed < 1
+                              ? 1
+                              : Math.min(10000, parsed)
+                          );
+                        }}
+                        className="w-20 border-0 bg-transparent py-2 text-center text-base font-bold focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={increaseQuantity}
+                        className="p-3 transition hover:bg-slate-100"
+                        aria-label="Increase quantity"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* BOOKING DATE */}
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold">
+                      Service date
+                    </label>
+
+                    <div className="relative">
+                      <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+                      <input
+                        type="date"
+                        min={getToday()}
+                        value={bookingDate}
+                        onChange={(event) =>
+                          setBookingDate(event.target.value)
+                        }
+                        className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+                  </div>
+
+                  {/* LOCATION */}
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold">
+                      Location
+                    </label>
+
+                    <div className="relative">
+                      <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+                      <input
+                        type="text"
+                        placeholder="e.g. No. 2 Opeyemi, Zone 2, Alakia, Ibadan"
+                        value={location}
+                        onChange={(event) =>
+                          setLocation(event.target.value)
+                        }
+                        className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+                  </div>
+
+                  {/* NOTES */}
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold">
+                      Additional notes{" "}
+                      <span className="font-normal text-slate-400">
+                        (optional)
+                      </span>
+                    </label>
+
+                    <textarea
+                      rows={3}
+                      placeholder="Any extra details about the service..."
+                      value={notes}
+                      onChange={(event) =>
+                        setNotes(event.target.value)
+                      }
+                      className="w-full resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                </div>
+              </section>
+            )}
+          </div>
+
+          {/* RIGHT — SUMMARY */}
+          <div className="lg:sticky lg:top-24 lg:self-start">
+            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+              <h2 className="mb-5 text-xl font-bold">
+                Order summary
+              </h2>
+
+              {selectedOption ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">
+                      Service
+                    </span>
+
+                    <span className="max-w-[60%] truncate text-right font-semibold">
+                      {selectedOption.name}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">
+                      Category
+                    </span>
+
+                    <span className="max-w-[60%] truncate text-right font-semibold">
+                      {selectedCategory?.name}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">
+                      Unit price
+                    </span>
+
+                    <span className="font-semibold">
+                      {formatNaira(selectedOption.unitPrice)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">
+                      Quantity
+                    </span>
+
+                    <span className="font-semibold">
+                      {quantity}
+                    </span>
+                  </div>
+
+                  <div className="my-2 border-t border-dashed border-slate-200" />
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold">
+                      Total
+                    </span>
+
+                    <span className="text-2xl font-black text-blue-700">
+                      {formatNaira(total)}
+                    </span>
+                  </div>
+
+                  <Button
+                    className="mt-4 h-12 w-full text-base font-bold"
+                    disabled={loadingCheckout}
+                    onClick={handleCheckout}
+                  >
+                    {loadingCheckout ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="mr-2 h-5 w-5" />
+                        Pay with KoraPay
+                      </>
+                    )}
+                  </Button>
+
+                  <p className="mt-3 text-center text-[11px] text-slate-400">
+                    You will be redirected to a secure payment
+                    page. Wallet is not used for Expert
+                    bookings.
+                  </p>
+                </div>
+              ) : (
+                <div className="py-6 text-center text-sm text-slate-500">
+                  Select a service to see your booking
+                  summary.
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}

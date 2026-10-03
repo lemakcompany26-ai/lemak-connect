@@ -182,7 +182,10 @@ const AdminSystemHealth = lazy(() =>
 );
 
 const AdminProfitCalculator = lazy(() =>
-  import("@/pages/admin/AdminProfitCalculator")
+  import("@/pages/admin/AdminProfitCalculator") 
+);
+const LemakExpertProductManagement = lazy(() =>
+  import("@/pages/admin/LemakExpertProductManagement"
 );
 
 // ============================================================

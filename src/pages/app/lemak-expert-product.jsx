@@ -2,18 +2,23 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   CalendarDays,
-  CheckCircle2,
+  Check,
   ChevronRight,
+  Clock3,
   Loader2,
   MapPin,
   Minus,
   Plus,
+  Search,
   ShieldCheck,
   ShoppingBag,
-  BriefcaseBusiness,
-  RefreshCw,
+  Sparkles,
+  Star,
+  Users,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 
@@ -21,215 +26,397 @@ const FALLBACK_PRODUCTS = [
   {
     id: "rentals",
     name: "Rentals",
-    description: "Chairs, tables, canopies and event equipment.",
+    description:
+      "Chairs, tables, canopies and professional event equipment.",
+    image:
+      "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1200&q=85",
     options: [
-      { id: "chairs", name: "Plastic Chairs", unitPrice: 500 },
-      { id: "tables", name: "Tables", unitPrice: 1500 },
-      { id: "canopies", name: "Canopies", unitPrice: 15000 },
+      {
+        id: "chairs",
+        name: "Plastic Chairs",
+        unitPrice: 500,
+        image:
+          "https://images.unsplash.com/photo-1503602642458-232111445657?auto=format&fit=crop&w=900&q=80",
+      },
+      {
+        id: "tables",
+        name: "Tables",
+        unitPrice: 1500,
+        image:
+          "https://images.unsplash.com/photo-1519710164239-da123dc03ef4?auto=format&fit=crop&w=900&q=80",
+      },
+      {
+        id: "canopies",
+        name: "Canopies",
+        unitPrice: 15000,
+        image:
+          "https://images.unsplash.com/photo-1478146896981-b80fe463b330?auto=format&fit=crop&w=900&q=80",
+      },
       {
         id: "event_equipment",
         name: "Event Equipment",
         unitPrice: 25000,
+        image:
+          "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=900&q=80",
       },
     ],
   },
+
   {
     id: "event-planning",
     name: "Event Planning",
-    description: "Professional event planning and decoration.",
+    description:
+      "Complete event planning, decoration and coordination.",
+    image:
+      "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1200&q=85",
     options: [
       {
         id: "wedding",
         name: "Wedding Planning",
         unitPrice: 150000,
+        image:
+          "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=900&q=80",
       },
       {
         id: "birthday",
         name: "Birthday Planning",
         unitPrice: 75000,
+        image:
+          "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=900&q=80",
       },
       {
         id: "house-warming",
         name: "House Warming",
         unitPrice: 60000,
+        image:
+          "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=900&q=80",
       },
       {
         id: "corporate",
         name: "Corporate Event",
         unitPrice: 150000,
+        image:
+          "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=900&q=80",
       },
       {
         id: "full-planning",
         name: "Full Event Planning",
         unitPrice: 200000,
+        image:
+          "https://images.unsplash.com/photo-1507504031003-b417219a0fde?auto=format&fit=crop&w=900&q=80",
       },
       {
         id: "decoration",
         name: "Event Decoration",
         unitPrice: 100000,
+        image:
+          "https://images.unsplash.com/photo-1478146896981-b80fe463b330?auto=format&fit=crop&w=900&q=80",
       },
     ],
   },
+
   {
     id: "water-production",
     name: "Water Production",
-    description: "Water production and custom branding.",
+    description:
+      "Water production, bulk supply and custom branded water.",
+    image:
+      "https://images.unsplash.com/photo-1548839140-29a749e1cf4d?auto=format&fit=crop&w=1200&q=85",
     options: [
       {
         id: "sachet",
         name: "Sachet Water",
         unitPrice: 25000,
+        image:
+          "https://images.unsplash.com/photo-1559839914-17aae19cec71?auto=format&fit=crop&w=900&q=80",
       },
       {
         id: "bottled",
         name: "Bottled Water",
         unitPrice: 50000,
+        image:
+          "https://images.unsplash.com/photo-1564419320461-6870880221ad?auto=format&fit=crop&w=900&q=80",
       },
       {
         id: "custom-branded",
         name: "Custom Branded Water",
         unitPrice: 100000,
+        image:
+          "https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=900&q=80",
       },
       {
         id: "bulk",
         name: "Bulk Water Production",
         unitPrice: 75000,
+        image:
+          "https://images.unsplash.com/photo-1523362628745-0c100150b504?auto=format&fit=crop&w=900&q=80",
       },
     ],
   },
+
   {
     id: "electricity",
     name: "Electricity",
-    description: "Electrical installation, wiring and maintenance.",
+    description:
+      "Electrical installation, wiring, maintenance and engineering.",
+    image:
+      "https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?auto=format&fit=crop&w=1200&q=85",
     options: [
       {
         id: "installation",
         name: "Electrical Installation",
         unitPrice: 75000,
+        image:
+          "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=900&q=80",
       },
       {
         id: "wiring",
         name: "Electrical Wiring",
         unitPrice: 100000,
+        image:
+          "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=900&q=80",
       },
       {
         id: "maintenance",
         name: "Electrical Maintenance",
         unitPrice: 50000,
+        image:
+          "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=900&q=80",
       },
       {
         id: "generator",
         name: "Generator / Electrical Engineering",
         unitPrice: 100000,
+        image:
+          "https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?auto=format&fit=crop&w=900&q=80",
       },
     ],
   },
+
   {
     id: "website-app-development",
     name: "Website & App Development",
     description:
-      "Professional website and application development.",
+      "Professional websites, mobile apps and custom software.",
+    image:
+      "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=85",
     options: [
       {
         id: "business-website",
         name: "Business Website",
         unitPrice: 150000,
+        image:
+          "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=900&q=80",
       },
       {
         id: "ecommerce",
         name: "E-commerce Website",
         unitPrice: 250000,
+        image:
+          "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=900&q=80",
       },
       {
         id: "mobile-app",
         name: "Mobile App",
         unitPrice: 400000,
+        image:
+          "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=900&q=80",
       },
       {
         id: "web-app",
         name: "Web Application",
         unitPrice: 350000,
+        image:
+          "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=900&q=80",
       },
       {
         id: "custom-software",
         name: "Custom Software",
         unitPrice: 500000,
+        image:
+          "https://images.unsplash.com/photo-1555949963-aa79dcee981c?auto=format&fit=crop&w=900&q=80",
       },
     ],
   },
 ];
 
-function formatNaira(value) {
-  return `₦${Number(value || 0).toLocaleString("en-NG")}`;
-}
+const formatNaira = (value) =>
+  `₦${Number(value || 0).toLocaleString("en-NG")}`;
 
-function getToday() {
-  return new Date().toISOString().split("T")[0];
+function ServiceImage({ src, alt, className = "" }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed || !src) {
+    return (
+      <div
+        className={`flex items-center justify-center bg-slate-100 text-slate-400 ${className}`}
+      >
+        <ShoppingBag className="h-10 w-10" />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setFailed(true)}
+      className={`object-cover ${className}`}
+    />
+  );
 }
 
 export default function LemakExpertProduct() {
   const navigate = useNavigate();
 
-  /*
-   * Start with fallback products immediately.
-   * This prevents the entire page from becoming unusable when
-   * the expertProducts backend function is slow or unavailable.
-   */
-  const [products, setProducts] = useState(FALLBACK_PRODUCTS);
-  const [loadingProducts, setLoadingProducts] = useState(false);
-  const [usingLiveProducts, setUsingLiveProducts] = useState(false);
+  const [products, setProducts] =
+    useState(FALLBACK_PRODUCTS);
 
-  const [categoryId, setCategoryId] = useState("");
-  const [optionId, setOptionId] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] =
+    useState("rentals");
 
-  const [quantity, setQuantity] = useState(1);
-  const [bookingDate, setBookingDate] = useState("");
-  const [location, setLocation] = useState("");
-  const [notes, setNotes] = useState("");
+  const [selectedOptionId, setSelectedOptionId] =
+    useState("chairs");
 
-  const [loadingCheckout, setLoadingCheckout] = useState(false);
-  const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const [quantity, setQuantity] =
+    useState(1);
 
-  /*
-   * Load live products in the background.
-   * The fallback products are already visible and selectable.
-   */
+  const [bookingDate, setBookingDate] =
+    useState("");
+
+  const [location, setLocation] =
+    useState("");
+
+  const [notes, setNotes] =
+    useState("");
+
+  const [search, setSearch] =
+    useState("");
+
+  const [loadingProducts, setLoadingProducts] =
+    useState(true);
+
+  const [checkoutLoading, setCheckoutLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  const [showCheckout, setShowCheckout] =
+    useState(false);
+
+  const selectedCategory =
+    products.find(
+      (item) =>
+        item.id === selectedCategoryId
+    ) || products[0];
+
+  const filteredProducts =
+    useMemo(() => {
+      const query =
+        search.trim().toLowerCase();
+
+      if (!query) {
+        return products;
+      }
+
+      return products.filter((item) => {
+        const categoryText =
+          `${item.name} ${item.description}`.toLowerCase();
+
+        const optionText =
+          item.options
+            ?.map(
+              (option) =>
+                `${option.name}`
+            )
+            .join(" ")
+            .toLowerCase() || "";
+
+        return (
+          categoryText.includes(query) ||
+          optionText.includes(query)
+        );
+      });
+    }, [products, search]);
+
+  const selectedOption =
+    selectedCategory?.options?.find(
+      (item) =>
+        item.id === selectedOptionId
+    ) ||
+    selectedCategory?.options?.[0];
+
+  const total =
+    Number(
+      selectedOption?.unitPrice || 0
+    ) * quantity;
+
   useEffect(() => {
     let mounted = true;
 
     async function loadProducts() {
+      setLoadingProducts(true);
+
       try {
-        setLoadingProducts(true);
+        const result =
+          await base44.functions.invoke(
+            "expertProducts",
+            {}
+          );
 
-        const result = await base44.functions.invoke(
-          "expertProducts",
-          {}
-        );
-
-        const loaded = result?.data?.products;
+        const loaded =
+          result?.data?.products;
 
         if (
           mounted &&
           Array.isArray(loaded) &&
           loaded.length > 0
         ) {
-          setProducts(loaded);
-          setUsingLiveProducts(true);
+          setProducts(
+            loaded.map((category) => {
+              const fallback =
+                FALLBACK_PRODUCTS.find(
+                  (item) =>
+                    item.id === category.id
+                );
+
+              return {
+                ...category,
+                image:
+                  category.image ||
+                  fallback?.image,
+                options:
+                  Array.isArray(
+                    category.options
+                  )
+                    ? category.options.map(
+                        (option) => {
+                          const fallbackOption =
+                            fallback?.options?.find(
+                              (item) =>
+                                item.id ===
+                                option.id
+                            );
+
+                          return {
+                            ...option,
+                            image:
+                              option.image ||
+                              fallbackOption?.image,
+                          };
+                        }
+                      )
+                    : [],
+              };
+            })
+          );
         }
       } catch (err) {
         console.error(
-          "Lemak Expert live products unavailable:",
+          "expertProducts:",
           err
         );
-
-        /*
-         * Do NOT replace products with an empty array.
-         * The fallback services remain available.
-         */
-        if (mounted) {
-          setUsingLiveProducts(false);
-        }
       } finally {
         if (mounted) {
           setLoadingProducts(false);
@@ -244,641 +431,332 @@ export default function LemakExpertProduct() {
     };
   }, []);
 
-  const selectedCategory = useMemo(() => {
-    return (
-      products.find(
-        (item) => item.id === categoryId
-      ) || null
-    );
-  }, [products, categoryId]);
+  useEffect(() => {
+    if (!selectedCategory) return;
 
-  const selectedOption = useMemo(() => {
-    return (
-      selectedCategory?.options?.find(
-        (item) => item.id === optionId
-      ) || null
-    );
-  }, [selectedCategory, optionId]);
+    const exists =
+      selectedCategory.options?.some(
+        (item) =>
+          item.id ===
+          selectedOptionId
+      );
 
-  const total = useMemo(() => {
-    if (!selectedOption) return 0;
-
-    return (
-      Number(selectedOption.unitPrice || 0) *
-      Number(quantity || 1)
-    );
-  }, [selectedOption, quantity]);
-
-  function selectCategory(id) {
-    setCategoryId(id);
-    setOptionId("");
-    setError("");
-    setSuccessMessage("");
-  }
-
-  function selectOption(id) {
-    setOptionId(id);
-    setError("");
-    setSuccessMessage("");
-  }
-
-  function increaseQuantity() {
-    setQuantity((current) =>
-      Math.min(10000, Number(current) + 1)
-    );
-  }
-
-  function decreaseQuantity() {
-    setQuantity((current) =>
-      Math.max(1, Number(current) - 1)
-    );
-  }
-
-  function resetSelection() {
-    setCategoryId("");
-    setOptionId("");
-    setQuantity(1);
-    setBookingDate("");
-    setLocation("");
-    setNotes("");
-    setError("");
-    setSuccessMessage("");
-  }
-
-  async function handleCheckout() {
-    setError("");
-    setSuccessMessage("");
-
-    if (!categoryId) {
-      setError("Please select a service category.");
-      return;
+    if (!exists) {
+      setSelectedOptionId(
+        selectedCategory.options?.[0]?.id ||
+          ""
+      );
     }
+  }, [
+    selectedCategory,
+    selectedOptionId,
+  ]);
 
-    if (!optionId) {
-      setError("Please select the exact service you need.");
-      return;
-    }
+  const selectCategory = (category) => {
+    setSelectedCategoryId(
+      category.id
+    );
 
-    if (!selectedCategory || !selectedOption) {
+    setSelectedOptionId(
+      category.options?.[0]?.id ||
+        ""
+    );
+
+    setError("");
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
+  const selectOption = (option) => {
+    setSelectedOptionId(
+      option.id
+    );
+
+    setError("");
+  };
+
+  const decreaseQuantity = () => {
+    setQuantity((value) =>
+      Math.max(1, value - 1)
+    );
+  };
+
+  const increaseQuantity = () => {
+    setQuantity((value) =>
+      Math.min(10000, value + 1)
+    );
+  };
+
+  const handleCheckout = async () => {
+    setError("");
+
+    if (!selectedCategory) {
       setError(
-        "The selected service is no longer available. Please select it again."
+        "Please select a service."
+      );
+      return;
+    }
+
+    if (!selectedOption) {
+      setError(
+        "Please select a service option."
       );
       return;
     }
 
     if (!bookingDate) {
-      setError("Please select your service date.");
-      return;
-    }
-
-    if (bookingDate < getToday()) {
-      setError("Please select today or a future date.");
+      setError(
+        "Please select your service date."
+      );
       return;
     }
 
     if (!location.trim()) {
-      setError("Please enter the service location.");
+      setError(
+        "Please enter the service location."
+      );
       return;
     }
 
-    const numericQuantity = Number(quantity);
+    const selectedDate =
+      new Date(
+        `${bookingDate}T00:00:00`
+      );
 
-    if (
-      !Number.isInteger(numericQuantity) ||
-      numericQuantity < 1
-    ) {
-      setError("Please enter a valid quantity.");
+    const today =
+      new Date();
+
+    today.setHours(
+      0,
+      0,
+      0,
+      0
+    );
+
+    if (selectedDate < today) {
+      setError(
+        "Please select today or a future date."
+      );
       return;
     }
 
     try {
-      setLoadingCheckout(true);
+      setCheckoutLoading(true);
 
-      const result = await base44.functions.invoke(
-        "expertBookingCheckout",
-        {
-          categoryId,
-          optionId,
-          quantity: numericQuantity,
-          bookingDate,
-          location: location.trim(),
-          notes: notes.trim(),
-          callbackUrl: window.location.href,
-        }
-      );
+      const result =
+        await base44.functions.invoke(
+          "expertBookingCheckout",
+          {
+            categoryId:
+              selectedCategory.id,
 
-      const data = result?.data;
+            optionId:
+              selectedOption.id,
 
-      if (!data) {
-        throw new Error(
-          "The booking service did not return a response."
+            quantity:
+              Number(quantity),
+
+            bookingDate,
+
+            location:
+              location.trim(),
+
+            notes:
+              notes.trim(),
+
+            callbackUrl:
+              window.location.href,
+          }
         );
-      }
+
+      const data =
+        result?.data || {};
 
       if (!data.checkoutUrl) {
         throw new Error(
           data.error ||
-            data.message ||
-            "Unable to create the payment checkout."
+            "Payment checkout could not be created."
         );
       }
 
-      setSuccessMessage(
-        "Booking created successfully. Redirecting to secure payment..."
-      );
-
-      window.location.href = data.checkoutUrl;
+      window.location.href =
+        data.checkoutUrl;
     } catch (err) {
       console.error(
-        "Lemak Expert checkout error:",
+        "expertBookingCheckout:",
         err
       );
 
-      const backendError =
-        err?.response?.data?.error ||
-        err?.data?.error ||
-        err?.message;
-
       setError(
-        backendError ||
-          "Unable to start payment. Please check your details and try again."
+        err?.message ||
+          "Unable to start payment. Please try again."
       );
     } finally {
-      setLoadingCheckout(false);
+      setCheckoutLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      {/* HEADER */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+    <div className="min-h-screen bg-slate-50 pb-24">
+      {/* TOP BAR */}
+      <header className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4">
           <button
-            type="button"
-            onClick={() => navigate("/app/services")}
-            className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
+            onClick={() =>
+              navigate("/app/services")
+            }
+            className="flex h-10 w-10 items-center justify-center rounded-full border bg-white hover:bg-slate-50"
           >
             <ArrowLeft className="h-5 w-5" />
-            <span>Back</span>
           </button>
 
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-2 text-lg font-black tracking-wide text-blue-700">
-              <BriefcaseBusiness className="h-5 w-5" />
-              LEMAK EXPERT
-            </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-blue-600">
+              LEMAK CONNECT
+            </p>
 
-            <div className="text-[11px] text-slate-500">
-              Developed by MOSCO under Lemak Company
-            </div>
+            <h1 className="truncate text-lg font-bold text-slate-900">
+              Lemak Expert
+            </h1>
           </div>
 
-          <ShoppingBag className="h-5 w-5 text-blue-700" />
+          <div className="hidden items-center gap-2 rounded-full bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 sm:flex">
+            <ShieldCheck className="h-4 w-4" />
+            Secure booking
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
-        {/* HERO */}
-        <section className="mb-8 overflow-hidden rounded-3xl bg-gradient-to-br from-blue-700 to-blue-950 p-6 text-white shadow-xl sm:p-10">
+      {/* HERO */}
+      <section className="bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700">
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:py-14">
           <div className="max-w-3xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">
-              <ShieldCheck className="h-4 w-4" />
-              Secure KoraPay Checkout
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur">
+              <Sparkles className="h-4 w-4" />
+              Professional services by Lemak Company
             </div>
 
-            <h1 className="text-3xl font-black sm:text-5xl">
-              Professional services,
+            <h2 className="text-3xl font-black tracking-tight text-white sm:text-5xl">
+              Book a service.
               <br />
-              made simple.
-            </h1>
+              Get it done professionally.
+            </h2>
 
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-blue-100 sm:text-base">
-              Book rentals, event planning, water production,
-              electricity services, website development and
-              custom applications through Lemak Expert.
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-blue-100 sm:text-base">
+              From event rentals and planning to
+              water production, electrical engineering,
+              websites and mobile applications —
+              choose a service and book directly.
             </p>
-          </div>
-        </section>
 
-        {/* LIVE/FALLBACK STATUS */}
-        <div className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3">
-          <div className="text-xs text-blue-800">
-            {loadingProducts ? (
-              <span className="inline-flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Checking for updated service prices...
-              </span>
-            ) : usingLiveProducts ? (
-              <span>
-                ✓ Live Lemak Expert services loaded.
-              </span>
-            ) : (
-              <span>
-                Lemak Expert services are ready to book.
-              </span>
+            <div className="mt-7 flex flex-wrap gap-3 text-sm text-white">
+              <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2">
+                <ShieldCheck className="h-4 w-4" />
+                Secure payment
+              </div>
+
+              <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2">
+                <Clock3 className="h-4 w-4" />
+                Fast response
+              </div>
+
+              <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2">
+                <Users className="h-4 w-4" />
+                Professional team
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <main className="mx-auto max-w-7xl px-4">
+        {/* SEARCH */}
+        <div className="-mt-6 rounded-2xl border bg-white p-3 shadow-lg">
+          <div className="flex items-center gap-3 rounded-xl bg-slate-100 px-4 py-3">
+            <Search className="h-5 w-5 text-slate-400" />
+
+            <input
+              value={search}
+              onChange={(event) =>
+                setSearch(
+                  event.target.value
+                )
+              }
+              placeholder="Search services..."
+              className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+            />
+
+            {search && (
+              <button
+                onClick={() =>
+                  setSearch("")
+                }
+              >
+                <X className="h-5 w-5 text-slate-400" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* CATEGORY CARDS */}
+        <section className="mt-8">
+          <div className="mb-5 flex items-end justify-between">
+            <div>
+              <p className="text-sm font-semibold text-blue-600">
+                EXPLORE SERVICES
+              </p>
+
+              <h3 className="mt-1 text-2xl font-bold text-slate-900">
+                What do you need?
+              </h3>
+            </div>
+
+            {loadingProducts && (
+              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
             )}
           </div>
 
-          {!loadingProducts && !usingLiveProducts && (
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              Refresh
-            </button>
-          )}
-        </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+            {filteredProducts.map(
+              (category) => {
+                const active =
+                  category.id ===
+                  selectedCategoryId;
 
-        {/* ERROR */}
-        {error && (
-          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
-            {error}
-          </div>
-        )}
-
-        {/* SUCCESS */}
-        {successMessage && (
-          <div className="mb-6 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm font-medium text-green-700">
-            {successMessage}
-          </div>
-        )}
-
-        <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-          {/* LEFT */}
-          <div className="space-y-6">
-            {/* CATEGORY */}
-            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-              <div className="mb-5">
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-700 text-xs font-bold text-white">
-                    1
-                  </span>
-
-                  <h2 className="text-xl font-bold">
-                    Choose a service
-                  </h2>
-                </div>
-
-                <p className="text-sm text-slate-500">
-                  Select the category that matches what
-                  you need.
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                {products.map((product) => {
-                  const active =
-                    categoryId === product.id;
-
-                  return (
-                    <button
-                      key={product.id}
-                      type="button"
-                      onClick={() =>
-                        selectCategory(product.id)
-                      }
-                      className={`group w-full rounded-2xl border p-4 text-left transition-all ${
-                        active
-                          ? "border-blue-600 bg-blue-50 shadow-sm ring-2 ring-blue-100"
-                          : "border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50 hover:shadow-sm"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div
-                            className={`font-bold ${
-                              active
-                                ? "text-blue-800"
-                                : "text-slate-900"
-                            }`}
-                          >
-                            {product.name}
-                          </div>
-
-                          <div className="mt-1 text-xs leading-5 text-slate-500">
-                            {product.description}
-                          </div>
-                        </div>
-
-                        <ChevronRight
-                          className={`h-5 w-5 shrink-0 transition ${
-                            active
-                              ? "translate-x-1 text-blue-700"
-                              : "text-slate-400 group-hover:text-blue-600"
-                          }`}
-                        />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            {/* OPTIONS */}
-            {selectedCategory && (
-              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-                <div className="mb-5">
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-700 text-xs font-bold text-white">
-                      2
-                    </span>
-
-                    <h2 className="text-xl font-bold">
-                      Choose the service
-                    </h2>
-                  </div>
-
-                  <p className="text-sm text-slate-500">
-                    Choose an option under{" "}
-                    <strong>
-                      {selectedCategory.name}
-                    </strong>
-                    .
-                  </p>
-                </div>
-
-                <div className="space-y-3">
-                  {selectedCategory.options?.map(
-                    (option) => {
-                      const active =
-                        optionId === option.id;
-
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() =>
-                            selectOption(option.id)
-                          }
-                          className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left transition-all ${
-                            active
-                              ? "border-blue-600 bg-blue-50 shadow-sm ring-2 ring-blue-100"
-                              : "border-slate-200 hover:border-blue-300 hover:bg-slate-50"
-                          }`}
-                        >
-                          <div>
-                            <div
-                              className={`font-semibold ${
-                                active
-                                  ? "text-blue-800"
-                                  : "text-slate-900"
-                              }`}
-                            >
-                              {option.name}
-                            </div>
-
-                            <div className="mt-1 text-sm text-slate-500">
-                              {formatNaira(
-                                option.unitPrice
-                              )}{" "}
-                              per unit
-                            </div>
-                          </div>
-
-                          {active ? (
-                            <CheckCircle2 className="h-6 w-6 shrink-0 text-blue-700" />
-                          ) : (
-                            <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
-                          )}
-                        </button>
-                      );
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() =>
+                      selectCategory(
+                        category
+                      )
                     }
-                  )}
-                </div>
-              </section>
-            )}
-
-            {/* DETAILS */}
-            {selectedOption && (
-              <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-                <div className="mb-5">
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-700 text-xs font-bold text-white">
-                      3
-                    </span>
-
-                    <h2 className="text-xl font-bold">
-                      Booking details
-                    </h2>
-                  </div>
-
-                  <p className="text-sm text-slate-500">
-                    Give us the details required to
-                    process your service.
-                  </p>
-                </div>
-
-                <div className="space-y-5">
-                  {/* QUANTITY */}
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold">
-                      Quantity
-                    </label>
-
-                    <div className="flex w-fit items-center overflow-hidden rounded-xl border border-slate-200">
-                      <button
-                        type="button"
-                        onClick={decreaseQuantity}
-                        disabled={quantity <= 1}
-                        className="p-3 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        aria-label="Decrease quantity"
-                      >
-                        <Minus className="h-4 w-4" />
-                      </button>
-
-                      <input
-                        type="number"
-                        min={1}
-                        max={10000}
-                        value={quantity}
-                        onChange={(event) => {
-                          const parsed = parseInt(
-                            event.target.value,
-                            10
-                          );
-                          setQuantity(
-                            Number.isNaN(parsed) || parsed < 1
-                              ? 1
-                              : Math.min(10000, parsed)
-                          );
-                        }}
-                        className="w-20 border-0 bg-transparent py-2 text-center text-base font-bold focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={increaseQuantity}
-                        className="p-3 transition hover:bg-slate-100"
-                        aria-label="Increase quantity"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* BOOKING DATE */}
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold">
-                      Service date
-                    </label>
-
-                    <div className="relative">
-                      <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-                      <input
-                        type="date"
-                        min={getToday()}
-                        value={bookingDate}
-                        onChange={(event) =>
-                          setBookingDate(event.target.value)
-                        }
-                        className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                      />
-                    </div>
-                  </div>
-
-                  {/* LOCATION */}
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold">
-                      Location
-                    </label>
-
-                    <div className="relative">
-                      <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-                      <input
-                        type="text"
-                        placeholder="e.g. No. 2 Opeyemi, Zone 2, Alakia, Ibadan"
-                        value={location}
-                        onChange={(event) =>
-                          setLocation(event.target.value)
-                        }
-                        className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                      />
-                    </div>
-                  </div>
-
-                  {/* NOTES */}
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold">
-                      Additional notes{" "}
-                      <span className="font-normal text-slate-400">
-                        (optional)
-                      </span>
-                    </label>
-
-                    <textarea
-                      rows={3}
-                      placeholder="Any extra details about the service..."
-                      value={notes}
-                      onChange={(event) =>
-                        setNotes(event.target.value)
-                      }
-                      className="w-full resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                    />
-                  </div>
-                </div>
-              </section>
-            )}
-          </div>
-
-          {/* RIGHT — SUMMARY */}
-          <div className="lg:sticky lg:top-24 lg:self-start">
-            <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-              <h2 className="mb-5 text-xl font-bold">
-                Order summary
-              </h2>
-
-              {selectedOption ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500">
-                      Service
-                    </span>
-
-                    <span className="max-w-[60%] truncate text-right font-semibold">
-                      {selectedOption.name}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500">
-                      Category
-                    </span>
-
-                    <span className="max-w-[60%] truncate text-right font-semibold">
-                      {selectedCategory?.name}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500">
-                      Unit price
-                    </span>
-
-                    <span className="font-semibold">
-                      {formatNaira(selectedOption.unitPrice)}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500">
-                      Quantity
-                    </span>
-
-                    <span className="font-semibold">
-                      {quantity}
-                    </span>
-                  </div>
-
-                  <div className="my-2 border-t border-dashed border-slate-200" />
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold">
-                      Total
-                    </span>
-
-                    <span className="text-2xl font-black text-blue-700">
-                      {formatNaira(total)}
-                    </span>
-                  </div>
-
-                  <Button
-                    className="mt-4 h-12 w-full text-base font-bold"
-                    disabled={loadingCheckout}
-                    onClick={handleCheckout}
+                    className={`group overflow-hidden rounded-2xl border bg-white text-left transition hover:-translate-y-1 hover:shadow-lg ${
+                      active
+                        ? "border-blue-600 ring-2 ring-blue-100"
+                        : "border-slate-200"
+                    }`}
                   >
-                    {loadingCheckout ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <ShieldCheck className="mr-2 h-5 w-5" />
-                        Pay with KoraPay
-                      </>
-                    )}
-                  </Button>
+                    <div className="relative h-32 overflow-hidden">
+                      <ServiceImage
+                        src={
+                          category.image
+                        }
+                        alt={
+                          category.name
+                        }
+                        className="h-full w-full transition duration-500 group-hover:scale-105"
+                      />
 
-                  <p className="mt-3 text-center text-[11px] text-slate-400">
-                    You will be redirected to a secure payment
-                    page. Wallet is not used for Expert
-                    bookings.
-                  </p>
-                </div>
-              ) : (
-                <div className="py-6 text-center text-sm text-slate-500">
-                  Select a service to see your booking
-                  summary.
-                </div>
-              )}
-            </section>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+
+                      {active && (
+                        <div className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white">
+                          <Check className="h-4 w-4" />
+                        </div>
+                      )}
+
+                      <

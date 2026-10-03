@@ -1,14 +1,24 @@
-import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
-
 const PRODUCTS = [
   {
     id: "rentals",
     name: "Rentals",
     description: "Chairs, tables, canopies and event equipment.",
     options: [
-      { id: "chairs", name: "Plastic Chairs", unitPrice: 500 },
-      { id: "tables", name: "Tables", unitPrice: 1500 },
-      { id: "canopies", name: "Canopies", unitPrice: 15000 },
+      {
+        id: "chairs",
+        name: "Plastic Chairs",
+        unitPrice: 500,
+      },
+      {
+        id: "tables",
+        name: "Tables",
+        unitPrice: 1500,
+      },
+      {
+        id: "canopies",
+        name: "Canopies",
+        unitPrice: 15000,
+      },
       {
         id: "event_equipment",
         name: "Event Equipment",
@@ -58,7 +68,7 @@ const PRODUCTS = [
   {
     id: "water-production",
     name: "Water Production",
-    description: "Water production and custom branding.",
+    description: "Water production, reservations and custom branding.",
     options: [
       {
         id: "sachet",
@@ -147,26 +157,53 @@ const PRODUCTS = [
 
 export default async function (req: Request): Promise<Response> {
   try {
-    if (req.method !== "GET") {
+    // Base44's frontend invoke() can use POST.
+    // Direct browser/API requests can use GET.
+    if (req.method !== "GET" && req.method !== "POST") {
       return Response.json(
-        { error: "Method not allowed" },
-        { status: 405 }
+        {
+          ok: false,
+          error: "Method not allowed",
+        },
+        {
+          status: 405,
+          headers: {
+            Allow: "GET, POST",
+          },
+        }
       );
     }
 
-    return Response.json({
-      ok: true,
-      currency: "NGN",
-      products: PRODUCTS,
-    });
+    return Response.json(
+      {
+        ok: true,
+        currency: "NGN",
+        products: PRODUCTS,
+      },
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+      }
+    );
   } catch (error) {
-    console.error("expertProducts:", error);
+    console.error("expertProducts error:", error);
 
     return Response.json(
       {
+        ok: false,
         error: "Unable to load Lemak Expert Product services.",
+        products: [],
       },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+      }
     );
   }
 }

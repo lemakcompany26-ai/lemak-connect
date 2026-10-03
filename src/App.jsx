@@ -134,6 +134,14 @@ const AppAnalytics = lazy(() =>
 );
 
 // ============================================================
+// LEMAK EXPERT PRODUCT
+// ============================================================
+
+const LemakExpertProduct = lazy(() =>
+  import("@/pages/app/lemak-expert-product")
+);
+
+// ============================================================
 // ADMIN PAGES
 // ============================================================
 
@@ -338,7 +346,7 @@ const AuthenticatedApp = () => {
   }
 
   // ----------------------------------------------------------
-  // Application routes
+  // APPLICATION ROUTES
   // ----------------------------------------------------------
 
   return (
@@ -429,7 +437,9 @@ const AuthenticatedApp = () => {
             }
           >
 
-            {/* COMPLETE PROFILE */}
+            {/* ==================================================
+                COMPLETE PROFILE
+                ================================================== */}
 
             <Route
               path="/complete-profile"
@@ -450,6 +460,15 @@ const AuthenticatedApp = () => {
               <Route
                 path="/app/services"
                 element={<AppServices />}
+              />
+
+              {/* ==================================================
+                  LEMAK EXPERT PRODUCT
+                  ================================================== */}
+
+              <Route
+                path="/app/lemak-expert-product"
+                element={<LemakExpertProduct />}
               />
 
               <Route
@@ -644,6 +663,7 @@ const AuthenticatedApp = () => {
 // ============================================================
 
 function App() {
+
   // ----------------------------------------------------------
   // Google Ads initialization
   // ----------------------------------------------------------

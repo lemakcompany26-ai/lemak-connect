@@ -1,139 +1,228 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
-import { appParams } from '@/lib/app-params';
+import React, {
+  createContext,
+  useState,
+  useContext,
+  useEffect,
+  useCallback,
+} from "react";
+import { base44 } from "@/api/base44Client";
+import { appParams } from "@/lib/app-params";
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
+  const [isLoadingPublicSettings, setIsLoadingPublicSettings] =
+    useState(true);
+
   const [authError, setAuthError] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [appPublicSettings, setAppPublicSettings] = useState(null); // Contains only { id, public_settings }
+  const [appPublicSettings, setAppPublicSettings] = useState(null);
 
-  useEffect(() => {
-    checkAppState();
+  /**
+   * Check the currently authenticated Base44 user.
+   */
+  const checkUserAuth = useCallback(async () => {
+    try {
+      setIsLoadingAuth(true);
+      setAuthError(null);
+
+      const currentUser = await base44.auth.me();
+
+      if (currentUser) {
+        setUser(currentUser);
+        setIsAuthenticated(true);
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    } catch (error) {
+      console.error("User auth check failed:", error);
+
+      setUser(null);
+      setIsAuthenticated(false);
+
+      if (error?.status === 401 || error?.status === 403) {
+        setAuthError({
+          type: "auth_required",
+          message: "Authentication required",
+        });
+      }
+    } finally {
+      setIsLoadingAuth(false);
+      setAuthChecked(true);
+    }
   }, []);
 
-  const checkAppState = async () => {
+  /**
+   * Check app settings and authentication.
+   *
+   * IMPORTANT:
+   * Authentication should not depend exclusively on appParams.token.
+   * After login/OTP, the SDK may have already stored the session while
+   * appParams.token is still unavailable.
+   */
+  const checkAppState = useCallback(async () => {
+    setIsLoadingPublicSettings(true);
+    setIsLoadingAuth(true);
+    setAuthError(null);
+
     try {
-      setIsLoadingPublicSettings(true);
-      setAuthError(null);
-      
       try {
-        const publicSettings = await base44.app.getPublicSettings();
+        const publicSettings =
+          await base44.app.getPublicSettings();
+
         setAppPublicSettings(publicSettings);
-        
-        // If we got the app public settings successfully, check if user is authenticated
-        if (appParams.token) {
-          await checkUserAuth();
-        } else {
-          setIsLoadingAuth(false);
-          setIsAuthenticated(false);
-          setAuthChecked(true);
-        }
-        setIsLoadingPublicSettings(false);
       } catch (appError) {
-        console.error('App state check failed:', appError);
-        
-        // Handle app-level errors
-        if (appError.status === 403 && appError.data?.extra_data?.reason) {
-          const reason = appError.data.extra_data.reason;
-          if (reason === 'auth_required') {
+        console.error(
+          "Failed to load public app settings:",
+          appError
+        );
+
+        if (
+          appError?.status === 403 &&
+          appError?.data?.extra_data?.reason
+        ) {
+          const reason =
+            appError.data.extra_data.reason;
+
+          if (reason === "auth_required") {
             setAuthError({
-              type: 'auth_required',
-              message: 'Authentication required'
+              type: "auth_required",
+              message: "Authentication required",
             });
-          } else if (reason === 'user_not_registered') {
+          } else if (reason === "user_not_registered") {
             setAuthError({
-              type: 'user_not_registered',
-              message: 'User not registered for this app'
+              type: "user_not_registered",
+              message:
+                "User not registered for this app",
             });
           } else {
             setAuthError({
               type: reason,
-              message: appError.message
+              message:
+                appError?.message ||
+                "Application error",
             });
           }
-        } else {
-          setAuthError({
-            type: 'unknown',
-            message: appError.message || 'Failed to load app'
-          });
         }
-        setIsLoadingPublicSettings(false);
-        setIsLoadingAuth(false);
       }
-    } catch (error) {
-      console.error('Unexpected error:', error);
-      setAuthError({
-        type: 'unknown',
-        message: error.message || 'An unexpected error occurred'
-      });
-      setIsLoadingPublicSettings(false);
-      setIsLoadingAuth(false);
-    }
-  };
 
-  const checkUserAuth = async () => {
-    try {
-      // Now check if the user is authenticated
-      setIsLoadingAuth(true);
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
-      setIsAuthenticated(true);
+      /*
+       * Always check the current user.
+       *
+       * Do NOT require appParams.token here.
+       */
+      await checkUserAuth();
+    } catch (error) {
+      console.error(
+        "Unexpected authentication error:",
+        error
+      );
+
+      setUser(null);
+      setIsAuthenticated(false);
+
+      setAuthError({
+        type: "unknown",
+        message:
+          error?.message ||
+          "An unexpected error occurred",
+      });
+
       setIsLoadingAuth(false);
       setAuthChecked(true);
-    } catch (error) {
-      console.error('User auth check failed:', error);
-      setIsLoadingAuth(false);
+    } finally {
+      setIsLoadingPublicSettings(false);
+    }
+  }, [checkUserAuth]);
+
+  /**
+   * Initial authentication check.
+   */
+  useEffect(() => {
+    let mounted = true;
+
+    const initialize = async () => {
+      if (!mounted) return;
+
+      await checkAppState();
+    };
+
+    initialize();
+
+    return () => {
+      mounted = false;
+    };
+  }, [checkAppState]);
+
+  /**
+   * Logout.
+   */
+  const logout = useCallback(
+    (shouldRedirect = true) => {
+      setUser(null);
       setIsAuthenticated(false);
       setAuthChecked(true);
-      
-      // If user auth fails, it might be an expired token
-      if (error.status === 401 || error.status === 403) {
-        setAuthError({
-          type: 'auth_required',
-          message: 'Authentication required'
-        });
+
+      try {
+        if (shouldRedirect) {
+          base44.auth.logout(window.location.origin);
+        } else {
+          base44.auth.logout();
+        }
+      } catch (error) {
+        console.error("Logout failed:", error);
       }
-    }
-  };
+    },
+    []
+  );
 
-  const logout = (shouldRedirect = true) => {
-    setUser(null);
-    setIsAuthenticated(false);
-    
-    if (shouldRedirect) {
-      // Use the SDK's logout method which handles token cleanup and redirect
-      base44.auth.logout(window.location.href);
-    } else {
-      // Just remove the token without redirect
-      base44.auth.logout();
+  /**
+   * Redirect to Base44 login.
+   */
+  const navigateToLogin = useCallback(() => {
+    try {
+      base44.auth.redirectToLogin(
+        window.location.href
+      );
+    } catch (error) {
+      console.error(
+        "Unable to redirect to login:",
+        error
+      );
     }
-  };
-
-  const navigateToLogin = () => {
-    // Use the SDK's redirectToLogin method
-    base44.auth.redirectToLogin(window.location.href);
-  };
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isAuthenticated, 
-      isLoadingAuth,
-      isLoadingPublicSettings,
-      authError,
-      appPublicSettings,
-      authChecked,
-      logout,
-      navigateToLogin,
-      checkUserAuth,
-      checkAppState
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated,
+
+        // Main loading state
+        isLoadingAuth,
+
+        // Compatibility alias for components
+        // that expect `isLoading`
+        isLoading: isLoadingAuth,
+
+        isLoadingPublicSettings,
+
+        authError,
+        appPublicSettings,
+        authChecked,
+
+        logout,
+        navigateToLogin,
+
+        checkUserAuth,
+        checkAppState,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -141,8 +230,12 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
+
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error(
+      "useAuth must be used within an AuthProvider"
+    );
   }
+
   return context;
 };

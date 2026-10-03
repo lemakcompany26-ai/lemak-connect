@@ -5,11 +5,39 @@ const ADMIN_EMAILS = [
   "dammyqueen107@gmail.com",
 ];
 
+const ALLOWED_STATUSES = [
+  "awaiting_payment",
+  "confirmed",
+  "processing",
+  "completed",
+  "cancelled",
+];
+
+function json(
+  data: unknown,
+  status = 200
+): Response {
+  return Response.json(data, {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+function clean(
+  value: unknown,
+  max = 500
+): string {
+  return String(value ?? "")
+    .trim()
+    .slice(0, max);
+}
+
 async function getAdmin(req: Request) {
   const base44 =
-    createClientFromRequest(
-      req
-    );
+    createClientFromRequest(req);
 
   const user =
     await base44.auth.me();
@@ -17,8 +45,8 @@ async function getAdmin(req: Request) {
   if (!user) {
     throw new Response(
       JSON.stringify({
-        error:
-          "Unauthorized",
+        ok: false,
+        error: "Unauthorized",
       }),
       {
         status: 401,
@@ -31,21 +59,20 @@ async function getAdmin(req: Request) {
   }
 
   const email =
-    String(
-      user.email || ""
-    ).toLowerCase();
+    clean(user.email, 320).toLowerCase();
 
-  if (
-    !ADMIN_EMAILS
-      .map((item) =>
-        item.toLowerCase()
-      )
-      .includes(email)
-  ) {
+  const isAdmin =
+    ADMIN_EMAILS.some(
+      (adminEmail) =>
+        adminEmail.toLowerCase() ===
+        email
+    );
+
+  if (!isAdmin) {
     throw new Response(
       JSON.stringify({
-        error:
-          "Forbidden",
+        ok: false,
+        error: "Forbidden",
       }),
       {
         status: 403,
@@ -63,259 +90,473 @@ async function getAdmin(req: Request) {
   };
 }
 
+async function readBody(
+  req: Request
+) {
+  if (req.method !== "POST") {
+    return {};
+  }
+
+  try {
+    const text =
+      await req.text();
+
+    if (!text.trim()) {
+      return {};
+    }
+
+    return JSON.parse(text);
+  } catch (error) {
+    console.error(
+      "expertAdmin body parse error:",
+      error
+    );
+
+    return {};
+  }
+}
+
 export default async function (
   req: Request
 ): Promise<Response> {
   try {
-    const { base44 } =
+    /*
+     * ------------------------------------------
+     * METHOD
+     * ------------------------------------------
+     */
+
+    if (
+      req.method !== "GET" &&
+      req.method !== "POST"
+    ) {
+      return json(
+        {
+          ok: false,
+          error:
+            "Method not allowed.",
+        },
+        405
+      );
+    }
+
+    /*
+     * ------------------------------------------
+     * ADMIN AUTHENTICATION
+     * ------------------------------------------
+     */
+
+    const {
+      base44,
+      user,
+    } =
       await getAdmin(req);
+
+    /*
+     * ------------------------------------------
+     * SERVICE ROLE
+     * ------------------------------------------
+     */
 
     const service =
       base44.asServiceRole;
 
-    if (
-      req.method !==
-        "GET" &&
-      req.method !==
-        "POST"
-    ) {
-      return Response.json(
-        {
-          error:
-            "Method not allowed",
-        },
-        { status: 405 }
-      );
-    }
+    /*
+     * ------------------------------------------
+     * REQUEST DATA
+     * ------------------------------------------
+     */
 
-    let body: any = {};
-
-    if (req.method === "POST") {
-      body =
-        await req.json()
-          .catch(() => ({}));
-    }
+    const body =
+      await readBody(req);
 
     const url =
       new URL(req.url);
 
     const action =
-      String(
-        body.action ||
+      clean(
+        body?.action ||
           url.searchParams.get(
             "action"
           ) ||
-          "list"
+          "list",
+        100
       );
 
     /*
+     * ------------------------------------------
      * LIST BOOKINGS
+     * ------------------------------------------
      */
-    if (
-      action === "list"
-    ) {
-      const bookings =
-        await service.entities.ExpertBooking.list(
-          "-created_date",
-          100
+
+    if (action === "list") {
+      try {
+        const bookings =
+          await service.entities.ExpertBooking.list(
+            "-created_date",
+            100
+          );
+
+        return json({
+          ok: true,
+          bookings:
+            Array.isArray(bookings)
+              ? bookings
+              : [],
+        });
+      } catch (error) {
+        console.error(
+          "expertAdmin list error:",
+          error
         );
 
-      return Response.json({
-        ok: true,
-        bookings:
-          bookings || [],
-      });
+        return json(
+          {
+            ok: false,
+            error:
+              "Unable to load expert bookings.",
+            bookings: [],
+          },
+          500
+        );
+      }
     }
 
     /*
+     * ------------------------------------------
      * GET ONE BOOKING
+     * ------------------------------------------
      */
-    if (
-      action === "get"
-    ) {
+
+    if (action === "get") {
       const id =
-        String(
-          body.id ||
+        clean(
+          body?.id ||
             url.searchParams.get(
               "id"
-            ) ||
-            ""
+            ),
+          200
         );
 
       if (!id) {
-        return Response.json(
+        return json(
           {
+            ok: false,
             error:
               "Booking ID is required.",
           },
-          { status: 400 }
+          400
         );
       }
 
-      const booking =
-        await service.entities.ExpertBooking.get(
-          id
+      try {
+        const booking =
+          await service.entities.ExpertBooking.get(
+            id
+          );
+
+        if (!booking) {
+          return json(
+            {
+              ok: false,
+              error:
+                "Booking not found.",
+            },
+            404
+          );
+        }
+
+        return json({
+          ok: true,
+          booking,
+        });
+      } catch (error) {
+        console.error(
+          "expertAdmin get error:",
+          error
         );
 
-      if (!booking) {
-        return Response.json(
+        return json(
           {
+            ok: false,
             error:
-              "Booking not found.",
+              "Unable to load this booking.",
           },
-          { status: 404 }
+          500
         );
       }
-
-      return Response.json({
-        ok: true,
-        booking,
-      });
     }
 
     /*
+     * ------------------------------------------
      * UPDATE BOOKING STATUS
+     * ------------------------------------------
      */
+
     if (
       action ===
       "update_status"
     ) {
       const id =
-        String(
-          body.id || ""
+        clean(
+          body?.id,
+          200
         );
 
       const bookingStatus =
-        String(
-          body.bookingStatus ||
-            ""
-        );
-
-      const allowedStatuses = [
-        "awaiting_payment",
-        "confirmed",
-        "processing",
-        "completed",
-        "cancelled",
-      ];
-
-      if (
-        !id ||
-        !allowedStatuses.includes(
-          bookingStatus
-        )
-      ) {
-        return Response.json(
-          {
-            error:
-              "Invalid booking status.",
-          },
-          { status: 400 }
-        );
-      }
-
-      const booking =
-        await service.entities.ExpertBooking.get(
-          id
-        );
-
-      if (!booking) {
-        return Response.json(
-          {
-            error:
-              "Booking not found.",
-          },
-          { status: 404 }
-        );
-      }
-
-      const updated =
-        await service.entities.ExpertBooking.update(
-          id,
-          {
-            bookingStatus,
-          }
-        );
-
-      return Response.json({
-        ok: true,
-        booking:
-          updated,
-      });
-    }
-
-    /*
-     * CANCEL UNPAID BOOKING
-     */
-    if (
-      action ===
-      "cancel"
-    ) {
-      const id =
-        String(
-          body.id || ""
+        clean(
+          body?.bookingStatus,
+          100
         );
 
       if (!id) {
-        return Response.json(
+        return json(
           {
+            ok: false,
             error:
               "Booking ID is required.",
           },
-          { status: 400 }
+          400
         );
       }
 
-      const booking =
-        await service.entities.ExpertBooking.get(
-          id
+      if (
+        !ALLOWED_STATUSES.includes(
+          bookingStatus
+        )
+      ) {
+        return json(
+          {
+            ok: false,
+            error:
+              "Invalid booking status.",
+          },
+          400
+        );
+      }
+
+      let booking;
+
+      try {
+        booking =
+          await service.entities.ExpertBooking.get(
+            id
+          );
+      } catch (error) {
+        console.error(
+          "expertAdmin status lookup error:",
+          error
         );
 
-      if (!booking) {
-        return Response.json(
+        return json(
           {
+            ok: false,
+            error:
+              "Unable to find the booking.",
+          },
+          500
+        );
+      }
+
+      if (!booking) {
+        return json(
+          {
+            ok: false,
             error:
               "Booking not found.",
           },
-          { status: 404 }
+          404
         );
       }
+
+      try {
+        const updated =
+          await service.entities.ExpertBooking.update(
+            id,
+            {
+              bookingStatus,
+            }
+          );
+
+        return json({
+          ok: true,
+          booking:
+            updated || {
+              ...booking,
+              bookingStatus,
+            },
+        });
+      } catch (error) {
+        console.error(
+          "expertAdmin status update error:",
+          error
+        );
+
+        return json(
+          {
+            ok: false,
+            error:
+              "Unable to update booking status.",
+          },
+          500
+        );
+      }
+    }
+
+    /*
+     * ------------------------------------------
+     * CANCEL BOOKING
+     * ------------------------------------------
+     */
+
+    if (action === "cancel") {
+      const id =
+        clean(
+          body?.id,
+          200
+        );
+
+      if (!id) {
+        return json(
+          {
+            ok: false,
+            error:
+              "Booking ID is required.",
+          },
+          400
+        );
+      }
+
+      let booking;
+
+      try {
+        booking =
+          await service.entities.ExpertBooking.get(
+            id
+          );
+      } catch (error) {
+        console.error(
+          "expertAdmin cancel lookup error:",
+          error
+        );
+
+        return json(
+          {
+            ok: false,
+            error:
+              "Unable to find the booking.",
+          },
+          500
+        );
+      }
+
+      if (!booking) {
+        return json(
+          {
+            ok: false,
+            error:
+              "Booking not found.",
+          },
+          404
+        );
+      }
+
+      /*
+       * Do not allow cancellation of an already
+       * completed booking.
+       */
+
+      if (
+        booking.bookingStatus ===
+        "completed"
+      ) {
+        return json(
+          {
+            ok: false,
+            error:
+              "A completed booking cannot be cancelled.",
+          },
+          400
+        );
+      }
+
+      /*
+       * Do not use this endpoint to cancel
+       * an already-paid booking.
+       *
+       * Paid bookings should normally go through
+       * your payment/refund workflow.
+       */
 
       if (
         booking.paymentStatus ===
         "paid"
       ) {
-        return Response.json(
+        return json(
           {
+            ok: false,
             error:
               "A paid booking cannot be cancelled using this endpoint.",
           },
-          { status: 400 }
+          400
         );
       }
 
-      await service.entities.ExpertBooking.update(
-        id,
-        {
-          bookingStatus:
-            "cancelled",
-        }
-      );
+      try {
+        const updated =
+          await service.entities.ExpertBooking.update(
+            id,
+            {
+              bookingStatus:
+                "cancelled",
+            }
+          );
 
-      return Response.json({
-        ok: true,
-      });
+        return json({
+          ok: true,
+          booking:
+            updated || {
+              ...booking,
+              bookingStatus:
+                "cancelled",
+            },
+        });
+      } catch (error) {
+        console.error(
+          "expertAdmin cancel update error:",
+          error
+        );
+
+        return json(
+          {
+            ok: false,
+            error:
+              "Unable to cancel this booking.",
+          },
+          500
+        );
+      }
     }
 
-    return Response.json(
-      {
-        error:
-          "Unknown action.",
-      },
-      { status: 400 }
-    );
+    /*
+     * ------------------------------------------
+     * UNKNOWN ACTION
+     * ------------------------------------------
+     */
 
+    return json(
+      {
+        ok: false,
+        error:
+          `Unknown action: ${action}`,
+      },
+      400
+    );
   } catch (error) {
+    /*
+     * Preserve our intentional 401/403 responses.
+     */
+
     if (
       error instanceof Response
     ) {
@@ -323,16 +564,17 @@ export default async function (
     }
 
     console.error(
-      "expertAdmin:",
+      "expertAdmin fatal error:",
       error
     );
 
-    return Response.json(
+    return json(
       {
+        ok: false,
         error:
           "Admin request failed.",
       },
-      { status: 500 }
+      500
     );
   }
-          }
+}

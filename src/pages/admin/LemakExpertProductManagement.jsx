@@ -867,4 +867,353 @@ export default function LemakExpertProductmanagement() {
                     </th>
 
                     <th className="px-5 py-4">
-                      Pay
+                      Payment
+                    </th>
+
+                    <th className="px-5 py-4">
+                      Booking Status
+                    </th>
+
+                    <th className="px-5 py-4">
+                      Date
+                    </th>
+
+                    <th className="px-5 py-4 text-right">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredBookings.map(
+                    (booking) => {
+                      const isUnpaid =
+                        String(
+                          booking.paymentStatus ||
+                            ""
+                        ).toLowerCase() !==
+                        "paid";
+
+                      const cancellable =
+                        isUnpaid &&
+                        booking.bookingStatus !==
+                          "cancelled";
+
+                      return (
+                        <tr
+                          key={booking.id}
+                          className="border-b text-sm transition hover:bg-gray-50"
+                        >
+                          <td className="px-5 py-4">
+                            <div className="font-semibold text-gray-900">
+                              {getCustomerName(
+                                booking
+                              )}
+                            </div>
+
+                            {booking.email && (
+                              <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                                <Mail className="h-3 w-3" />
+                                {booking.email}
+                              </div>
+                            )}
+
+                            {booking.phone && (
+                              <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                                <Phone className="h-3 w-3" />
+                                {booking.phone}
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <div className="font-medium text-gray-900">
+                              {getServiceName(
+                                booking
+                              )}
+                            </div>
+
+                            {booking.bookingReference && (
+                              <div className="mt-1 font-mono text-xs text-gray-500">
+                                {
+                                  booking.bookingReference
+                                }
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="px-5 py-4 font-bold text-gray-900">
+                            {formatMoney(
+                              getAmount(booking)
+                            )}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <span
+                              className={`inline-block rounded-full border px-2.5 py-1 text-xs font-semibold ${getPaymentClass(
+                                booking.paymentStatus
+                              )}`}
+                            >
+                              {String(
+                                booking.paymentStatus ||
+                                  "unknown"
+                              ).toLowerCase()}
+                            </span>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <span
+                              className={`inline-block rounded-full border px-2.5 py-1 text-xs font-semibold ${getStatusClass(
+                                booking.bookingStatus
+                              )}`}
+                            >
+                              {getStatusLabel(
+                                booking.bookingStatus
+                              )}
+                            </span>
+                          </td>
+
+                          <td className="px-5 py-4 text-xs text-gray-500">
+                            {formatDate(
+                              booking.createdAt ||
+                                booking.createdDate ||
+                                booking.updatedDate
+                            )}
+                          </td>
+
+                          <td className="px-5 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  openBooking(booking)
+                                }
+                                className="gap-1"
+                              >
+                                <Eye className="h-4 w-4" />
+                                View
+                              </Button>
+
+                              {cancellable && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={
+                                    actionLoading
+                                  }
+                                  onClick={() =>
+                                    cancelBooking(
+                                      booking
+                                    )
+                                  }
+                                  className="gap-1 border-red-200 text-red-600 hover:bg-red-50"
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                  Cancel
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* DETAILS DIALOG */}
+
+      <Dialog
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Booking Details
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedBooking && (
+            <div className="space-y-4">
+              <div className="grid gap-3 text-sm">
+                <InfoRow
+                  icon={User}
+                  label="Customer"
+                  value={getCustomerName(
+                    selectedBooking
+                  )}
+                />
+
+                <InfoRow
+                  icon={Mail}
+                  label="Email"
+                  value={
+                    selectedBooking.email ||
+                    "—"
+                  }
+                />
+
+                <InfoRow
+                  icon={Phone}
+                  label="Phone"
+                  value={
+                    selectedBooking.phone ||
+                    "—"
+                  }
+                />
+
+                <InfoRow
+                  icon={PackageCheck}
+                  label="Service"
+                  value={getServiceName(
+                    selectedBooking
+                  )}
+                />
+
+                <InfoRow
+                  icon={MapPin}
+                  label="Location"
+                  value={
+                    selectedBooking.location ||
+                    selectedBooking.address ||
+                    "—"
+                  }
+                />
+
+                <InfoRow
+                  icon={CalendarDays}
+                  label="Service Date"
+                  value={
+                    selectedBooking.bookingDate ||
+                    selectedBooking.serviceDate ||
+                    "—"
+                  }
+                />
+
+                <InfoRow
+                  icon={Banknote}
+                  label="Amount"
+                  value={formatMoney(
+                    getAmount(selectedBooking)
+                  )}
+                />
+
+                <InfoRow
+                  icon={CreditCard}
+                  label="Payment Status"
+                  value={String(
+                    selectedBooking.paymentStatus ||
+                      "unknown"
+                  ).toLowerCase()}
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-gray-700">
+                  Update Booking Status
+                </label>
+
+                <Select
+                  value={
+                    selectedBooking.bookingStatus ||
+                    "awaiting_payment"
+                  }
+                  onValueChange={(value) =>
+                    updateStatus(
+                      selectedBooking,
+                      value
+                    )
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Booking status" />
+                  </SelectTrigger>
+
+                  <SelectContent>
+                    {STATUS_OPTIONS.map(
+                      (status) => (
+                        <SelectItem
+                          key={status.value}
+                          value={status.value}
+                        >
+                          {status.label}
+                        </SelectItem>
+                      )
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedBooking.notes && (
+                <div className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
+                  <span className="font-semibold text-gray-700">
+                    Notes:{" "}
+                  </span>
+                  {selectedBooking.notes}
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------
+   SUMMARY CARD
+------------------------------------------------------- */
+
+function SummaryCard({ title, value, icon: Icon }) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-3">
+          <div className="rounded-xl bg-blue-100 p-2 text-blue-700">
+            <Icon className="h-5 w-5" />
+          </div>
+
+          <div className="min-w-0">
+            <p className="truncate text-xs text-gray-500">
+              {title}
+            </p>
+
+            <p className="text-xl font-bold">
+              {Number(value || 0)}
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* -------------------------------------------------------
+   INFO ROW
+------------------------------------------------------- */
+
+function InfoRow({ icon: Icon, label, value }) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border p-3">
+      <div className="rounded-lg bg-blue-50 p-2 text-blue-700">
+        <Icon className="h-4 w-4" />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-gray-500">
+          {label}
+        </p>
+
+        <p className="break-words font-semibold text-gray-900">
+          {value}
+        </p>
+      </div>
+    </div>
+  );
+}

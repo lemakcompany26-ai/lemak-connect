@@ -571,4 +571,23 @@ export default function LemakExpertProduct() {
                     type="button"
                     onClick={handleCheckout}
                     disabled={loadingCheckout}
-                    className="mt-6 h-12 w-full rounded-xl bg-blue-700 font-bold hover:bg-blu
+                    className="mt-6 h-12 w-full rounded-xl bg-blue-700 font-bold hover:bg-blue-800"
+                  >
+                    {loadingCheckout ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Starting checkout...
+                      </>
+                    ) : (
+                      "Pay with KoraPay"
+                    )}
+                  </Button>
+                </>
+              )}
+            </section>
+          </aside>
+        </div>
+      </main>
+    </div>
+  );
+}

@@ -12,13 +12,12 @@ import {
 } from "react-router-dom";
 
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
-import { UserNotRegisteredError } from "@/lib/app-params";
-import { ScrollToTop } from "@/components/ScrollToTop";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { GADS_CONVERSION_ID } from "@/lib/google-ads";
+import ScrollToTop from "@/components/ScrollToTop";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import { GADS_CONVERSION_ID } from "@/lib/ads";
 
-import AppShell from "@/components/AppShell";
-import AdminShell from "@/components/AdminShell";
+import AppShell from "@/components/app/AppShell";
+import AdminShell from "@/components/admin/AdminShell";
 
 import Landing from "./pages/Landing.jsx";
 import Events from "./pages/Events";
@@ -252,7 +251,7 @@ function AuthenticatedApp() {
     return <RouteFallback />;
   }
 
-  if (authError instanceof UserNotRegisteredError) {
+  if (authError?.type === "user_not_registered") {
     return <Navigate to="/register" replace />;
   }
 

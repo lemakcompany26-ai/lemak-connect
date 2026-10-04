@@ -1149,4 +1149,76 @@ SMSPOOL SERVICES
 */
 
 async function smsPoolServices() {
-  if (!SMSPOOL
+  if (!SMSPOOL_KEY) {
+    throw new Error(
+      "Server 2 is not configured. SMSPOOL_API_KEY is missing."
+    );
+  }
+
+  /*
+   * SMSPool explicitly supports
+   * the SMS-Activate/Hero-SMS
+   * compatible stub.
+   */
+  const form =
+    new URLSearchParams();
+
+  form.set(
+    "key",
+    SMSPOOL_KEY
+  );
+
+  form.set(
+    "action",
+    "getServicesList"
+  );
+
+  form.set(
+    "setting",
+    "smspool"
+  );
+
+  const response =
+    await fetch(
+      `${SMSPOOL_BASE}/stubs/handler_api`,
+      {
+        method:
+          "POST",
+        headers: {
+          "Content-Type":
+            "application/x-www-form-urlencoded"
+        },
+        body:
+          form.toString()
+      }
+    );
+
+  const data =
+    await readResponse(
+      response
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      `Server 2 services request failed (${response.status}).`
+    );
+  }
+
+  const services =
+    normalizeSmsPoolServices(
+      data
+    );
+
+  if (
+    services.length ===
+      0
+  ) {
+    throw new Error(
+      "Server 2 returned no available services."
+    );
+  }
+
+  services.sort(
+    (a, b) =>
+      a.name.localeCompare(
+       

@@ -866,4 +866,505 @@ export default function LemakExpertProductManagement() {
                               }
                               onValueChange={(
                                 value
-             
+                              ) =>
+                                updateStatus(
+                                  booking,
+                                  value
+                                )
+                              }
+                              disabled={
+                                saving
+                              }
+                            >
+                              <SelectTrigger
+                                className={`h-8 w-44 text-xs ${statusClass(
+                                  booking.bookingStatus
+                                )}`}
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+
+                              <SelectContent>
+                                {STATUS_OPTIONS.map(
+                                  (item) => (
+                                    <SelectItem
+                                      key={
+                                        item.value
+                                      }
+                                      value={
+                                        item.value
+                                      }
+                                    >
+                                      {item.label}
+                                    </SelectItem>
+                                  )
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </td>
+
+                          <td className="p-3 text-xs text-muted-foreground">
+                            {formatDate(
+                              booking.created_date
+                            )}
+                          </td>
+
+                          <td className="p-3">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedBooking(
+                                  booking
+                                );
+                                setDetailsOpen(
+                                  true
+                                );
+                              }}
+                            >
+                              <Eye className="mr-1 h-4 w-4" />
+                              View
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    )}
+
+                    {filteredBookings.length ===
+                      0 && (
+                      <tr>
+                        <td
+                          colSpan={7}
+                          className="p-8 text-center text-muted-foreground"
+                        >
+                          No orders found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {tab === "products" && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle>
+              Services & Prices
+            </CardTitle>
+
+            <Button
+              onClick={
+                openCreateProduct
+              }
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add service
+            </Button>
+          </CardHeader>
+
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px] text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="p-3">
+                      Category
+                    </th>
+                    <th className="p-3">
+                      Service
+                    </th>
+                    <th className="p-3">
+                      Price
+                    </th>
+                    <th className="p-3">
+                      Status
+                    </th>
+                    <th className="p-3">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {products.map(
+                    (product) => (
+                      <tr
+                        key={product.id}
+                        className="border-b"
+                      >
+                        <td className="p-3">
+                          {
+                            product.categoryName
+                          }
+                        </td>
+
+                        <td className="p-3 font-medium">
+                          {
+                            product.optionName
+                          }
+                        </td>
+
+                        <td className="p-3 font-semibold">
+                          {money(
+                            product.unitPrice
+                          )}
+                        </td>
+
+                        <td className="p-3">
+                          <span
+                            className={`rounded-full px-2 py-1 text-xs ${
+                              product.active !==
+                              false
+                                ? "bg-green-100 text-green-700"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {product.active !==
+                            false
+                              ? "Active"
+                              : "Hidden"}
+                          </span>
+                        </td>
+
+                        <td className="p-3">
+                          <div className="flex gap-2">
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              disabled={
+                                saving
+                              }
+                              onClick={() =>
+                                openEditProduct(
+                                  product
+                                )
+                              }
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              disabled={
+                                saving
+                              }
+                              onClick={() =>
+                                toggleProduct(
+                                  product
+                                )
+                              }
+                            >
+                              <Power className="h-4 w-4" />
+                            </Button>
+
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              disabled={
+                                saving
+                              }
+                              onClick={() =>
+                                deleteProduct(
+                                  product
+                                )
+                              }
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  )}
+
+                  {products.length ===
+                    0 && (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="p-8 text-center text-muted-foreground"
+                      >
+                        No services yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ORDER DETAILS */}
+      <Dialog
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Order details
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedBooking && (
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-primary" />
+                {selectedBooking.customerName ||
+                  "Customer"}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-primary" />
+                {selectedBooking.customerEmail ||
+                  "No email"}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-primary" />
+                {selectedBooking.customerPhone ||
+                  "No phone"}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-primary" />
+                {selectedBooking.location ||
+                  "No location"}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-primary" />
+                {formatDate(
+                  selectedBooking.bookingDate
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-primary" />
+                {selectedBooking.paymentReference ||
+                  "No reference"}
+              </div>
+
+              <div className="rounded-xl bg-muted p-4">
+                <div className="flex justify-between">
+                  <span>Service</span>
+                  <span className="font-medium">
+                    {
+                      selectedBooking.categoryName
+                    }{" "}
+                    ·{" "}
+                    {
+                      selectedBooking.optionName
+                    }
+                  </span>
+                </div>
+
+                <div className="mt-2 flex justify-between">
+                  <span>Quantity</span>
+                  <span className="font-medium">
+                    {selectedBooking.quantity ||
+                      1}
+                  </span>
+                </div>
+
+                <div className="mt-2 flex justify-between border-t pt-2 font-bold">
+                  <span>Total</span>
+                  <span>
+                    {money(
+                      selectedBooking.amount
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {selectedBooking.notes && (
+                <div className="rounded-xl border p-3">
+                  <p className="mb-1 text-xs text-muted-foreground">
+                    Notes
+                  </p>
+                  {selectedBooking.notes}
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ADD / EDIT SERVICE */}
+      <Dialog
+        open={productOpen}
+        onOpenChange={setProductOpen}
+      >
+        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingProduct
+                ? "Edit service"
+                : "Add service"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <Input
+              placeholder="Category ID (e.g. rentals)"
+              value={
+                productForm.categoryId
+              }
+              onChange={(e) =>
+                setProductForm({
+                  ...productForm,
+                  categoryId:
+                    e.target.value,
+                })
+              }
+            />
+
+            <Input
+              placeholder="Category name"
+              value={
+                productForm.categoryName
+              }
+              onChange={(e) =>
+                setProductForm({
+                  ...productForm,
+                  categoryName:
+                    e.target.value,
+                })
+              }
+            />
+
+            <Input
+              placeholder="Category description"
+              value={
+                productForm.categoryDescription
+              }
+              onChange={(e) =>
+                setProductForm({
+                  ...productForm,
+                  categoryDescription:
+                    e.target.value,
+                })
+              }
+            />
+
+            <Input
+              placeholder="Service ID (e.g. chairs)"
+              value={
+                productForm.optionId
+              }
+              onChange={(e) =>
+                setProductForm({
+                  ...productForm,
+                  optionId:
+                    e.target.value,
+                })
+              }
+            />
+
+            <Input
+              placeholder="Service name"
+              value={
+                productForm.optionName
+              }
+              onChange={(e) =>
+                setProductForm({
+                  ...productForm,
+                  optionName:
+                    e.target.value,
+                })
+              }
+            />
+
+            <Input
+              placeholder="Description"
+              value={
+                productForm.description
+              }
+              onChange={(e) =>
+                setProductForm({
+                  ...productForm,
+                  description:
+                    e.target.value,
+                })
+              }
+            />
+
+            <Input
+              type="number"
+              placeholder="Price (NGN)"
+              value={
+                productForm.unitPrice
+              }
+              onChange={(e) =>
+                setProductForm({
+                  ...productForm,
+                  unitPrice:
+                    e.target.value,
+                })
+              }
+            />
+
+            <Input
+              placeholder="Image URL"
+              value={
+                productForm.imageUrl
+              }
+              onChange={(e) =>
+                setProductForm({
+                  ...productForm,
+                  imageUrl:
+                    e.target.value,
+                })
+              }
+            />
+
+            <Input
+              type="number"
+              placeholder="Sort order"
+              value={
+                productForm.sortOrder
+              }
+              onChange={(e) =>
+                setProductForm({
+                  ...productForm,
+                  sortOrder:
+                    e.target.value,
+                })
+              }
+            />
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() =>
+                  setProductOpen(false)
+                }
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+
+              <Button
+                onClick={saveProduct}
+                disabled={saving}
+              >
+                {saving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                )}
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

@@ -785,4 +785,76 @@ export default function LemakExpertProduct() {
                         selectedProduct.optionName
                       }
                     </span>
-                  </di
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span>
+                      Category
+                    </span>
+
+                    <span className="font-medium">
+                      {
+                        selectedProduct.categoryName
+                      }
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span>
+                      Unit price
+                    </span>
+
+                    <span className="font-medium">
+                      {money(
+                        selectedProduct.unitPrice
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span>
+                      Quantity
+                    </span>
+
+                    <span className="font-medium">
+                      {quantity}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between border-t pt-3 text-base font-bold">
+                    <span>
+                      Total
+                    </span>
+
+                    <span>
+                      {money(total)}
+                    </span>
+                  </div>
+                </div>
+
+                <Button
+                  className="mt-6 h-12 w-full text-base font-bold"
+                  disabled={paying}
+                  onClick={
+                    handleCheckout
+                  }
+                >
+                  {paying ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    `Pay ${money(total)}`
+                  )}
+                </Button>
+
+                <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Paid securely before service
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}

@@ -1,7 +1,12 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.44";
 import { secrets } from "base44:runtime";
 
-const KORA_API = "https://api.korapay.com/merchant/api/v1";
+const KORA_API =
+  "https://api.korapay.com/merchant/api/v1";
+
+/* -------------------------------------------------------
+   LEMAK EXPERT PRODUCTS
+------------------------------------------------------- */
 
 const PRODUCTS = [
   {
@@ -155,10 +160,30 @@ const PRODUCTS = [
   },
 ];
 
-function clean(value: unknown, max = 1000): string {
+/* -------------------------------------------------------
+   HELPERS
+------------------------------------------------------- */
+
+function clean(
+  value: unknown,
+  max = 1000
+): string {
   return String(value ?? "")
     .trim()
     .slice(0, max);
+}
+
+function json(
+  data: unknown,
+  status = 200
+): Response {
+  return Response.json(data, {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
+  });
 }
 
 function findService(
@@ -198,13 +223,22 @@ function isValidBookingDate(
     `${bookingDate}T00:00:00`
   );
 
-  if (Number.isNaN(selectedDate.getTime())) {
+  if (
+    Number.isNaN(
+      selectedDate.getTime()
+    )
+  ) {
     return false;
   }
 
   const today = new Date();
 
-  today.setHours(0, 0, 0, 0);
+  today.setHours(
+    0,
+    0,
+    0,
+    0
+  );
 
   return selectedDate >= today;
 }
@@ -223,7 +257,6 @@ function isSafeCallbackUrl(
       origin
     );
 
-    // Only allow your own Lemak Connect origin.
     return url.origin === origin;
   } catch {
     return false;
@@ -231,10 +264,12 @@ function isSafeCallbackUrl(
 }
 
 function makeReference(): string {
-  const timestamp = Date.now();
+  const timestamp =
+    Date.now();
 
   const randomPart =
-    crypto.randomUUID()
+    crypto
+      .randomUUID()
       .replace(/-/g, "")
       .slice(0, 12)
       .toUpperCase();
@@ -242,135 +277,164 @@ function makeReference(): string {
   return `LMK-EXP-${timestamp}-${randomPart}`;
 }
 
+/* -------------------------------------------------------
+   MAIN FUNCTION
+------------------------------------------------------- */
+
 export default async function (
   req: Request
 ): Promise<Response> {
   let service: any = null;
-  let createdBookingId: string | null = null;
-  let createdPaymentId: string | null = null;
+
+  let createdBookingId:
+    | string
+    | null = null;
+
+  let createdPaymentId:
+    | string
+    | null = null;
 
   try {
-    /*
-     * ----------------------------------------------------
-     * 1. METHOD CHECK
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       1. METHOD
+    --------------------------------------------------- */
 
     if (req.method !== "POST") {
-      return Response.json(
+      return json(
         {
           ok: false,
-          error: "Method not allowed.",
+          error:
+            "Method not allowed.",
         },
-        {
-          status: 405,
-          headers: {
-            Allow: "POST",
-          },
-        }
+        405
       );
     }
 
-    /*
-     * ----------------------------------------------------
-     * 2. BASE44 CLIENT + AUTH
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       2. BASE44 + AUTH
+    --------------------------------------------------- */
 
     const base44 =
       createClientFromRequest(req);
 
-    const user =
-      await base44.auth.me();
+    let user;
+
+    try {
+      user =
+        await base44.auth.me();
+    } catch (authError) {
+      console.error(
+        "Lemak Expert auth error:",
+        authError
+      );
+
+      return json(
+        {
+          ok: false,
+          error:
+            "Authentication failed. Please sign in again.",
+        },
+        401
+      );
+    }
 
     if (!user) {
-      return Response.json(
+      return json(
         {
           ok: false,
           error:
             "Please sign in before booking a service.",
         },
-        {
-          status: 401,
-        }
+        401
       );
     }
 
-    /*
-     * ----------------------------------------------------
-     * 3. SERVICE ROLE
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       3. SERVICE ROLE
+    --------------------------------------------------- */
 
     service =
       base44.asServiceRole;
 
-    /*
-     * ----------------------------------------------------
-     * 4. READ REQUEST BODY
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       4. BODY
+    --------------------------------------------------- */
 
     let body: any;
 
     try {
       body = await req.json();
     } catch {
-      return Response.json(
+      return json(
         {
           ok: false,
           error:
             "Invalid request body.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
-    /*
-     * ----------------------------------------------------
-     * 5. CLEAN INPUTS
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       5. INPUTS
+    --------------------------------------------------- */
 
     const categoryId =
-      clean(body?.categoryId, 100);
+      clean(
+        body?.categoryId,
+        100
+      );
 
     const optionId =
-      clean(body?.optionId, 100);
+      clean(
+        body?.optionId,
+        100
+      );
 
     const bookingDate =
-      clean(body?.bookingDate, 100);
+      clean(
+        body?.bookingDate,
+        100
+      );
 
     const location =
-      clean(body?.location, 1000);
+      clean(
+        body?.location,
+        1000
+      );
 
     const notes =
-      clean(body?.notes, 2000);
+      clean(
+        body?.notes,
+        2000
+      );
 
     const callbackUrl =
-      clean(body?.callbackUrl, 1000);
+      clean(
+        body?.callbackUrl,
+        1000
+      );
 
     const quantity =
-      Number(body?.quantity);
+      Number(
+        body?.quantity
+      );
 
-    /*
-     * ----------------------------------------------------
-     * 6. VALIDATE SERVICE
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       6. SERVICE VALIDATION
+    --------------------------------------------------- */
 
-    if (!categoryId || !optionId) {
-      return Response.json(
+    if (
+      !categoryId ||
+      !optionId
+    ) {
+      return json(
         {
           ok: false,
           error:
             "Please select a service and exact service option.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
@@ -381,96 +445,85 @@ export default async function (
       );
 
     if (!selected) {
-      return Response.json(
+      return json(
         {
           ok: false,
           error:
             "Invalid service selection.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
-    /*
-     * ----------------------------------------------------
-     * 7. VALIDATE QUANTITY
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       7. QUANTITY
+    --------------------------------------------------- */
 
     if (
-      !Number.isInteger(quantity) ||
+      !Number.isInteger(
+        quantity
+      ) ||
       quantity < 1 ||
       quantity > 10000
     ) {
-      return Response.json(
+      return json(
         {
           ok: false,
-          error: "Invalid quantity.",
+          error:
+            "Invalid quantity.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
-    /*
-     * ----------------------------------------------------
-     * 8. VALIDATE DATE
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       8. DATE
+    --------------------------------------------------- */
 
     if (!bookingDate) {
-      return Response.json(
+      return json(
         {
           ok: false,
           error:
             "Please select a service date.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
-    if (!isValidBookingDate(bookingDate)) {
-      return Response.json(
+    if (
+      !isValidBookingDate(
+        bookingDate
+      )
+    ) {
+      return json(
         {
           ok: false,
           error:
             "Please select today or a future service date.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
-    /*
-     * ----------------------------------------------------
-     * 9. VALIDATE LOCATION
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       9. LOCATION
+    --------------------------------------------------- */
 
     if (!location) {
-      return Response.json(
+      return json(
         {
           ok: false,
           error:
             "Please provide the service location.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
-    /*
-     * ----------------------------------------------------
-     * 10. CALCULATE PRICE SERVER-SIDE
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       10. PRICE
+    --------------------------------------------------- */
 
     const unitPrice =
       Number(
@@ -478,18 +531,18 @@ export default async function (
       );
 
     if (
-      !Number.isFinite(unitPrice) ||
+      !Number.isFinite(
+        unitPrice
+      ) ||
       unitPrice <= 0
     ) {
-      return Response.json(
+      return json(
         {
           ok: false,
           error:
             "Invalid service price.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
@@ -497,39 +550,38 @@ export default async function (
       unitPrice * quantity;
 
     if (
-      !Number.isFinite(amount) ||
+      !Number.isFinite(
+        amount
+      ) ||
       amount < 100
     ) {
-      return Response.json(
+      return json(
         {
           ok: false,
           error:
             "Invalid booking amount.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
-    if (amount > 50000000) {
-      return Response.json(
+    if (
+      amount >
+      50000000
+    ) {
+      return json(
         {
           ok: false,
           error:
             "Booking amount exceeds the allowed limit.",
         },
-        {
-          status: 400,
-        }
+        400
       );
     }
 
-    /*
-     * ----------------------------------------------------
-     * 11. KORAPAY SECRET
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       11. KORAPAY SECRET
+    --------------------------------------------------- */
 
     const koraSecret =
       secrets.get(
@@ -538,140 +590,230 @@ export default async function (
 
     if (!koraSecret) {
       console.error(
-        "expertBookingCheckout: KORA_SECRET_KEY is missing."
+        "KORA_SECRET_KEY is missing."
       );
 
-      return Response.json(
+      return json(
         {
           ok: false,
           error:
-            "Payment service is temporarily unavailable.",
+            "Payment service is temporarily unavailable. KORA_SECRET_KEY is not configured.",
         },
-        {
-          status: 503,
-        }
+        503
       );
     }
 
-    /*
-     * ----------------------------------------------------
-     * 12. GENERATE PAYMENT REFERENCE
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       12. CUSTOMER
+    --------------------------------------------------- */
+
+    const customerName =
+      clean(
+        user.full_name ||
+          user.name ||
+          "Lemak Connect Customer",
+        200
+      );
+
+    const customerEmail =
+      clean(
+        user.email,
+        320
+      );
+
+    if (!customerEmail) {
+      return json(
+        {
+          ok: false,
+          error:
+            "Your account does not have a valid email address. Please update your profile before making payment.",
+        },
+        400
+      );
+    }
+
+    /* ---------------------------------------------------
+       13. REFERENCE
+    --------------------------------------------------- */
 
     const reference =
       makeReference();
 
-    /*
-     * ----------------------------------------------------
-     * 13. CREATE BOOKING
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       14. CREATE BOOKING
+    --------------------------------------------------- */
 
-    const booking =
-      await service.entities.ExpertBooking.create(
-        {
-          userId: user.id,
+    let booking;
 
-          customerName:
-            clean(
-              user.full_name,
-              200
-            ),
+    try {
+      booking =
+        await service.entities.ExpertBooking.create(
+          {
+            userId:
+              user.id,
 
-          customerEmail:
-            clean(
-              user.email,
-              320
-            ),
+            customerName,
 
-          categoryId,
+            customerEmail,
 
-          categoryName:
-            selected.category.name,
+            categoryId,
 
-          optionId,
+            categoryName:
+              selected.category.name,
 
-          optionName:
-            selected.option.name,
+            optionId,
 
-          quantity,
+            optionName:
+              selected.option.name,
 
-          unitPrice,
+            quantity,
 
-          amount,
+            unitPrice,
 
-          bookingDate,
+            amount,
 
-          location,
+            bookingDate,
 
-          notes,
+            location,
 
-          paymentReference:
-            reference,
+            notes,
 
-          paymentStatus:
-            "pending",
+            paymentReference:
+              reference,
 
-          bookingStatus:
-            "awaiting_payment",
-        }
+            paymentStatus:
+              "pending",
+
+            bookingStatus:
+              "awaiting_payment",
+          }
+        );
+    } catch (bookingError) {
+      console.error(
+        "ExpertBooking.create failed:",
+        bookingError
       );
+
+      return json(
+        {
+          ok: false,
+          error:
+            "Unable to create your booking record. Please check the ExpertBooking entity configuration.",
+          details:
+            bookingError instanceof Error
+              ? bookingError.message
+              : String(
+                  bookingError
+                ),
+        },
+        500
+      );
+    }
 
     createdBookingId =
       booking?.id || null;
 
     if (!createdBookingId) {
-      throw new Error(
-        "Booking was created without an ID."
+      return json(
+        {
+          ok: false,
+          error:
+            "Booking was created without a booking ID.",
+        },
+        500
       );
     }
 
-    /*
-     * ----------------------------------------------------
-     * 14. CREATE PAYMENT RECORD
-     * ----------------------------------------------------
-     *
-     * amount = NGN amount
-     * amountKobo = smallest NGN unit
-     */
+    /* ---------------------------------------------------
+       15. CREATE PAYMENT RECORD
+    ---------------------------------------------------
+    
+       IMPORTANT:
+       Store the amount in NGN here.
+       Do NOT multiply by 100.
+    */
 
-    const payment =
-      await service.entities.ExpertPayment.create(
-        {
-          bookingId:
-            createdBookingId,
+    let payment;
 
-          userId:
-            user.id,
+    try {
+      payment =
+        await service.entities.ExpertPayment.create(
+          {
+            bookingId:
+              createdBookingId,
 
-          reference,
+            userId:
+              user.id,
 
-          amount:
-            Math.round(amount * 100),
+            reference,
 
-          currency:
-            "NGN",
+            amount,
 
-          status:
-            "initialized",
+            currency:
+              "NGN",
 
-          provider:
-            "korapay",
-        }
+            status:
+              "initialized",
+
+            provider:
+              "korapay",
+          }
+        );
+    } catch (paymentError) {
+      console.error(
+        "ExpertPayment.create failed:",
+        paymentError
       );
+
+      try {
+        await service.entities.ExpertBooking.update(
+          createdBookingId,
+          {
+            paymentStatus:
+              "failed",
+
+            bookingStatus:
+              "payment_failed",
+          }
+        );
+      } catch (updateError) {
+        console.error(
+          "Unable to mark booking payment failed:",
+          updateError
+        );
+      }
+
+      return json(
+        {
+          ok: false,
+          error:
+            "Unable to create the payment record. Please check the ExpertPayment entity configuration.",
+          details:
+            paymentError instanceof Error
+              ? paymentError.message
+              : String(
+                  paymentError
+                ),
+        },
+        500
+      );
+    }
 
     createdPaymentId =
       payment?.id || null;
 
-    /*
-     * ----------------------------------------------------
-     * 15. CALLBACK URL
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       16. ORIGIN
+    --------------------------------------------------- */
 
     const origin =
-      new URL(req.url).origin;
+      new URL(
+        req.url
+      ).origin;
+
+    /* ---------------------------------------------------
+       17. REDIRECT URL
+    --------------------------------------------------- */
 
     let redirectUrl =
       `${origin}/app/lemak-expert-product`;
@@ -687,32 +829,34 @@ export default async function (
         callbackUrl;
     }
 
-    /*
-     * ----------------------------------------------------
-     * 16. WEBHOOK URL
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       18. WEBHOOK URL
+    --------------------------------------------------- */
 
     const notificationUrl =
       `${origin}/functions/expertPaymentWebhook`;
 
-    /*
-     * ----------------------------------------------------
-     * 17. KORAPAY REQUEST
-     * ----------------------------------------------------
-     *
-     * IMPORTANT:
-     * KoraPay receives amount in NGN,
-     * not Kobo.
-     */
+    /* ---------------------------------------------------
+       19. KORAPAY PAYLOAD
+    ---------------------------------------------------
+    
+       KoraPay Initialize Charge requires:
+       amount
+       currency
+       reference
+       redirect_url
+       notification_url
+       narration
+       customer.email
+    */
 
     const koraPayload = {
-      reference,
-
       amount,
 
       currency:
         "NGN",
+
+      reference,
 
       redirect_url:
         redirectUrl,
@@ -720,54 +864,202 @@ export default async function (
       notification_url:
         notificationUrl,
 
+      narration:
+        `Lemak Expert - ${selected.category.name} - ${selected.option.name}`,
+
+      merchant_bears_cost:
+        false,
+
       customer: {
         name:
-          clean(
-            user.full_name,
-            200
-          ),
+          customerName,
 
         email:
-          clean(
-            user.email,
-            320
-          ),
+          customerEmail,
       },
     };
 
     console.log(
-      "Initializing Lemak Expert payment:",
+      "Lemak Expert KoraPay request:",
       {
         reference,
         amount,
+        currency:
+          "NGN",
         categoryId,
         optionId,
         quantity,
+        redirectUrl,
+        notificationUrl,
       }
     );
 
-    /*
-     * ----------------------------------------------------
-     * 18. CALL KORAPAY
-     * ----------------------------------------------------
-     */
+    /* ---------------------------------------------------
+       20. CALL KORAPAY
+    --------------------------------------------------- */
 
-    const response =
-      await fetch(
-        `${KORA_API}/charges/initialize`,
+    let response;
+
+    try {
+      response =
+        await fetch(
+          `${KORA_API}/charges/initialize`,
+          {
+            method:
+              "POST",
+
+            headers: {
+              Authorization:
+                `Bearer ${koraSecret}`,
+
+              "Content-Type":
+                "application/json",
+
+              Accept:
+                "application/json",
+            },
+
+            body:
+              JSON.stringify(
+                koraPayload
+              ),
+          }
+        );
+    } catch (networkError) {
+      console.error(
+        "KoraPay network error:",
+        networkError
+      );
+
+      await markPaymentFailed(
+        service,
+        createdBookingId,
+        createdPaymentId
+      );
+
+      return json(
         {
-          method: "POST",
+          ok: false,
+          error:
+            "Unable to connect to KoraPay. Please try again.",
+          details:
+            networkError instanceof Error
+              ? networkError.message
+              : String(
+                  networkError
+                ),
+        },
+        502
+      );
+    }
 
-          headers: {
-            Authorization:
-              `Bearer ${koraSecret}`,
+    /* ---------------------------------------------------
+       21. READ KORAPAY RESPONSE
+    --------------------------------------------------- */
 
-            "Content-Type":
-              "application/json",
+    const rawResponse =
+      await response.text();
 
-            Accept:
-              "application/json",
-          },
+    let koraData: any = null;
 
-          body:
-            JSON
+    try {
+      koraData =
+        rawResponse
+          ? JSON.parse(
+              rawResponse
+            )
+          : null;
+    } catch {
+      koraData = null;
+    }
+
+    console.log(
+      "KoraPay response:",
+      {
+        httpStatus:
+          response.status,
+
+        status:
+          koraData?.status,
+
+        message:
+          koraData?.message,
+
+        error:
+          koraData?.error,
+
+        reference,
+      }
+    );
+
+    /* ---------------------------------------------------
+       22. CHECK KORAPAY SUCCESS
+    --------------------------------------------------- */
+
+    const checkoutUrl =
+      koraData?.data
+        ?.checkout_url;
+
+    const koraSuccess =
+      response.ok &&
+      koraData?.status ===
+        true &&
+      typeof checkoutUrl ===
+        "string" &&
+      checkoutUrl.trim()
+        .length > 0;
+
+    if (!koraSuccess) {
+      await markPaymentFailed(
+        service,
+        createdBookingId,
+        createdPaymentId
+      );
+
+      const providerMessage =
+        koraData?.message ||
+        koraData?.error ||
+        koraData?.data?.message ||
+        `KoraPay returned HTTP ${response.status}.`;
+
+      return json(
+        {
+          ok: false,
+
+          error:
+            `KoraPay could not initialize the payment: ${providerMessage}`,
+
+          reference,
+
+          providerStatus:
+            response.status,
+
+          providerResponse:
+            koraData,
+        },
+        502
+      );
+    }
+
+    /* ---------------------------------------------------
+       23. SUCCESS
+    --------------------------------------------------- */
+
+    console.log(
+      "Lemak Expert payment initialized successfully:",
+      {
+        reference,
+        bookingId:
+          createdBookingId,
+        paymentId:
+          createdPaymentId,
+      }
+    );
+
+    return json({
+      ok: true,
+
+      bookingId:
+        createdBookingId,
+
+     

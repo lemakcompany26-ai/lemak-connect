@@ -2,31 +2,64 @@ import { createClientFromRequest } from "npm:@base44/sdk";
 
 /*
 =========================================================
+LEMAK CONNECT - VIRTUAL NUMBERS BACKEND
+=========================================================
+
+SUPPORTED ACTIONS
+
+catalog
+services
+countries
+price
+order
+checkOtp
+cancel
+
+SERVER 1 = Fleexa
+SERVER 2 = SMSPool
+
+API KEYS NEVER GO TO THE FRONTEND.
+=========================================================
+*/
+
+
+/*
+=========================================================
 ENVIRONMENT
 =========================================================
 */
 
 const FLEEXA_BASE =
-  Deno.env.get("FLEEXA_API_URL") ||
-  "https://fleexa.com.ng/developer";
+  (
+    Deno.env.get("FLEEXA_API_URL") ||
+    "https://fleexa.com.ng/developer"
+  ).replace(/\/+$/, "");
 
 const FLEEXA_KEY =
   Deno.env.get("FLEEXA_API_KEY") || "";
 
 const SMSPOOL_BASE =
-  Deno.env.get("SMSPOOL_API_URL") ||
-  "https://api.smspool.net";
+  (
+    Deno.env.get("SMSPOOL_API_URL") ||
+    "https://api.smspool.net"
+  ).replace(/\/+$/, "");
 
 const SMSPOOL_KEY =
   Deno.env.get("SMSPOOL_API_KEY") || "";
 
-const USD_NGN_RATE = Number(
-  Deno.env.get("SMSPOOL_USD_NGN_RATE") || "1600"
-);
+const USD_NGN_RATE =
+  Number(
+    Deno.env.get("SMSPOOL_USD_NGN_RATE") ||
+      "1600"
+  );
 
-const MARKUP_PERCENT = Number(
-  Deno.env.get("VIRTUAL_NUMBER_MARKUP_PERCENT") || "30"
-);
+const MARKUP_PERCENT =
+  Number(
+    Deno.env.get(
+      "VIRTUAL_NUMBER_MARKUP_PERCENT"
+    ) || "30"
+  );
+
 
 /*
 =========================================================
@@ -41,32 +74,65 @@ function json(data, status = 200) {
       status,
       headers: {
         "Content-Type": "application/json",
-        "Cache-Control": "no-store"
+        "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers":
+          "Content-Type, Authorization",
+        "Access-Control-Allow-Methods":
+          "GET, POST, OPTIONS"
       }
     }
   );
 }
 
+
 function clean(value) {
   return String(value ?? "").trim();
 }
 
+
 function num(value, fallback = 0) {
   const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
+
+  return Number.isFinite(n)
+    ? n
+    : fallback;
 }
 
+
 function customerPrice(providerPrice) {
+  const price = num(providerPrice);
+
+  if (price <= 0) {
+    return 0;
+  }
+
   return Math.ceil(
-    num(providerPrice) *
+    price *
       (1 + MARKUP_PERCENT / 100)
   );
 }
 
-function fleexaHeaders(jsonContent = false) {
+
+function usdToNaira(value) {
+  const usd = num(value);
+
+  if (usd <= 0) {
+    return 0;
+  }
+
+  return usd * USD_NGN_RATE;
+}
+
+
+function fleexaHeaders(
+  jsonContent = false
+) {
   const headers = {
-    Authorization: `Bearer ${FLEEXA_KEY}`,
-    "X-API-Key": FLEEXA_KEY
+    Authorization:
+      `Bearer ${FLEEXA_KEY}`,
+    "X-API-Key":
+      FLEEXA_KEY
   };
 
   if (jsonContent) {
@@ -77,14 +143,10 @@ function fleexaHeaders(jsonContent = false) {
   return headers;
 }
 
-function smsPoolForm() {
-  const form = new URLSearchParams();
-  form.set("key", SMSPOOL_KEY);
-  return form;
-}
 
 async function readResponse(response) {
-  const text = await response.text();
+  const text =
+    await response.text();
 
   if (!text) {
     return {};
@@ -98,6 +160,7 @@ async function readResponse(response) {
     };
   }
 }
+
 
 function getArray(data) {
   if (Array.isArray(data)) {
@@ -120,57 +183,32 @@ function getArray(data) {
     return data.countries;
   }
 
-  if (Array.isArray(data?.apps)) {
-    return data.apps;
-  }
-
   if (Array.isArray(data?.items)) {
     return data.items;
+  }
+
+  if (Array.isArray(data?.apps)) {
+    return data.apps;
   }
 
   return [];
 }
 
-/*
-=========================================================
-PRICE EXTRACTION
-=========================================================
-*/
 
-function extractFleexaPrice(data) {
-  if (Array.isArray(data)) {
-    const first = data[0];
-
-    return num(
-      first?.price_ngn ??
-        first?.rate ??
-        first?.price ??
-        first?.cost ??
-        first?.amount
-    );
-  }
-
-  if (
-    data?.data &&
-    typeof data.data === "object"
-  ) {
-    return num(
-      data.data?.price_ngn ??
-        data.data?.rate ??
-        data.data?.price ??
-        data.data?.cost ??
-        data.data?.amount
-    );
-  }
-
-  return num(
-    data?.price_ngn ??
-      data?.rate ??
-      data?.price ??
-      data?.cost ??
-      data?.amount
+function getProviderError(
+  data,
+  fallback
+) {
+  return clean(
+    data?.message ||
+    data?.error ||
+    data?.type ||
+    data?.msg ||
+    data?.raw ||
+    fallback
   );
 }
+
 
 /*
 =========================================================
@@ -182,6 +220,12 @@ async function getWallet(
   base44,
   userEmail
 ) {
+  if (!userEmail) {
+    throw new Error(
+      "User email is required."
+    );
+  }
+
   const wallets =
     await base44.entities.Wallet.filter({
       userEmail
@@ -198,9 +242,11 @@ async function getWallet(
 
   return {
     wallet,
-    balance: num(wallet.balance)
+    balance:
+      num(wallet.balance)
   };
 }
+
 
 async function updateWallet(
   base44,
@@ -210,21 +256,69 @@ async function updateWallet(
   await base44.entities.Wallet.update(
     wallet.id,
     {
-      balance: newBalance
+      balance:
+        Number(newBalance)
     }
   );
 }
 
+
 /*
 =========================================================
-FLEEXA SERVICES
+FLEEXA
 =========================================================
+*/
+
+
+function extractFleexaPrice(data) {
+  if (Array.isArray(data)) {
+    const first =
+      data[0];
+
+    return num(
+      first?.price_ngn ??
+      first?.rate ??
+      first?.price ??
+      first?.cost ??
+      first?.amount
+    );
+  }
+
+  if (
+    data?.data &&
+    typeof data.data ===
+      "object" &&
+    !Array.isArray(data.data)
+  ) {
+    return num(
+      data.data?.price_ngn ??
+      data.data?.rate ??
+      data.data?.price ??
+      data.data?.cost ??
+      data.data?.amount
+    );
+  }
+
+  return num(
+    data?.price_ngn ??
+    data?.rate ??
+    data?.price ??
+    data?.cost ??
+    data?.amount
+  );
+}
+
+
+/*
+---------------------------------------------------------
+FLEEXA SERVICES
+---------------------------------------------------------
 */
 
 async function fleexaServices() {
   if (!FLEEXA_KEY) {
     throw new Error(
-      "FLEEXA_API_KEY is missing from Base44 Secrets."
+      "Server 1 is not configured. FLEEXA_API_KEY is missing."
     );
   }
 
@@ -233,28 +327,36 @@ async function fleexaServices() {
       `${FLEEXA_BASE}/sms4/apps`,
       {
         method: "GET",
-        headers: fleexaHeaders()
+        headers:
+          fleexaHeaders()
       }
     );
 
   const data =
-    await readResponse(response);
+    await readResponse(
+      response
+    );
 
   if (!response.ok) {
     throw new Error(
-      `Fleexa services request failed (${response.status}).`
+      `Server 1 services request failed (${response.status}): ${getProviderError(
+        data,
+        "Provider error"
+      )}`
     );
   }
 
-  let list = getArray(data);
+  let list =
+    getArray(data);
 
   /*
-   * Some APIs can return an object map.
+   * Handle object-map responses.
    */
   if (
     list.length === 0 &&
     data &&
-    typeof data === "object"
+    typeof data ===
+      "object"
   ) {
     const possible =
       data.data ||
@@ -263,23 +365,29 @@ async function fleexaServices() {
 
     if (
       possible &&
-      typeof possible === "object" &&
+      typeof possible ===
+        "object" &&
       !Array.isArray(possible)
     ) {
-      list = Object.entries(
-        possible
-      ).map(([id, value]) => ({
-        id,
-        name:
-          typeof value === "string"
-            ? value
-            : value?.name || id,
-        ...(
-          typeof value === "object"
-            ? value
-            : {}
-        )
-      }));
+      list =
+        Object.entries(
+          possible
+        ).map(
+          ([id, value]) => ({
+            id,
+            name:
+              typeof value ===
+                "string"
+                ? value
+                : value?.name ||
+                  value?.serviceName ||
+                  id,
+            ...(typeof value ===
+            "object"
+              ? value
+              : {})
+          })
+        );
     }
   }
 
@@ -287,77 +395,84 @@ async function fleexaServices() {
     list
       .map((item) => {
         if (
-          typeof item === "string"
+          typeof item ===
+          "string"
         ) {
           return {
             id: item,
             realId: item,
             name: item,
-            provider: "fleexa",
+            provider:
+              "fleexa",
             serverId: "a",
-            country: "US",
-            countryProviderId: "US",
+            country:
+              "US",
+            countryProviderId:
+              "US",
             countryName:
               "United States"
           };
         }
 
-        const id = clean(
-          item?.serviceName ??
+        const id =
+          clean(
+            item?.serviceName ??
             item?.service ??
             item?.id ??
             item?.code ??
             item?.slug
-        );
+          );
 
-        const name = clean(
-          item?.name ??
+        const name =
+          clean(
+            item?.name ??
             item?.serviceName ??
             item?.service ??
             id
-        );
+          );
 
         return {
           id,
           realId: id,
           name,
-          provider: "fleexa",
+          provider:
+            "fleexa",
           serverId: "a",
-          country: "US",
-          countryProviderId: "US",
+          country:
+            "US",
+          countryProviderId:
+            "US",
           countryName:
             "United States"
         };
       })
       .filter(
-        (item) => item.id
+        (item) =>
+          item.id
       );
 
-  /*
-   * WhatsApp first.
-   */
   services.sort(
     (a, b) => {
-      const aWhatsApp =
+      const aw =
         a.name
           .toLowerCase()
           .includes("whatsapp");
 
-      const bWhatsApp =
+      const bw =
         b.name
           .toLowerCase()
           .includes("whatsapp");
 
       if (
-        aWhatsApp &&
-        !bWhatsApp
+        aw &&
+        !bw
       ) {
         return -1;
       }
 
       if (
-        !aWhatsApp &&
-        bWhatsApp
+        bw &&
+        !aw
       ) {
         return 1;
       }
@@ -371,10 +486,11 @@ async function fleexaServices() {
   return services;
 }
 
+
 /*
-=========================================================
+---------------------------------------------------------
 FLEEXA PRICE
-=========================================================
+---------------------------------------------------------
 */
 
 async function fleexaPrice(
@@ -382,38 +498,55 @@ async function fleexaPrice(
 ) {
   if (!FLEEXA_KEY) {
     throw new Error(
-      "FLEEXA_API_KEY is missing from Base44 Secrets."
+      "Server 1 is not configured. FLEEXA_API_KEY is missing."
+    );
+  }
+
+  const serviceName =
+    clean(service);
+
+  if (!serviceName) {
+    throw new Error(
+      "A service is required."
     );
   }
 
   const response =
     await fetch(
       `${FLEEXA_BASE}/sms4/prices?serviceName=${encodeURIComponent(
-        service
+        serviceName
       )}`,
       {
         method: "GET",
-        headers: fleexaHeaders()
+        headers:
+          fleexaHeaders()
       }
     );
 
   const data =
-    await readResponse(response);
+    await readResponse(
+      response
+    );
 
   if (!response.ok) {
     throw new Error(
-      `Fleexa price request failed (${response.status}).`
+      `Server 1 price request failed (${response.status}): ${getProviderError(
+        data,
+        "Provider error"
+      )}`
     );
   }
 
   const providerPrice =
-    extractFleexaPrice(data);
+    extractFleexaPrice(
+      data
+    );
 
   if (
     providerPrice <= 0
   ) {
     throw new Error(
-      `Fleexa returned no valid price for service "${service}".`
+      `No live price is currently available for ${serviceName}.`
     );
   }
 
@@ -423,15 +556,18 @@ async function fleexaPrice(
       customerPrice(
         providerPrice
       ),
-    currency: "NGN",
-    available: true
+    currency:
+      "NGN",
+    available:
+      true
   };
 }
 
+
 /*
-=========================================================
+---------------------------------------------------------
 FLEEXA BUY
-=========================================================
+---------------------------------------------------------
 */
 
 async function fleexaBuy({
@@ -448,16 +584,18 @@ async function fleexaBuy({
   const {
     wallet,
     balance
-  } = await getWallet(
-    base44,
-    userEmail
-  );
+  } =
+    await getWallet(
+      base44,
+      userEmail
+    );
 
   const charge =
     pricing.customerPrice;
 
   if (
-    balance < charge
+    balance <
+    charge
   ) {
     throw new Error(
       `Insufficient wallet balance. Required ₦${charge.toLocaleString()}, available ₦${balance.toLocaleString()}.`
@@ -465,13 +603,14 @@ async function fleexaBuy({
   }
 
   /*
-   * Reserve the user's money BEFORE
-   * purchasing from provider.
+   * Reserve customer's wallet
+   * before provider purchase.
    */
   await updateWallet(
     base44,
     wallet,
-    balance - charge
+    balance -
+      charge
   );
 
   let response;
@@ -482,16 +621,21 @@ async function fleexaBuy({
       await fetch(
         `${FLEEXA_BASE}/sms4/buy`,
         {
-          method: "POST",
+          method:
+            "POST",
           headers:
-            fleexaHeaders(true),
-          body: JSON.stringify({
-            serviceName: service,
-            maxPrice:
-              String(
-                pricing.providerPrice
-              )
-          })
+            fleexaHeaders(
+              true
+            ),
+          body:
+            JSON.stringify({
+              serviceName:
+                service,
+              maxPrice:
+                String(
+                  pricing.providerPrice
+                )
+            })
         }
       );
 
@@ -500,18 +644,16 @@ async function fleexaBuy({
         response
       );
   } catch (error) {
-    /*
-     * Refund our wallet reservation
-     * if provider request itself failed.
-     */
-    await updateWallet(
-      base44,
-      wallet,
-      balance
-    );
+    try {
+      await updateWallet(
+        base44,
+        wallet,
+        balance
+      );
+    } catch {}
 
     throw new Error(
-      `Could not contact Fleexa: ${
+      `Could not contact Server 1: ${
         error?.message ||
         "network error"
       }`
@@ -520,29 +662,22 @@ async function fleexaBuy({
 
   if (
     !response.ok ||
-    data?.success !== true
+    data?.success !==
+      true
   ) {
-    /*
-     * Refund user wallet if provider
-     * rejects the purchase.
-     */
     try {
       await updateWallet(
         base44,
         wallet,
         balance
       );
-    } catch (refundError) {
-      console.error(
-        "FLEEXA WALLET REFUND ERROR:",
-        refundError
-      );
-    }
+    } catch {}
 
     throw new Error(
-      data?.message ||
-        data?.error ||
-        `Fleexa rejected the purchase (${response.status}).`
+      getProviderError(
+        data,
+        `Server 1 rejected the purchase (${response.status}).`
+      )
     );
   }
 
@@ -553,21 +688,17 @@ async function fleexaBuy({
   const phone =
     clean(
       purchase?.phone ||
-        purchase?.number
+      purchase?.number
     );
 
   const activationId =
     clean(
       purchase?.activation_id ||
-        purchase?.requestId ||
-        purchase?.id
+      purchase?.requestId ||
+      purchase?.id
     );
 
   if (!phone) {
-    /*
-     * Refund if provider did not return
-     * a usable number.
-     */
     try {
       await updateWallet(
         base44,
@@ -577,13 +708,21 @@ async function fleexaBuy({
     } catch {}
 
     throw new Error(
-      "Fleexa accepted the purchase but returned no phone number."
+      "Server 1 accepted the purchase but returned no phone number."
     );
   }
 
   if (!activationId) {
+    try {
+      await updateWallet(
+        base44,
+        wallet,
+        balance
+      );
+    } catch {}
+
     throw new Error(
-      "Fleexa returned the phone number but no activation ID. Contact admin before trying again."
+      "Server 1 returned a number but no activation ID. Your wallet has been refunded."
     );
   }
 
@@ -598,7 +737,10 @@ async function fleexaBuy({
             phone,
           orderId:
             `fleexa_${activationId}`,
-          serverId: "a",
+          providerOrderId:
+            activationId,
+          serverId:
+            "a",
           country:
             country ||
             "US",
@@ -609,59 +751,83 @@ async function fleexaBuy({
       );
   } catch (error) {
     console.error(
-      "FLEEXA RENTAL SAVE ERROR:",
+      "SERVER 1 RENTAL SAVE ERROR:",
       error
     );
 
+    /*
+     * Number is already purchased.
+     * Do NOT refund wallet here because
+     * the provider already supplied it.
+     */
     return {
-      success: true,
-      warning:
-        "The number was purchased, but Lemak Connect could not save the rental record. Contact admin before making another purchase.",
+      success:
+        true,
       providerPurchased:
         true,
+      warning:
+        "The number was purchased, but the rental record could not be saved. Contact admin before making another purchase.",
       phone,
       orderId:
         `fleexa_${activationId}`,
-      charged: charge
+      charged:
+        charge,
+      providerPrice:
+        pricing.providerPrice
     };
   }
 
   return {
-    success: true,
-    provider: "fleexa",
-    serverId: "a",
+    success:
+      true,
+    provider:
+      "fleexa",
+    serverId:
+      "a",
     phone,
     orderId:
       `fleexa_${activationId}`,
     rentalId:
       rental?.id,
-    charged: charge,
+    charged:
+      charge,
     providerPrice:
       pricing.providerPrice,
-    currency: "NGN",
-    country: "US",
+    currency:
+      "NGN",
+    country:
+      "US",
     countryName:
       "United States"
   };
 }
 
+
 /*
-=========================================================
+---------------------------------------------------------
 FLEEXA CHECK OTP
-=========================================================
+---------------------------------------------------------
 */
 
 async function fleexaCheck(
   requestId
 ) {
+  if (!requestId) {
+    throw new Error(
+      "Fleexa request ID is missing."
+    );
+  }
+
   const response =
     await fetch(
       `${FLEEXA_BASE}/sms4/check/${encodeURIComponent(
         requestId
       )}`,
       {
-        method: "GET",
-        headers: fleexaHeaders()
+        method:
+          "GET",
+        headers:
+          fleexaHeaders()
       }
     );
 
@@ -672,7 +838,10 @@ async function fleexaCheck(
 
   if (!response.ok) {
     throw new Error(
-      `Fleexa OTP check failed (${response.status}).`
+      `Server 1 OTP check failed (${response.status}): ${getProviderError(
+        data,
+        "Provider error"
+      )}`
     );
   }
 
@@ -681,8 +850,10 @@ async function fleexaCheck(
     data;
 
   return {
-    success: true,
-    provider: "fleexa",
+    success:
+      true,
+    provider:
+      "fleexa",
     status:
       result?.status ||
       result?.state ||
@@ -703,25 +874,36 @@ async function fleexaCheck(
   };
 }
 
+
 /*
-=========================================================
+---------------------------------------------------------
 FLEEXA CANCEL
-=========================================================
+---------------------------------------------------------
 */
 
 async function fleexaCancel(
   requestId
 ) {
+  if (!requestId) {
+    throw new Error(
+      "Fleexa request ID is missing."
+    );
+  }
+
   const response =
     await fetch(
       `${FLEEXA_BASE}/sms4/cancel`,
       {
-        method: "POST",
+        method:
+          "POST",
         headers:
-          fleexaHeaders(true),
-        body: JSON.stringify({
-          requestId
-        })
+          fleexaHeaders(
+            true
+          ),
+        body:
+          JSON.stringify({
+            requestId
+          })
       }
     );
 
@@ -732,36 +914,40 @@ async function fleexaCancel(
 
   if (!response.ok) {
     throw new Error(
-      data?.message ||
-        data?.error ||
-        `Fleexa cancellation failed (${response.status}).`
+      getProviderError(
+        data,
+        `Server 1 cancellation failed (${response.status}).`
+      )
     );
   }
 
   return {
-    success: true,
-    provider: "fleexa",
-    response: data
+    success:
+      true,
+    provider:
+      "fleexa",
+    response:
+      data
   };
 }
 
+
 /*
 =========================================================
-SMSPOOL STUB
+SMSPOOL HELPERS
 =========================================================
 */
 
-async function smsPoolStub(
-  params
+
+async function smsPoolPost(
+  path,
+  params = {}
 ) {
   if (!SMSPOOL_KEY) {
     throw new Error(
-      "SMSPOOL_API_KEY is missing from Base44 Secrets."
+      "Server 2 is not configured. SMSPOOL_API_KEY is missing."
     );
   }
-
-  const url =
-    `${SMSPOOL_BASE}/stubs/handler_api`;
 
   const form =
     new URLSearchParams();
@@ -772,12 +958,18 @@ async function smsPoolStub(
   );
 
   for (
-    const [key, value] of
-    Object.entries(params)
+    const [key, value]
+    of Object.entries(
+      params
+    )
   ) {
     if (
-      value !== undefined &&
-      value !== null
+      value !==
+        undefined &&
+      value !==
+        null &&
+      value !==
+        ""
     ) {
       form.set(
         key,
@@ -786,44 +978,49 @@ async function smsPoolStub(
     }
   }
 
-  form.set(
-    "setting",
-    "smspool"
-  );
-
-  const response =
-    await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type":
-          "application/x-www-form-urlencoded"
-      },
-      body:
-        form.toString()
-    });
-
-  const text =
-    await response.text();
-
-  let data;
+  let response;
 
   try {
-    data =
-      JSON.parse(text);
-  } catch {
-    data = {
-      raw: text
-    };
+    response =
+      await fetch(
+        `${SMSPOOL_BASE}${path}`,
+        {
+          method:
+            "POST",
+          headers: {
+            "Content-Type":
+              "application/x-www-form-urlencoded"
+          },
+          body:
+            form.toString()
+        }
+      );
+  } catch (error) {
+    throw new Error(
+      `Could not contact Server 2: ${
+        error?.message ||
+        "network error"
+      }`
+    );
   }
+
+  const data =
+    await readResponse(
+      response
+    );
 
   if (!response.ok) {
     throw new Error(
-      `SMSPool request failed (${response.status}).`
+      `Server 2 request failed (${response.status}): ${getProviderError(
+        data,
+        "Provider error"
+      )}`
     );
   }
 
   return data;
 }
+
 
 /*
 =========================================================
@@ -835,12 +1032,14 @@ function normalizeSmsPoolServices(
   data
 ) {
   /*
-   * SMSPool's compatible API can return
-   * an object keyed by service ID.
+   * SMSPool's compatible stub
+   * can return an object keyed
+   * by service ID.
    */
   if (
     data &&
-    typeof data === "object" &&
+    typeof data ===
+      "object" &&
     !Array.isArray(data)
   ) {
     const source =
@@ -850,7 +1049,8 @@ function normalizeSmsPoolServices(
 
     if (
       source &&
-      typeof source === "object" &&
+      typeof source ===
+        "object" &&
       !Array.isArray(source)
     ) {
       return Object.entries(
@@ -868,159 +1068,22 @@ function normalizeSmsPoolServices(
                   id;
 
             return {
-              id: clean(id),
-              realId: clean(id),
-              name: clean(name),
+              id:
+                clean(id),
+              realId:
+                clean(id),
+              name:
+                clean(name),
               provider:
                 "smspool",
-              serverId: "b"
+              serverId:
+                "b"
             };
           }
         )
         .filter(
-          (item) => item.id
-        );
-    }
-  }
-
-  const array =
-    getArray(data);
-
-  return array
-    .map((item) => {
-      if (
-        typeof item === "string"
-      ) {
-        return {
-          id: item,
-          realId: item,
-          name: item,
-          provider:
-            "smspool",
-          serverId: "b"
-        };
-      }
-
-      const id =
-        clean(
-          item?.service ??
-            item?.service_id ??
-            item?.id ??
-            item?.code
-        );
-
-      const name =
-        clean(
-          item?.name ??
-            item?.service_name ??
-            item?.service ??
-            id
-        );
-
-      return {
-        id,
-        realId: id,
-        name,
-        provider:
-          "smspool",
-        serverId: "b"
-      };
-    })
-    .filter(
-      (item) => item.id
-    );
-}
-
-async function smsPoolServices() {
-  const data =
-    await smsPoolStub({
-      action:
-        "getServicesList"
-    });
-
-  const services =
-    normalizeSmsPoolServices(
-      data
-    );
-
-  if (
-    services.length === 0
-  ) {
-    throw new Error(
-      "SMSPool returned no available services."
-    );
-  }
-
-  services.sort(
-    (a, b) =>
-      a.name.localeCompare(
-        b.name
-      )
-  );
-
-  return services;
-}
-
-/*
-=========================================================
-SMSPOOL COUNTRIES
-=========================================================
-*/
-
-function normalizeSmsPoolCountries(
-  data
-) {
-  if (
-    data &&
-    typeof data === "object" &&
-    !Array.isArray(data)
-  ) {
-    const source =
-      data.countries ||
-      data.data ||
-      data;
-
-    if (
-      source &&
-      typeof source === "object" &&
-      !Array.isArray(source)
-    ) {
-      return Object.entries(
-        source
-      )
-        .map(
-          ([id, value]) => {
-            const name =
-              typeof value ===
-                "string"
-                ? value
-                : value?.name ||
-                  value?.country_name ||
-                  value?.country ||
-                  id;
-
-            const code =
-              typeof value ===
-                "object"
-                ? clean(
-                    value?.iso ||
-                      value?.iso2 ||
-                      value?.country_code ||
-                      ""
-                  )
-                : "";
-
-            return {
-              id: clean(id),
-              providerId:
-                clean(id),
-              name: clean(name),
-              code
-            };
-          }
-        )
-        .filter(
-          (item) => item.id
+          (item) =>
+            item.id
         );
     }
   }
@@ -1028,133 +1091,62 @@ function normalizeSmsPoolCountries(
   return getArray(data)
     .map((item) => {
       if (
-        typeof item === "string"
+        typeof item ===
+        "string"
       ) {
         return {
-          id: item,
-          providerId: item,
-          name: item,
-          code: item
+          id:
+            item,
+          realId:
+            item,
+          name:
+            item,
+          provider:
+            "smspool",
+          serverId:
+            "b"
         };
       }
 
       const id =
         clean(
-          item?.country ??
-            item?.country_id ??
-            item?.id ??
-            item?.code
+          item?.service ??
+          item?.service_id ??
+          item?.id ??
+          item?.code
         );
 
       const name =
         clean(
           item?.name ??
-            item?.country_name ??
-            item?.country ??
-            id
-        );
-
-      const code =
-        clean(
-          item?.iso ||
-            item?.iso2 ||
-            item?.country_code ||
-            ""
+          item?.service_name ??
+          item?.service ??
+          id
         );
 
       return {
         id,
-        providerId: id,
+        realId:
+          id,
         name,
-        code
+        provider:
+          "smspool",
+        serverId:
+          "b"
       };
     })
     .filter(
-      (item) => item.id
+      (item) =>
+        item.id
     );
 }
 
-async function smsPoolCountries() {
-  const data =
-    await smsPoolStub({
-      action:
-        "getCountriesList"
-    });
-
-  const countries =
-    normalizeSmsPoolCountries(
-      data
-    );
-
-  if (
-    countries.length === 0
-  ) {
-    throw new Error(
-      "SMSPool returned no available countries."
-    );
-  }
-
-  countries.sort(
-    (a, b) =>
-      a.name.localeCompare(
-        b.name
-      )
-  );
-
-  return countries;
-}
 
 /*
-=========================================================
-SMSPOOL PRICE
-=========================================================
+---------------------------------------------------------
+SMSPOOL SERVICES
+---------------------------------------------------------
 */
 
-async function smsPoolPrice({
-  service,
-  country
-}) {
-  if (!SMSPOOL_KEY) {
-    throw new Error(
-      "SMSPOOL_API_KEY is missing from Base44 Secrets."
-    );
-  }
-
-  const form =
-    new URLSearchParams();
-
-  form.set(
-    "key",
-    SMSPOOL_KEY
-  );
-
-  form.set(
-    "service",
-    String(service)
-  );
-
-  form.set(
-    "country",
-    String(country)
-  );
-
-  const response =
-    await fetch(
-      `${SMSPOOL_BASE}/request/price`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/x-www-form-urlencoded"
-        },
-        body:
-          form.toString()
-      }
-    );
-
-  const data =
-    await readResponse(
-      response
-    );
-
-  
+async function smsPoolServices() {
+  if (!SMSPOOL

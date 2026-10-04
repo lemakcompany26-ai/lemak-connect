@@ -758,5 +758,364 @@ export default function LemakExpertProduct() {
                           <Check className="h-4 w-4" />
                         </div>
                       )}
+                    </div>
 
-                      <
+                    <div className="p-4">
+                      <h4 className="truncate font-bold text-slate-900">
+                        {category.name}
+                      </h4>
+
+                      <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                        {category.description}
+                      </p>
+
+                      <div className="mt-3 flex items-center justify-between text-xs">
+                        <span className="font-semibold text-blue-600">
+                          {category.options?.length || 0}{" "}
+                          options
+                        </span>
+
+                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                      </div>
+                    </div>
+                  </button>
+                );
+              }
+            )}
+          </div>
+        </section>
+
+        {/* SELECTED CATEGORY + BOOKING */}
+        {selectedCategory && (
+          <section className="mt-10 grid gap-6 pb-10 lg:grid-cols-3">
+            {/* OPTIONS */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <ShoppingBag className="h-5 w-5 text-blue-600" />
+
+                  <h3 className="text-lg font-bold text-slate-900">
+                    {selectedCategory.name}
+                  </h3>
+                </div>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedCategory.description}
+                </p>
+
+                <div className="mt-5 space-y-2">
+                  {(selectedCategory.options || []).map(
+                    (option) => {
+                      const optionActive =
+                        option.id ===
+                        selectedOptionId;
+
+                      return (
+                        <button
+                          key={option.id}
+                          onClick={() =>
+                            selectOption(option)
+                          }
+                          className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${
+                            optionActive
+                              ? "border-blue-600 bg-blue-50 ring-1 ring-blue-100"
+                              : "border-slate-200 hover:border-blue-300"
+                          }`}
+                        >
+                          <span
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                              optionActive
+                                ? "border-blue-600 bg-blue-600 text-white"
+                                : "border-slate-300"
+                            }`}
+                          >
+                            {optionActive && (
+                              <Check className="h-3 w-3" />
+                            )}
+                          </span>
+
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">
+                            {option.name}
+                          </span>
+
+                          <span className="shrink-0 text-sm font-bold text-slate-900">
+                            {formatNaira(
+                              option.unitPrice
+                            )}
+                          </span>
+                        </button>
+                      );
+                    }
+                  )}
+                </div>
+              </div>
+
+              {/* QUANTITY */}
+              <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                <h4 className="text-sm font-bold text-slate-900">
+                  Quantity
+                </h4>
+
+                <div className="mt-3 flex items-center gap-4">
+                  <button
+                    onClick={decreaseQuantity}
+                    disabled={quantity <= 1}
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 hover:bg-slate-50 disabled:opacity-40"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+
+                  <span className="min-w-[3rem] text-center text-lg font-extrabold text-slate-900">
+                    {quantity}
+                  </span>
+
+                  <button
+                    onClick={increaseQuantity}
+                    className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 hover:bg-slate-50"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+
+                  <span className="ml-auto text-sm font-semibold text-blue-600">
+                    {formatNaira(total)}
+                  </span>
+                </div>
+              </div>
+
+              {/* BOOKING DETAILS */}
+              <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                <h4 className="text-sm font-bold text-slate-900">
+                  Booking details
+                </h4>
+
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                      <CalendarDays className="h-3.5 w-3.5" />
+                      Service date
+                    </label>
+
+                    <input
+                      type="date"
+                      value={bookingDate}
+                      onChange={(event) =>
+                        setBookingDate(
+                          event.target.value
+                        )
+                      }
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                      <MapPin className="h-3.5 w-3.5" />
+                      Service location
+                    </label>
+
+                    <input
+                      value={location}
+                      onChange={(event) =>
+                        setLocation(
+                          event.target.value
+                        )
+                      }
+                      placeholder="e.g. No. 2 Opeyemi, Zone 2, Alakia, Ibadan"
+                      className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600">
+                      Notes (optional)
+                    </label>
+
+                    <textarea
+                      value={notes}
+                      onChange={(event) =>
+                        setNotes(
+                          event.target.value
+                        )
+                      }
+                      rows={3}
+                      placeholder="Anything the team should know..."
+                      className="mt-1.5 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* CHECKOUT SUMMARY */}
+            <div className="lg:col-span-1">
+              <div className="sticky top-24 space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Star className="h-5 w-5 text-blue-600" />
+
+                  <h4 className="text-base font-bold text-slate-900">
+                    Order summary
+                  </h4>
+                </div>
+
+                <div className="space-y-2 rounded-xl bg-slate-50 p-4 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-slate-600">
+                      {selectedOption?.name ||
+                        "No option selected"}
+                    </span>
+
+                    <span className="shrink-0 font-semibold text-slate-900">
+                      {formatNaira(
+                        selectedOption?.unitPrice
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600">
+                      Quantity
+                    </span>
+
+                    <span className="font-semibold text-slate-900">
+                      {quantity}
+                    </span>
+                  </div>
+
+                  <div className="border-t border-slate-200 pt-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-900">
+                        Total
+                      </span>
+
+                      <span className="text-lg font-extrabold text-blue-600">
+                        {formatNaira(total)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+                    {error}
+                  </div>
+                )}
+
+                <Button
+                  className="h-12 w-full text-base font-bold"
+                  disabled={checkoutLoading}
+                  onClick={() =>
+                    setShowCheckout(true)
+                  }
+                >
+                  Continue
+                </Button>
+
+                <p className="flex items-center justify-center gap-1.5 text-center text-xs text-slate-500">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Paid securely before service
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+      </main>
+
+      {/* CHECKOUT SHEET */}
+      {showCheckout && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center">
+          <div className="w-full max-w-lg rounded-t-3xl bg-white p-6 sm:rounded-3xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900">
+                Confirm booking
+              </h3>
+
+              <button
+                onClick={() =>
+                  setShowCheckout(false)
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 hover:bg-slate-50"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3 rounded-2xl bg-slate-50 p-4 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-600">
+                  Service
+                </span>
+
+                <span className="truncate font-semibold text-slate-900">
+                  {selectedCategory?.name}
+                  {" \u00b7 "}
+                  {selectedOption?.name}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">
+                  Quantity
+                </span>
+
+                <span className="font-semibold text-slate-900">
+                  {quantity}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">
+                  Date
+                </span>
+
+                <span className="font-semibold text-slate-900">
+                  {bookingDate || "Not selected"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">
+                  Location
+                </span>
+
+                <span className="max-w-[55%] truncate text-right font-semibold text-slate-900">
+                  {location || "Not provided"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-slate-200 pt-3">
+                <span className="font-bold text-slate-900">
+                  Total
+                </span>
+
+                <span className="text-lg font-extrabold text-blue-600">
+                  {formatNaira(total)}
+                </span>
+              </div>
+            </div>
+
+            <Button
+              className="mt-5 h-12 w-full text-base font-bold"
+              disabled={checkoutLoading}
+              onClick={handleCheckout}
+            >
+              {checkoutLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                `Pay ${formatNaira(total)}`
+              )}
+            </Button>
+
+            <button
+              onClick={() =>
+                setShowCheckout(false)
+              }
+              className="mt-3 w-full text-center text-sm font-medium text-slate-500"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,141 +1,612 @@
-import { useCallback, useEffect, useState } from 'react';
-import { base44 } from '@/api/base44Client';
-import { formatNaira } from '@/lib/format';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Copy,
+  Globe2,
+  Loader2,
+  MessageSquare,
+  Phone,
+  RefreshCw,
+  Server,
+  ShieldCheck,
+  Smartphone,
+  Timer,
+  X,
+} from "lucide-react";
+import { base44 } from "@/api/base44Client";
+import { formatNaira } from "@/lib/utils";
 
-const SOCIAL = ['whatsapp','telegram','facebook','instagram','tiktok','twitter','x','google','youtube','snapchat','discord'];
+export default function VirtualNumbers() {
+  const [servers, setServers] = useState([]);
+  const [selectedServer, setSelectedServer] = useState(null);
+  const [catalog, setCatalog] = useState(null);
 
-export default function VirtualNumbers(){
-  const [servers,setServers]=useState([]);
-  const [selectedServer,setSelectedServer]=useState(null);
-  const [country,setCountry]=useState('US');
-  const [catalog,setCatalog]=useState(null);
-  const [tab,setTab]=useState('sms');
-  const [prices,setPrices]=useState({});
-  const [loading,setLoading]=useState(true);
+  const [country, setCountry] = useState("US");
+  const [countryName, setCountryName] = useState("United States");
+  const [countryProviderId, setCountryProviderId] = useState("US");
 
-  const load = useCallback(async()=>{
-    setLoading(true);
-    try{
-      const r = await base44.functions.invoke('virtualNumbers',{action:'provider_catalog'});
-      const d = r.data || r;
-      setServers(d.servers || []);
-    }catch(e){ console.log('catalog error',e); }
-    setLoading(false);
-  },[]);
+  const [tab, setTab] = useState("sms");
+  const [prices, setPrices] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [loadingPrices, setLoadingPrices] = useState(false);
+  const [buying, setBuying] = useState(null);
 
-  useEffect(()=>{ load(); },[load]);
+  const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
+  const [purchasedNumber, setPurchasedNumber] = useState(null);
 
-  const selectServer = (s)=>{
-    setSelectedServer(s.id);
-    setCatalog(s);
-    if(s.id==='a'){ setCountry('US'); setTab('sms'); }
-    else { setCountry(''); setTab('sms'); }
-    setPrices({});
-    if(s.smsServices && s.smsServices.length){
-      s.smsServices.slice(0,20).forEach(async(item)=>{
-        try{
-          const res = await base44.functions.invoke('virtualNumbers',{action:'quote',serverId:s.id,country:s.id==='a'?'US':(country||'NG'),services:[item.id]});
-          const p = (res.data||res).prices || {};
-          setPrices(prev=>({...prev,...p}));
-        }catch{}
+  const [otp, setOtp] = useState(null);
+  const [checkingOtp, setCheckingOtp] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  const [timeLeft, setTimeLeft] = useState(420);
+
+  const loadCatalog = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const res = await base44.functions.invoke("virtualNumbers", {
+        action: "catalog",
       });
-    }
-  };
 
-  const selectCountry = async(code)=>{
-    setCountry(code);
+      const data = res?.data || res;
+
+      if (!data?.success) {
+        throw new Error(data?.error || "Unable to load virtual-number servers.");
+      }
+
+      const list = Array.isArray(data.servers) ? data.servers : [];
+
+      setServers(list);
+
+      if (!selectedServer && list.length) {
+        setSelectedServer(list[0]);
+      }
+    } catch (err) {
+      setError(err?.message || "Unable to load virtual-number servers.");
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedServer]);
+
+  const loadServerData = useCallback(async () => {
+    if (!selectedServer?.id) return;
+
+    try {
+      setLoading(true);
+      setError("");
+      setPrices({});
+      setCatalog(null);
+
+      const serviceRes = await base44.functions.invoke("virtualNumbers", {
+        action: "services",
+        serverId: selectedServer.id,
+      });
+
+      const serviceData = serviceRes?.data || serviceRes;
+
+      if (!serviceData?.success) {
+        throw new Error(
+          serviceData?.error || "Unable to load available services."
+        );
+      }
+
+      const serviceList = Array.isArray(serviceData.services)
+        ? serviceData.services
+        : [];
+
+      let countries = [];
+
+      const countryRes = await base44.functions.invoke("virtualNumbers", {
+        action: "countries",
+        serverId: selectedServer.id,
+      });
+
+      const countryData = countryRes?.data || countryRes;
+
+      if (countryData?.success && Array.isArray(countryData.countries)) {
+        countries = countryData.countries;
+      }
+
+      setCatalog({
+        services: serviceList,
+        countries,
+      });
+
+      if (selectedServer.id === "a") {
+        const us =
+          countries.find(
+            (x) =>
+              String(x.id || "").toUpperCase() === "US" ||
+              String(x.providerId || "").toUpperCase() === "US"
+          ) || {
+            id: "US",
+            providerId: "US",
+            name: "United States",
+            code: "US",
+          };
+
+        setCountry(us.id || "US");
+        setCountryProviderId(us.providerId || us.id || "US");
+        setCountryName(us.name || "United States");
+      } else if (countries.length) {
+        const first = countries[0];
+
+        setCountry(first.id || first.providerId || "");
+        setCountryProviderId(
+          first.providerId || first.id || first.code || ""
+        );
+        setCountryName(first.name || first.country || first.title || "");
+      } else {
+        setCountry("");
+        setCountryProviderId("");
+        setCountryName("");
+      }
+    } catch (err) {
+      setError(err?.message || "Unable to load virtual-number services.");
+      setCatalog({ services: [], countries: [] });
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedServer]);
+
+  useEffect(() => {
+    loadCatalog();
+  }, [loadCatalog]);
+
+  useEffect(() => {
+    if (selectedServer) {
+      loadServerData();
+    }
+  }, [selectedServer, loadServerData]);
+
+  const services = useMemo(() => {
+    const list = Array.isArray(catalog?.services) ? catalog.services : [];
+
+    const filtered = list.filter((item) => {
+      const text = `${item.name || ""} ${item.id || ""}`.toLowerCase();
+      return text.includes(search.toLowerCase());
+    });
+
+    return filtered;
+  }, [catalog, search]);
+
+  const countries = useMemo(() => {
+    return Array.isArray(catalog?.countries) ? catalog.countries : [];
+  }, [catalog]);
+
+  const loadPrice = useCallback(
+    async (item) => {
+      if (!selectedServer?.id || !item?.id) return;
+
+      try {
+        setLoadingPrices(true);
+
+        const res = await base44.functions.invoke("virtualNumbers", {
+          action: "price",
+          serverId: selectedServer.id,
+          service: item.id,
+          realId: item.realId || item.id,
+          country,
+          countryProviderId,
+        });
+
+        const data = res?.data || res;
+
+        if (!data?.success) {
+          throw new Error(data?.error || "Price unavailable.");
+        }
+
+        setPrices((old) => ({
+          ...old,
+          [item.id]: data,
+        }));
+      } catch (err) {
+        setPrices((old) => ({
+          ...old,
+          [item.id]: {
+            error: err?.message || "Price unavailable.",
+          },
+        }));
+      } finally {
+        setLoadingPrices(false);
+      }
+    },
+    [selectedServer, country, countryProviderId]
+  );
+
+  useEffect(() => {
+    if (!services.length || !selectedServer) return;
+
+    let cancelled = false;
+
+    const loadAllPrices = async () => {
+      setLoadingPrices(true);
+
+      for (const item of services) {
+        if (cancelled) break;
+
+        try {
+          const res = await base44.functions.invoke("virtualNumbers", {
+            action: "price",
+            serverId: selectedServer.id,
+            service: item.id,
+            realId: item.realId || item.id,
+            country,
+            countryProviderId,
+          });
+
+          const data = res?.data || res;
+
+          if (!cancelled) {
+            setPrices((old) => ({
+              ...old,
+              [item.id]: data?.success
+                ? data
+                : { error: data?.error || "Price unavailable." },
+            }));
+          }
+        } catch (err) {
+          if (!cancelled) {
+            setPrices((old) => ({
+              ...old,
+              [item.id]: {
+                error: err?.message || "Price unavailable.",
+              },
+            }));
+          }
+        }
+      }
+
+      if (!cancelled) setLoadingPrices(false);
+    };
+
+    loadAllPrices();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [services, selectedServer, country, countryProviderId]);
+
+  const handleCountryChange = (e) => {
+    const value = e.target.value;
+    const selected =
+      countries.find(
+        (item) =>
+          String(item.id) === String(value) ||
+          String(item.providerId) === String(value)
+      ) || null;
+
+    setCountry(value);
+    setCountryProviderId(
+      selected?.providerId || selected?.id || selected?.code || value
+    );
+    setCountryName(
+      selected?.name ||
+        selected?.country ||
+        selected?.title ||
+        value
+    );
     setPrices({});
-    if(!catalog) return;
-    for(let i=0;i<Math.min(20,catalog.smsServices.length);i++){
-      const item = catalog.smsServices[i];
-      try{
-        const res = await base44.functions.invoke('virtualNumbers',{action:'quote',serverId:catalog.id,country:code,services:[item.id]});
-        const p = (res.data||res).prices || {};
-        setPrices(prev=>({...prev,...p}));
-      }catch{}
+  };
+
+  const handleServerChange = (server) => {
+    setSelectedServer(server);
+    setSearch("");
+    setPrices({});
+    setPurchasedNumber(null);
+    setOtp(null);
+    setTab("sms");
+  };
+
+  const handleBuy = async (item) => {
+    if (!catalog) return;
+
+    const priceData = prices[item.id];
+
+    if (!priceData?.customerPrice) {
+      alert(
+        "The live provider price has not loaded yet. Please wait a moment and try again."
+      );
+      return;
+    }
+
+    const priceValue = Number(priceData.customerPrice);
+
+    if (!Number.isFinite(priceValue) || priceValue <= 0) {
+      alert("The live price for this service is unavailable.");
+      return;
+    }
+
+    if (!country) {
+      alert("Please select a country first.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Buy ${item.name || item.id} for ${formatNaira(priceValue)}?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setBuying(item.id);
+      setError("");
+      setOtp(null);
+
+      const user = await base44.auth.me();
+
+      if (!user?.email) {
+        throw new Error("Please log in before buying a virtual number.");
+      }
+
+      const res = await base44.functions.invoke("virtualNumbers", {
+        action: "order",
+        serverId: selectedServer.id,
+        service: item.id,
+        realId: item.realId || item.id,
+        country,
+        countryName,
+        countryProviderId,
+        price: priceValue,
+        userEmail: user.email,
+      });
+
+      const data = res?.data || res;
+
+      if (!data?.success) {
+        throw new Error(data?.error || "Unable to purchase this number.");
+      }
+
+      if (!data?.phone) {
+        throw new Error(
+          "The provider completed the order but did not return a phone number."
+        );
+      }
+
+      const purchase = {
+        phone: data.phone,
+        orderId: data.orderId || data.requestId,
+        requestId: data.requestId || data.orderId,
+        rentalId: data.rentalId,
+        charged: data.charged ?? priceValue,
+        customerPrice: data.customerPrice ?? priceValue,
+        providerPrice: data.providerPrice,
+        currency: data.currency || "NGN",
+        service: item.name || item.id,
+        serviceId: item.id,
+        country: data.country || country,
+        countryName: data.countryName || countryName,
+        status: data.status || "waiting_sms",
+        serverId: selectedServer.id,
+      };
+
+      setPurchasedNumber(purchase);
+      setOtp(null);
+      setTimeLeft(420);
+
+      alert(
+        `Virtual number purchased successfully.\n\nNumber: ${purchase.phone}\nOrder ID: ${purchase.orderId}`
+      );
+    } catch (err) {
+      const message =
+        err?.response?.data?.error ||
+        err?.message ||
+        "Unable to purchase virtual number.";
+
+      setError(message);
+      alert(message);
+    } finally {
+      setBuying(null);
     }
   };
 
-  if(loading) return <div className="p-10 text-center text-zinc-400">Loading servers...</div>;
+  const checkOtp = useCallback(async () => {
+    if (!purchasedNumber?.orderId && !purchasedNumber?.requestId) return;
 
-  if(!selectedServer){
+    try {
+      setCheckingOtp(true);
+      setError("");
+
+      const res = await base44.functions.invoke("virtualNumbers", {
+        action: "checkOtp",
+        serverId: purchasedNumber.serverId || selectedServer?.id,
+        orderId: purchasedNumber.orderId,
+        requestId: purchasedNumber.requestId || purchasedNumber.orderId,
+      });
+
+      const data = res?.data || res;
+
+      if (!data?.success) {
+        throw new Error(data?.error || "Unable to check OTP.");
+      }
+
+      setOtp({
+        status: data.status,
+        code: data.code || "",
+        smsText: data.smsText || data.sms || "",
+        phone: data.phone || purchasedNumber.phone,
+      });
+
+      if (data.code) {
+        setTimeLeft(0);
+      }
+    } catch (err) {
+      setError(err?.message || "Unable to check OTP.");
+    } finally {
+      setCheckingOtp(false);
+    }
+  }, [purchasedNumber, selectedServer]);
+
+  const cancelOrder = async () => {
+    if (!purchasedNumber?.orderId && !purchasedNumber?.requestId) return;
+
+    const confirmed = window.confirm(
+      "Cancel this virtual number and request a refund if the provider allows it?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setCancelling(true);
+      setError("");
+
+      const res = await base44.functions.invoke("virtualNumbers", {
+        action: "cancel",
+        serverId: purchasedNumber.serverId || selectedServer?.id,
+        orderId: purchasedNumber.orderId,
+        requestId: purchasedNumber.requestId || purchasedNumber.orderId,
+      });
+
+      const data = res?.data || res;
+
+      if (!data?.success) {
+        throw new Error(data?.error || "Unable to cancel this order.");
+      }
+
+      setPurchasedNumber(null);
+      setOtp(null);
+      setTimeLeft(420);
+
+      alert(data?.message || "Virtual-number order cancelled.");
+    } catch (err) {
+      const message = err?.message || "Unable to cancel this order.";
+      setError(message);
+      alert(message);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!purchasedNumber || timeLeft <= 0) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((value) => {
+        if (value <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+
+        return value - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [purchasedNumber, timeLeft]);
+
+  useEffect(() => {
+    if (!purchasedNumber || timeLeft <= 0) return;
+
+    const interval = setInterval(() => {
+      checkOtp();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [purchasedNumber, timeLeft, checkOtp]);
+
+  const formatTimer = (seconds) => {
+    const min = Math.floor(seconds / 60);
+    const sec = seconds % 60;
+
+    return `${String(min).padStart(2, "0")}:${String(sec).padStart(
+      2,
+      "0"
+    )}`;
+  };
+
+  const copyNumber = async () => {
+    if (!purchasedNumber?.phone) return;
+
+    try {
+      await navigator.clipboard.writeText(purchasedNumber.phone);
+      alert("Phone number copied.");
+    } catch {
+      alert(purchasedNumber.phone);
+    }
+  };
+
+  if (loading && !catalog && !servers.length) {
     return (
-      <div className="p-4 space-y-4">
-        <h1 className="text-white text-xl font-bold">Choose Server To Start</h1>
-        <p className="text-xs text-zinc-400">You must select Server 1 or Server 2 before you see live numbers.</p>
-        <div className="grid gap-3">
-          {servers.map(s=>{
-            return (
-              <button key={s.id} onClick={()=>selectServer(s)} className={"p-5 rounded-2xl border text-left "+(s.online?"border-zinc-700 bg-zinc-800 hover:border-amber-400":"border-red-900/50 bg-zinc-900 opacity-50")}>
-                <div className="text-white font-bold">{s.id==='a'?'Server 1 - Fleexa (US Only)':'Server 2 - SmsPool (All Countries)'}</div>
-                <div className="text-xs text-zinc-400 mt-1">{s.online? s.smsStock+" live services - "+(s.countries?s.countries.length:0)+" countries":"Offline - check API keys"}</div>
-                <div className="mt-2 text-xs text-amber-400 font-bold">Tap to select →</div>
-              </button>
-            )
-          })}
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <p className="text-sm text-muted-foreground">
+            Loading virtual numbers...
+          </p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="p-4 space-y-4 pb-20">
-      <div className="flex justify-between items-center">
-        <button onClick={()=>{ setSelectedServer(null); setCatalog(null); }} className="text-xs text-zinc-400 border border-zinc-700 px-3 py-1 rounded-full">← Change Server</button>
-        <div className="text-xs text-white font-bold">{selectedServer==='a'?'Server 1 US Only':'Server 2 All Countries'} - {country||'Select country'}</div>
-      </div>
+    <div className="min-h-screen bg-background pb-24">
+      <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6">
+        <div className="mb-6 flex items-center gap-3">
+          <button
+            onClick={() => window.history.back()}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border bg-card hover:bg-muted"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
 
-      {selectedServer==='a' && (
-        <div className="space-y-3">
-          <div className="flex gap-2">
-            <button onClick={()=>setTab('sms')} className={"px-4 py-2 rounded-full text-xs font-bold "+(tab==='sms'?"bg-amber-400 text-black":"bg-zinc-800 text-zinc-300")}>SMS OTP</button>
-            <button onClick={()=>setTab('email')} className={"px-4 py-2 rounded-full text-xs font-bold "+(tab==='email'?"bg-amber-400 text-black":"bg-zinc-800 text-zinc-300")}>Email OTP</button>
-            <button onClick={()=>setTab('rent')} className={"px-4 py-2 rounded-full text-xs font-bold "+(tab==='rent'?"bg-amber-400 text-black":"bg-zinc-800 text-zinc-300")}>Rentals 1-12 mo</button>
+          <div>
+            <h1 className="text-xl font-bold">Virtual Numbers</h1>
+            <p className="text-sm text-muted-foreground">
+              Rent real numbers for SMS and OTP verification
+            </p>
           </div>
-          {tab==='sms' && (
-            <div className="space-y-2">
-              {(catalog?.smsServices||SOCIAL.map(id=>({id,available:100}))).map(item=>{
-                const p = prices[item.id];
-                return (
-                  <div key={item.id} className="bg-zinc-800 border border-zinc-700 p-3 rounded-xl flex justify-between items-center">
-                    <div><div className="text-white text-sm font-bold">{item.id}</div><div className="text-[11px] text-zinc-400">Available: {item.available||'on demand'}</div></div>
-                    <div className="text-right"><div className="text-amber-400 text-xs font-bold">{p? (p.customerPrice? formatNaira(p.customerPrice):'Not available'):'Loading price...'}</div><button className="mt-1 text-[10px] bg-white text-black px-2 py-1 rounded-full">Buy Now</button></div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
         </div>
-      )}
 
-      {selectedServer==='b' && (
-        <div className="space-y-3">
-          {!country && (
-            <div className="space-y-2">
-              <div className="text-sm text-white font-bold">Select Country to see live numbers</div>
-              <div className="grid grid-cols-2 gap-2">
-                {(catalog?.countries||[{code:'NG',name:'Nigeria'},{code:'US',name:'USA'}]).map(c=>{
-                  return <button key={c.code} onClick={()=>selectCountry(c.code)} className="bg-zinc-800 border border-zinc-700 p-3 rounded-xl text-left"><div className="text-white text-sm">{c.code}</div><div className="text-xs text-zinc-400">{c.name}</div></button>
-                })}
-              </div>
-            </div>
-          )}
-          {country && (
-            <div className="space-y-2">
-              <div className="flex justify-between"><div className="text-xs text-zinc-400">Live numbers for {country}</div><button onClick={()=>setCountry('')} className="text-xs text-amber-400">Change country</button></div>
-              {(catalog?.smsServices||[]).slice(0,50).map(item=>{
-                const p = prices[item.id];
-                return (
-                  <div key={item.id} className="bg-zinc-800 border border-zinc-700 p-3 rounded-xl flex justify-between">
-                    <div><div className="text-white text-sm font-bold">{item.id}</div><div className="text-[11px] text-zinc-400">{country} - Live</div></div>
-                    <div className="text-amber-400 text-xs">{p?.customerPrice? formatNaira(p.customerPrice):'...'}</div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-       }
+        {error && (
+          <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <X className="mt-0.5 h-5 w-5 shrink-0" />
+            <div className="flex-1">{error}</div>
+
+            <button
+              onClick={() => setError("")}
+              className="rounded-md p-1 hover:bg-red-100"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        <div className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold">Choose Server</h2>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {servers.map((server) => {
+              const active = selectedServer?.id === server.id;
+
+              return (
+                <button
+                  key={server.id}
+                  onClick={() => handleServerChange(server)}
+                  className={`rounded-2xl border p-4 text-left transition ${
+                    active
+                      ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100"
+                      : "bg-card hover:border-blue-300"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`flex h-11 w-11 items-center justify-center rounded-xl ${
+                          active
+                            ? "bg-blue-600 text-white"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        <Server className="h-5 w-5" />
+                      </div>
+
+                      <div>
+                        <div className="font-semibold">
+                          {server.name || `Server ${server.id}`}
+                        </div>
+
+                        <div

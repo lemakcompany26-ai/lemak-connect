@@ -71,15 +71,14 @@ async function getAdmin(req: Request) {
   const email = clean(user.email, 200).toLowerCase();
 
   const isAdmin = ADMIN_EMAILS.some(
-    (adminEmail) =>
-      adminEmail.toLowerCase() === email
+    (admin) => admin.toLowerCase() === email
   );
 
   if (!isAdmin) {
     throw new Response(
       JSON.stringify({
         ok: false,
-        error: "You do not have permission to access Lemak Expert management.",
+        error: "You do not have permission to manage Lemak Expert.",
       }),
       {
         status: 403,
@@ -96,14 +95,29 @@ async function getAdmin(req: Request) {
   };
 }
 
+async function readBody(req: Request) {
+  if (req.method !== "POST") {
+    return {};
+  }
+
+  try {
+    const data = await req.json();
+
+    if (!data || typeof data !== "object") {
+      return {};
+    }
+
+    return data;
+  } catch {
+    return {};
+  }
+}
+
 export default async function (
   req: Request
 ): Promise<Response> {
   try {
-    if (
-      req.method !== "GET" &&
-      req.method !== "POST"
-    ) {
+    if (req.method !== "GET" && req.method !== "POST") {
       return json(
         {
           ok: false,
@@ -114,19 +128,9 @@ export default async function (
     }
 
     const { base44 } = await getAdmin(req);
-
     const service = base44.asServiceRole;
 
-    let body: Record<string, any> = {};
-
-    if (req.method === "POST") {
-      try {
-        body = await req.json();
-      } catch {
-        body = {};
-      }
-    }
-
+    const body = await readBody(req);
     const url = new URL(req.url);
 
     const action = clean(
@@ -137,14 +141,17 @@ export default async function (
     );
 
     /*
-     * LIST
+     * ============================
+     * BOOKINGS
+     * ============================
      */
+
     if (action === "list") {
       try {
         const bookings =
           await service.entities.ExpertBooking.list(
             "-created_date",
-            100
+            500
           );
 
         return json({
@@ -155,7 +162,7 @@ export default async function (
         });
       } catch (error) {
         console.error(
-          "expertAdmin list error:",
+          "expertAdmin booking list:",
           error
         );
 
@@ -163,7 +170,7 @@ export default async function (
           {
             ok: false,
             error:
-              "Unable to read ExpertBooking records. Check that the ExpertBooking entity exists.",
+              "Unable to read ExpertBooking. Make sure the ExpertBooking entity exists.",
             bookings: [],
           },
           500
@@ -171,9 +178,6 @@ export default async function (
       }
     }
 
-    /*
-     * GET ONE
-     */
     if (action === "get") {
       const id = clean(
         body.id ||
@@ -193,9 +197,7 @@ export default async function (
 
       try {
         const booking =
-          await service.entities.ExpertBooking.get(
-            id
-          );
+          await service.entities.ExpertBooking.get(id);
 
         if (!booking) {
           return json(
@@ -213,24 +215,20 @@ export default async function (
         });
       } catch (error) {
         console.error(
-          "expertAdmin get error:",
+          "expertAdmin booking get:",
           error
         );
 
         return json(
           {
             ok: false,
-            error:
-              "Unable to retrieve this booking.",
+            error: "Unable to retrieve booking.",
           },
           500
         );
       }
     }
 
-    /*
-     * UPDATE STATUS
-     */
     if (action === "update_status") {
       const id = clean(body.id, 200);
       const bookingStatus = clean(
@@ -248,11 +246,7 @@ export default async function (
         );
       }
 
-      if (
-        !ALLOWED_STATUSES.includes(
-          bookingStatus
-        )
-      ) {
+      if (!ALLOWED_STATUSES.includes(bookingStatus)) {
         return json(
           {
             ok: false,
@@ -262,40 +256,20 @@ export default async function (
         );
       }
 
-      let booking;
-
       try {
-        booking =
-          await service.entities.ExpertBooking.get(
-            id
+        const booking =
+          await service.entities.ExpertBooking.get(id);
+
+        if (!booking) {
+          return json(
+            {
+              ok: false,
+              error: "Booking not found.",
+            },
+            404
           );
-      } catch (error) {
-        console.error(
-          "expertAdmin status lookup error:",
-          error
-        );
+        }
 
-        return json(
-          {
-            ok: false,
-            error:
-              "Unable to find the booking.",
-          },
-          500
-        );
-      }
-
-      if (!booking) {
-        return json(
-          {
-            ok: false,
-            error: "Booking not found.",
-          },
-          404
-        );
-      }
-
-      try {
         const updated =
           await service.entities.ExpertBooking.update(
             id,
@@ -314,7 +288,7 @@ export default async function (
         });
       } catch (error) {
         console.error(
-          "expertAdmin update error:",
+          "expertAdmin update status:",
           error
         );
 
@@ -329,9 +303,6 @@ export default async function (
       }
     }
 
-    /*
-     * CANCEL
-     */
     if (action === "cancel") {
       const id = clean(body.id, 200);
 
@@ -345,56 +316,36 @@ export default async function (
         );
       }
 
-      let booking;
-
       try {
-        booking =
-          await service.entities.ExpertBooking.get(
-            id
+        const booking =
+          await service.entities.ExpertBooking.get(id);
+
+        if (!booking) {
+          return json(
+            {
+              ok: false,
+              error: "Booking not found.",
+            },
+            404
           );
-      } catch (error) {
-        console.error(
-          "expertAdmin cancel lookup error:",
-          error
-        );
+        }
 
-        return json(
-          {
-            ok: false,
-            error:
-              "Unable to find the booking.",
-          },
-          500
-        );
-      }
+        const paymentStatus = clean(
+          booking.paymentStatus,
+          100
+        ).toLowerCase();
 
-      if (!booking) {
-        return json(
-          {
-            ok: false,
-            error: "Booking not found.",
-          },
-          404
-        );
-      }
+        if (paymentStatus === "paid") {
+          return json(
+            {
+              ok: false,
+              error:
+                "A paid booking cannot be cancelled from this action.",
+            },
+            400
+          );
+        }
 
-      const paymentStatus = clean(
-        booking.paymentStatus,
-        100
-      ).toLowerCase();
-
-      if (paymentStatus === "paid") {
-        return json(
-          {
-            ok: false,
-            error:
-              "A paid booking cannot be cancelled with this action.",
-          },
-          400
-        );
-      }
-
-      try {
         const updated =
           await service.entities.ExpertBooking.update(
             id,
@@ -413,7 +364,43 @@ export default async function (
         });
       } catch (error) {
         console.error(
-          "expertAdmin cancel update error:",
+          "expertAdmin cancel:",
+          error
+        );
+
+        return json(
+          {
+            ok: false,
+            error: "Unable to cancel booking.",
+          },
+          500
+        );
+      }
+    }
+
+    /*
+     * ============================
+     * PRODUCTS
+     * ============================
+     */
+
+    if (action === "products") {
+      try {
+        const products =
+          await service.entities.ExpertProduct.list(
+            "sortOrder",
+            500
+          );
+
+        return json({
+          ok: true,
+          products: Array.isArray(products)
+            ? products
+            : [],
+        });
+      } catch (error) {
+        console.error(
+          "expertAdmin products:",
           error
         );
 
@@ -421,7 +408,336 @@ export default async function (
           {
             ok: false,
             error:
-              "Unable to cancel this booking.",
+              "Unable to read ExpertProduct. Create the ExpertProduct entity first.",
+            products: [],
+          },
+          500
+        );
+      }
+    }
+
+    if (action === "create_product") {
+      const categoryId = clean(
+        body.categoryId,
+        100
+      );
+
+      const categoryName = clean(
+        body.categoryName,
+        200
+      );
+
+      const categoryDescription = clean(
+        body.categoryDescription,
+        1000
+      );
+
+      const optionId = clean(
+        body.optionId,
+        100
+      );
+
+      const optionName = clean(
+        body.optionName,
+        200
+      );
+
+      const description = clean(
+        body.description,
+        1000
+      );
+
+      const unitPrice = Number(
+        body.unitPrice
+      );
+
+      const imageUrl = clean(
+        body.imageUrl,
+        2000
+      );
+
+      const sortOrder = Number(
+        body.sortOrder || 0
+      );
+
+      if (
+        !categoryId ||
+        !categoryName ||
+        !optionId ||
+        !optionName
+      ) {
+        return json(
+          {
+            ok: false,
+            error:
+              "Category and service name are required.",
+          },
+          400
+        );
+      }
+
+      if (
+        !Number.isFinite(unitPrice) ||
+        unitPrice < 0
+      ) {
+        return json(
+          {
+            ok: false,
+            error: "Enter a valid price.",
+          },
+          400
+        );
+      }
+
+      try {
+        const product =
+          await service.entities.ExpertProduct.create(
+            {
+              categoryId,
+              categoryName,
+              categoryDescription,
+              optionId,
+              optionName,
+              description,
+              unitPrice,
+              imageUrl,
+              active: true,
+              sortOrder,
+            }
+          );
+
+        return json({
+          ok: true,
+          product,
+        });
+      } catch (error) {
+        console.error(
+          "expertAdmin create product:",
+          error
+        );
+
+        return json(
+          {
+            ok: false,
+            error:
+              "Unable to create product. Check the ExpertProduct entity fields.",
+          },
+          500
+        );
+      }
+    }
+
+    if (action === "update_product") {
+      const id = clean(body.id, 200);
+
+      if (!id) {
+        return json(
+          {
+            ok: false,
+            error: "Product ID is required.",
+          },
+          400
+        );
+      }
+
+      const updates: Record<string, any> = {};
+
+      if (body.categoryId !== undefined)
+        updates.categoryId = clean(
+          body.categoryId,
+          100
+        );
+
+      if (body.categoryName !== undefined)
+        updates.categoryName = clean(
+          body.categoryName,
+          200
+        );
+
+      if (
+        body.categoryDescription !==
+        undefined
+      )
+        updates.categoryDescription = clean(
+          body.categoryDescription,
+          1000
+        );
+
+      if (body.optionId !== undefined)
+        updates.optionId = clean(
+          body.optionId,
+          100
+        );
+
+      if (body.optionName !== undefined)
+        updates.optionName = clean(
+          body.optionName,
+          200
+        );
+
+      if (body.description !== undefined)
+        updates.description = clean(
+          body.description,
+          1000
+        );
+
+      if (body.imageUrl !== undefined)
+        updates.imageUrl = clean(
+          body.imageUrl,
+          2000
+        );
+
+      if (body.unitPrice !== undefined) {
+        const price = Number(
+          body.unitPrice
+        );
+
+        if (
+          !Number.isFinite(price) ||
+          price < 0
+        ) {
+          return json(
+            {
+              ok: false,
+              error: "Invalid price.",
+            },
+            400
+          );
+        }
+
+        updates.unitPrice = price;
+      }
+
+      if (body.sortOrder !== undefined) {
+        updates.sortOrder = Number(
+          body.sortOrder || 0
+        );
+      }
+
+      if (body.active !== undefined) {
+        updates.active =
+          body.active === true ||
+          body.active === "true";
+      }
+
+      try {
+        const product =
+          await service.entities.ExpertProduct.update(
+            id,
+            updates
+          );
+
+        return json({
+          ok: true,
+          product,
+        });
+      } catch (error) {
+        console.error(
+          "expertAdmin update product:",
+          error
+        );
+
+        return json(
+          {
+            ok: false,
+            error:
+              "Unable to update product.",
+          },
+          500
+        );
+      }
+    }
+
+    if (action === "toggle_product") {
+      const id = clean(body.id, 200);
+
+      if (!id) {
+        return json(
+          {
+            ok: false,
+            error: "Product ID is required.",
+          },
+          400
+        );
+      }
+
+      try {
+        const product =
+          await service.entities.ExpertProduct.get(id);
+
+        if (!product) {
+          return json(
+            {
+              ok: false,
+              error: "Product not found.",
+            },
+            404
+          );
+        }
+
+        const updated =
+          await service.entities.ExpertProduct.update(
+            id,
+            {
+              active:
+                product.active === false,
+            }
+          );
+
+        return json({
+          ok: true,
+          product: updated,
+        });
+      } catch (error) {
+        console.error(
+          "expertAdmin toggle product:",
+          error
+        );
+
+        return json(
+          {
+            ok: false,
+            error:
+              "Unable to change product status.",
+          },
+          500
+        );
+      }
+    }
+
+    if (action === "delete_product") {
+      const id = clean(body.id, 200);
+
+      if (!id) {
+        return json(
+          {
+            ok: false,
+            error: "Product ID is required.",
+          },
+          400
+        );
+      }
+
+      try {
+        await service.entities.ExpertProduct.delete(
+          id
+        );
+
+        return json({
+          ok: true,
+          deletedId: id,
+        });
+      } catch (error) {
+        console.error(
+          "expertAdmin delete product:",
+          error
+        );
+
+        return json(
+          {
+            ok: false,
+            error:
+              "Unable to delete product.",
           },
           500
         );
@@ -441,7 +757,7 @@ export default async function (
     }
 
     console.error(
-      "expertAdmin fatal error:",
+      "expertAdmin fatal:",
       error
     );
 
@@ -456,4 +772,4 @@ export default async function (
       500
     );
   }
-    }
+        }

@@ -16,7 +16,10 @@ import {
   X,
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
-import { formatNaira } from "@/lib/utils";
+import { formatNaira } from "@/lib/format";
+import { Input } from "@/components/ui/input";
+import ActiveNumberPanel from "@/components/vnum/ActiveNumberPanel";
+import NumberServiceList from "@/components/vnum/NumberServiceList";
 
 export default function VirtualNumbers() {
   const [servers, setServers] = useState([]);
@@ -575,6 +578,22 @@ export default function VirtualNumbers() {
           </div>
         )}
 
+        <ActiveNumberPanel
+          purchase={purchasedNumber}
+          otp={otp}
+          timerLabel={formatTimer(timeLeft)}
+          checking={checkingOtp}
+          cancelling={cancelling}
+          onCopy={copyNumber}
+          onCheck={checkOtp}
+          onCancel={cancelOrder}
+          onClose={() => {
+            setPurchasedNumber(null);
+            setOtp(null);
+            setTimeLeft(420);
+          }}
+        />
+
         <div className="mb-6">
           <h2 className="mb-3 text-sm font-semibold">Choose Server</h2>
 
@@ -609,4 +628,73 @@ export default function VirtualNumbers() {
                           {server.name || `Server ${server.id}`}
                         </div>
 
-                        <div
+                        {server.description && (
+                          <div className="text-xs text-muted-foreground">
+                            {server.description}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {active && <Check className="h-5 w-5 text-blue-600" />}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mb-4 space-y-3">
+          {countries.length > 0 && (
+            <div>
+              <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold">
+                <Globe2 className="h-4 w-4" />
+                Country
+              </label>
+
+              <select
+                value={country}
+                onChange={handleCountryChange}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                {countries.map((item) => {
+                  const value = item.id || item.providerId || item.code;
+
+                  return (
+                    <option key={value} value={value}>
+                      {item.name || item.country || item.title || value}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
+
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search services (WhatsApp, Telegram...)"
+          />
+        </div>
+
+        <div>
+          <h2 className="mb-3 text-sm font-semibold">Select Service</h2>
+
+          {loading && !catalog ? (
+            <div className="flex justify-center rounded-2xl border bg-card p-6">
+              <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+            </div>
+          ) : (
+            <NumberServiceList
+              services={services}
+              prices={prices}
+              loadingPrices={loadingPrices}
+              buying={buying}
+              onBuy={handleBuy}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

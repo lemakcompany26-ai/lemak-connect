@@ -892,129 +892,51 @@ Deno.serve(async (request) => {
         );
       }
 
-      throw new Error("Invalid virtual--number server.");
-    }
-
-    if (action === "price") {
-      if (server === "a") {
-        return json(await fleexaPrice(p?.service));
-      }
-
-      if (server === "b") {
-        return json(
-          await smsPoolPrice(
-            p?.service,
-            p?.country
-          )
-        );
-      }
-
-      throw new Error("Invalid virtual-number server.");
-    }
-
-    if (action === "order") {
-      const user = await base44.auth.me();
-
-      const email = clean(
-        p?.userEmail || user?.email
-      );
-
-      if (!email) {
-        throw new Error(
-          "Unable to identify logged-in user."
-        );
-      }
-
-      if (server === "a") {
-        return json(
-          await fleexaBuy(
-            base44,
-            email,
-            p?.service,
-            p?.country
-          )
-        );
-      }
-
-      if (server === "b") {
-        return json(
-          await smsPoolBuy(
-            base44,
-            email,
-            p?.service,
-            p?.country,
-            p?.countryName
-          )
-        );
-      }
-
-      throw new Error("Invalid virtual-number server.");
+    throw new Error("Invalid virtual-number server.");
     }
 
     if (action === "checkOtp") {
-      const id = clean(
-        p?.requestId || p?.orderId
-      );
-
-      if (!id) {
-        throw new Error("Order ID is required.");
-      }
+      const id = clean(p?.requestId || p?.orderId);
+      if (!id) throw new Error("Order ID is required.");
 
       let s = server;
 
       if (!s) {
         if (id.startsWith("fleexa_")) s = "a";
-        if (id.startsWith("smspool_")) s = "b";
+        else if (id.startsWith("smspool_")) s = "b";
       }
 
       if (s === "a") {
-        return json(
-          await fleexaCheck(id)
-        );
+        return json(await fleexaCheck(id));
       }
 
       if (s === "b") {
-        return json(
-          await smsPoolCheck(id)
-        );
+        return json(await smsPoolCheck(id));
       }
 
-      throw new Error(
-        "Unable to determine virtual-number server."
-      );
+      throw new Error("Unable to determine virtual-number server.");
     }
 
     if (action === "cancel") {
-      const id = clean(
-        p?.requestId || p?.orderId
-      );
-
-      if (!id) {
-        throw new Error("Order ID is required.");
-      }
+      const id = clean(p?.requestId || p?.orderId);
+      if (!id) throw new Error("Order ID is required.");
 
       let s = server;
 
       if (!s) {
         if (id.startsWith("fleexa_")) s = "a";
-        if (id.startsWith("smspool_")) s = "b";
+        else if (id.startsWith("smspool_")) s = "b";
       }
 
       if (s === "a") {
-        return json(
-          await fleexaCancel(id)
-        );
+        return json(await fleexaCancel(id));
       }
 
       if (s === "b") {
-        return json(
-          await smsPoolCancel(id)
-        );
+        return json(await smsPoolCancel(id));
       }
 
-      throw new Error(
-        "Unable to determine virtual-number server."
-      );
+      throw new Error("Unable to determine virtual-number server.");
     }
 
     throw new Error(
@@ -1022,17 +944,12 @@ Deno.serve(async (request) => {
     );
 
   } catch (e) {
-    console.error(
-      "VIRTUAL NUMBERS ERROR:",
-      e
-    );
+    console.error("VIRTUAL NUMBERS ERROR:", e);
 
     return json(
       {
         success: false,
-        error:
-          e?.message ||
-          "Virtual-number backend error.",
+        error: e?.message || "Virtual-number backend error.",
       },
       500
     );

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+
 import {
   RefreshCw,
   Search,
@@ -15,24 +16,33 @@ import {
   MapPin,
   CalendarDays,
   Banknote,
-  AlertCircle,
+  Plus,
+  Pencil,
+  Trash2,
+  Power,
+  BriefcaseBusiness,
+  ShoppingBag,
 } from "lucide-react";
 
 import { base44 } from "@/api/base44Client";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
 import {
   Select,
   SelectContent,
@@ -41,11 +51,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-/* -------------------------------------------------------
-   CONFIG
-------------------------------------------------------- */
-
-const ADMIN_FUNCTION_NAME = "expertAdmin";
+const ADMIN_FUNCTION_NAME =
+  "expertAdmin";
 
 const STATUS_OPTIONS = [
   {
@@ -70,14 +77,22 @@ const STATUS_OPTIONS = [
   },
 ];
 
-/* -------------------------------------------------------
-   HELPERS
-------------------------------------------------------- */
+const EMPTY_PRODUCT = {
+  categoryId: "",
+  categoryName: "",
+  categoryDescription: "",
+  optionId: "",
+  optionName: "",
+  description: "",
+  unitPrice: "",
+  imageUrl: "",
+  sortOrder: 0,
+};
 
-function formatMoney(value) {
-  const amount = Number(value || 0);
-
-  return `₦${amount.toLocaleString("en-NG", {
+function money(value) {
+  return `₦${Number(
+    value || 0
+  ).toLocaleString("en-NG", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -98,127 +113,138 @@ function formatDate(value) {
   });
 }
 
-function getStatusLabel(status) {
-  return (
-    STATUS_OPTIONS.find(
-      (item) => item.value === status
-    )?.label ||
-    status ||
-    "Unknown"
-  );
-}
-
-function getStatusClass(status) {
+function statusClass(status) {
   switch (status) {
     case "awaiting_payment":
-      return "bg-amber-100 text-amber-700 border-amber-200";
-
+      return "bg-amber-100 text-amber-700";
     case "confirmed":
-      return "bg-blue-100 text-blue-700 border-blue-200";
-
+      return "bg-blue-100 text-blue-700";
     case "processing":
-      return "bg-purple-100 text-purple-700 border-purple-200";
-
+      return "bg-purple-100 text-purple-700";
     case "completed":
-      return "bg-green-100 text-green-700 border-green-200";
-
+      return "bg-green-100 text-green-700";
     case "cancelled":
-      return "bg-red-100 text-red-700 border-red-200";
-
+      return "bg-red-100 text-red-700";
     default:
-      return "bg-gray-100 text-gray-700 border-gray-200";
+      return "bg-gray-100 text-gray-700";
   }
 }
 
-function getPaymentClass(status) {
-  switch (String(status || "").toLowerCase()) {
-    case "paid":
-      return "bg-green-100 text-green-700 border-green-200";
+export default function LemakExpertProductManagement() {
+  const [tab, setTab] =
+    useState("orders");
 
-    case "pending":
-      return "bg-amber-100 text-amber-700 border-amber-200";
+  const [bookings, setBookings] =
+    useState([]);
 
-    case "failed":
-      return "bg-red-100 text-red-700 border-red-200";
+  const [products, setProducts] =
+    useState([]);
 
-    default:
-      return "bg-gray-100 text-gray-700 border-gray-200";
-  }
-}
+  const [loading, setLoading] =
+    useState(true);
 
-/* -------------------------------------------------------
-   MAIN COMPONENT
-------------------------------------------------------- */
+  const [refreshing, setRefreshing] =
+    useState(false);
 
-export default function LemakExpertProductmanagement() {
-  const [bookings, setBookings] = useState([]);
-  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [saving, setSaving] =
+    useState(false);
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] =
+    useState("");
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [search, setSearch] =
+    useState("");
 
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [statusFilter, setStatusFilter] =
+    useState("all");
 
-  const [error, setError] = useState("");
+  const [selectedBooking, setSelectedBooking] =
+    useState(null);
 
-  /* -------------------------------------------------------
-     API CALL
-  ------------------------------------------------------- */
+  const [detailsOpen, setDetailsOpen] =
+    useState(false);
 
-  const callAdmin = useCallback(async (payload = {}) => {
-    const response = await base44.functions.invoke(
-      ADMIN_FUNCTION_NAME,
-      payload
-    );
+  const [productOpen, setProductOpen] =
+    useState(false);
 
-    return response?.data || response;
-  }, []);
+  const [editingProduct, setEditingProduct] =
+    useState(null);
 
-  /* -------------------------------------------------------
-     LOAD BOOKINGS
-  ------------------------------------------------------- */
+  const [productForm, setProductForm] =
+    useState(EMPTY_PRODUCT);
 
-  const loadBookings = useCallback(
-    async (showRefresh = false) => {
+  const callAdmin = useCallback(
+    async (payload = {}) => {
+      const result =
+        await base44.functions.invoke(
+          ADMIN_FUNCTION_NAME,
+          payload
+        );
+
+      return result?.data || result;
+    },
+    []
+  );
+
+  const loadAll = useCallback(
+    async (refresh = false) => {
       try {
         setError("");
 
-        if (showRefresh) {
+        if (refresh) {
           setRefreshing(true);
         } else {
           setLoading(true);
         }
 
-        const result = await callAdmin({
-          action: "list",
-        });
+        const [bookingResult, productResult] =
+          await Promise.all([
+            callAdmin({
+              action: "list",
+            }),
+            callAdmin({
+              action: "products",
+            }),
+          ]);
 
-        if (!result?.ok) {
+        if (!bookingResult?.ok) {
           throw new Error(
-            result?.error ||
-              "Unable to load expert bookings."
+            bookingResult?.error ||
+              "Unable to load orders."
+          );
+        }
+
+        if (!productResult?.ok) {
+          throw new Error(
+            productResult?.error ||
+              "Unable to load products."
           );
         }
 
         setBookings(
-          Array.isArray(result.bookings)
-            ? result.bookings
+          Array.isArray(
+            bookingResult.bookings
+          )
+            ? bookingResult.bookings
+            : []
+        );
+
+        setProducts(
+          Array.isArray(
+            productResult.products
+          )
+            ? productResult.products
             : []
         );
       } catch (err) {
         console.error(
-          "LemakExpertProductmanagement load error:",
+          "Lemak Expert admin:",
           err
         );
 
         setError(
           err?.message ||
-            "Unable to load expert bookings."
+            "Unable to load Lemak Expert."
         );
       } finally {
         setLoading(false);
@@ -229,536 +255,487 @@ export default function LemakExpertProductmanagement() {
   );
 
   useEffect(() => {
-    loadBookings();
-  }, [loadBookings]);
-
-  /* -------------------------------------------------------
-     GET ONE BOOKING
-  ------------------------------------------------------- */
-
-  const openBooking = async (booking) => {
-    if (!booking?.id) {
-      setSelectedBooking(booking);
-      setDetailsOpen(true);
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      setError("");
-
-      const result = await callAdmin({
-        action: "get",
-        id: booking.id,
-      });
-
-      if (!result?.ok) {
-        throw new Error(
-          result?.error ||
-            "Unable to load booking."
-        );
-      }
-
-      setSelectedBooking(
-        result.booking || booking
-      );
-
-      setDetailsOpen(true);
-    } catch (err) {
-      console.error(
-        "Get booking error:",
-        err
-      );
-
-      setError(
-        err?.message ||
-          "Unable to load booking."
-      );
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  /* -------------------------------------------------------
-     UPDATE STATUS
-  ------------------------------------------------------- */
+    loadAll();
+  }, [loadAll]);
 
   const updateStatus = async (
     booking,
     newStatus
   ) => {
-    if (!booking?.id || !newStatus) return;
-
-    const oldStatus =
-      booking.bookingStatus;
-
-    if (oldStatus === newStatus) {
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Change booking status from "${getStatusLabel(
-        oldStatus
-      )}" to "${getStatusLabel(
-        newStatus
-      )}"?`
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     try {
-      setActionLoading(true);
+      setSaving(true);
       setError("");
 
-      const result = await callAdmin({
-        action: "update_status",
-        id: booking.id,
-        bookingStatus: newStatus,
-      });
+      const result =
+        await callAdmin({
+          action: "update_status",
+          id: booking.id,
+          bookingStatus: newStatus,
+        });
 
       if (!result?.ok) {
         throw new Error(
           result?.error ||
-            "Unable to update booking status."
+            "Unable to update status."
         );
       }
 
-      const updatedBooking =
-        result.booking || {
-          ...booking,
-          bookingStatus: newStatus,
-        };
-
-      setBookings((current) =>
-        current.map((item) =>
+      setBookings((items) =>
+        items.map((item) =>
           item.id === booking.id
-            ? updatedBooking
+            ? {
+                ...item,
+                bookingStatus:
+                  newStatus,
+              }
             : item
         )
       );
 
-      if (
-        selectedBooking?.id ===
-        booking.id
-      ) {
-        setSelectedBooking(
-          updatedBooking
-        );
-      }
-    } catch (err) {
-      console.error(
-        "Update booking status error:",
-        err
+      setSelectedBooking((item) =>
+        item?.id === booking.id
+          ? {
+              ...item,
+              bookingStatus:
+                newStatus,
+            }
+          : item
       );
-
+    } catch (err) {
       setError(
         err?.message ||
-          "Unable to update booking status."
+          "Unable to update order."
       );
     } finally {
-      setActionLoading(false);
+      setSaving(false);
     }
   };
 
-  /* -------------------------------------------------------
-     CANCEL UNPAID BOOKING
-  ------------------------------------------------------- */
-
-  const cancelBooking = async (booking) => {
-    if (!booking?.id) return;
-
+  const deleteProduct = async (
+    product
+  ) => {
     if (
-      String(
-        booking.paymentStatus || ""
-      ).toLowerCase() === "paid"
+      !window.confirm(
+        `Delete "${product.optionName}"?`
+      )
     ) {
-      window.alert(
-        "This booking has already been paid. The unpaid-booking cancellation action cannot be used."
-      );
-
-      return;
-    }
-
-    const confirmed = window.confirm(
-      "Are you sure you want to cancel this unpaid booking?"
-    );
-
-    if (!confirmed) {
       return;
     }
 
     try {
-      setActionLoading(true);
-      setError("");
+      setSaving(true);
 
-      const result = await callAdmin({
-        action: "cancel",
-        id: booking.id,
-      });
+      const result =
+        await callAdmin({
+          action: "delete_product",
+          id: product.id,
+        });
 
       if (!result?.ok) {
         throw new Error(
           result?.error ||
-            "Unable to cancel booking."
+            "Unable to delete product."
         );
       }
 
-      const updatedBooking = {
-        ...booking,
-        bookingStatus: "cancelled",
+      setProducts((items) =>
+        items.filter(
+          (item) =>
+            item.id !== product.id
+        )
+      );
+    } catch (err) {
+      setError(
+        err?.message ||
+          "Unable to delete product."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleProduct = async (
+    product
+  ) => {
+    try {
+      setSaving(true);
+
+      const result =
+        await callAdmin({
+          action: "toggle_product",
+          id: product.id,
+        });
+
+      if (!result?.ok) {
+        throw new Error(
+          result?.error ||
+            "Unable to change product."
+        );
+      }
+
+      setProducts((items) =>
+        items.map((item) =>
+          item.id === product.id
+            ? result.product
+            : item
+        )
+      );
+    } catch (err) {
+      setError(
+        err?.message ||
+          "Unable to change product."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openCreateProduct = () => {
+    setEditingProduct(null);
+    setProductForm(
+      EMPTY_PRODUCT
+    );
+    setProductOpen(true);
+  };
+
+  const openEditProduct = (
+    product
+  ) => {
+    setEditingProduct(product);
+
+    setProductForm({
+      categoryId:
+        product.categoryId || "",
+      categoryName:
+        product.categoryName || "",
+      categoryDescription:
+        product.categoryDescription ||
+        "",
+      optionId:
+        product.optionId || "",
+      optionName:
+        product.optionName || "",
+      description:
+        product.description || "",
+      unitPrice:
+        product.unitPrice ?? "",
+      imageUrl:
+        product.imageUrl || "",
+      sortOrder:
+        product.sortOrder || 0,
+    });
+
+    setProductOpen(true);
+  };
+
+  const saveProduct = async () => {
+    try {
+      setSaving(true);
+      setError("");
+
+      const payload = {
+        ...productForm,
+        unitPrice: Number(
+          productForm.unitPrice
+        ),
+        sortOrder: Number(
+          productForm.sortOrder || 0
+        ),
       };
 
-      setBookings((current) =>
-        current.map((item) =>
-          item.id === booking.id
-            ? updatedBooking
-            : item
-        )
-      );
+      let result;
 
-      if (
-        selectedBooking?.id ===
-        booking.id
-      ) {
-        setSelectedBooking(
-          updatedBooking
+      if (editingProduct) {
+        result =
+          await callAdmin({
+            action: "update_product",
+            id: editingProduct.id,
+            ...payload,
+          });
+      } else {
+        result =
+          await callAdmin({
+            action: "create_product",
+            ...payload,
+          });
+      }
+
+      if (!result?.ok) {
+        throw new Error(
+          result?.error ||
+            "Unable to save product."
         );
       }
-    } catch (err) {
-      console.error(
-        "Cancel booking error:",
-        err
-      );
 
+      if (editingProduct) {
+        setProducts((items) =>
+          items.map((item) =>
+            item.id ===
+            editingProduct.id
+              ? result.product
+              : item
+          )
+        );
+      } else {
+        setProducts((items) => [
+          ...items,
+          result.product,
+        ]);
+      }
+
+      setProductOpen(false);
+    } catch (err) {
       setError(
         err?.message ||
-          "Unable to cancel booking."
+          "Unable to save product."
       );
     } finally {
-      setActionLoading(false);
+      setSaving(false);
     }
   };
 
-  /* -------------------------------------------------------
-     FILTER BOOKINGS
-  ------------------------------------------------------- */
+  const filteredBookings =
+    useMemo(() => {
+      const query =
+        search
+          .trim()
+          .toLowerCase();
 
-  const filteredBookings = useMemo(() => {
-    const query =
-      search.trim().toLowerCase();
+      return bookings.filter(
+        (booking) => {
+          const matchesSearch =
+            !query ||
+            [
+              booking.id,
+              booking.customerName,
+              booking.customerEmail,
+              booking.customerPhone,
+              booking.categoryName,
+              booking.optionName,
+              booking.location,
+              booking.paymentReference,
+            ]
+              .filter(Boolean)
+              .some((value) =>
+                String(value)
+                  .toLowerCase()
+                  .includes(query)
+              );
 
-    return bookings.filter((booking) => {
-      const matchesSearch =
-        !query ||
-        [
-          booking.id,
-          booking.name,
-          booking.fullName,
-          booking.customerName,
-          booking.email,
-          booking.phone,
-          booking.service,
-          booking.serviceName,
-          booking.bookingReference,
-        ]
-          .filter(Boolean)
-          .some((value) =>
-            String(value)
-              .toLowerCase()
-              .includes(query)
+          const matchesStatus =
+            statusFilter === "all" ||
+            booking.bookingStatus ===
+              statusFilter;
+
+          return (
+            matchesSearch &&
+            matchesStatus
           );
-
-      const matchesStatus =
-        statusFilter === "all" ||
-        booking.bookingStatus ===
-          statusFilter;
-
-      const matchesPayment =
-        paymentFilter === "all" ||
-        String(
-          booking.paymentStatus || ""
-        ).toLowerCase() ===
-          paymentFilter;
-
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesPayment
+        }
       );
-    });
-  }, [
-    bookings,
-    search,
-    statusFilter,
-    paymentFilter,
-  ]);
+    }, [
+      bookings,
+      search,
+      statusFilter,
+    ]);
 
-  /* -------------------------------------------------------
-     SUMMARY
-  ------------------------------------------------------- */
-
-  const summary = useMemo(() => {
-    const total = bookings.length;
-
-    const awaitingPayment =
-      bookings.filter(
-        (item) =>
-          item.bookingStatus ===
-          "awaiting_payment"
-      ).length;
-
-    const confirmed =
-      bookings.filter(
-        (item) =>
-          item.bookingStatus ===
-          "confirmed"
-      ).length;
-
-    const processing =
-      bookings.filter(
-        (item) =>
-          item.bookingStatus ===
-          "processing"
-      ).length;
-
-    const completed =
-      bookings.filter(
-        (item) =>
-          item.bookingStatus ===
-          "completed"
-      ).length;
-
-    const paid =
-      bookings.filter(
-        (item) =>
-          String(
-            item.paymentStatus || ""
-          ).toLowerCase() === "paid"
-      ).length;
-
-    const revenue = bookings
-      .filter(
-        (item) =>
-          String(
-            item.paymentStatus || ""
-          ).toLowerCase() === "paid"
-      )
-      .reduce(
-        (totalAmount, item) =>
-          totalAmount +
-          Number(
-            item.amount ||
-              item.totalAmount ||
-              item.price ||
-              0
-          ),
-        0
-      );
+  const stats = useMemo(() => {
+    const revenue =
+      bookings
+        .filter(
+          (item) =>
+            String(
+              item.paymentStatus ||
+                ""
+            ).toLowerCase() ===
+            "paid"
+        )
+        .reduce(
+          (sum, item) =>
+            sum +
+            Number(
+              item.amount || 0
+            ),
+          0
+        );
 
     return {
-      total,
-      awaitingPayment,
-      confirmed,
-      processing,
-      completed,
-      paid,
+      total: bookings.length,
+      pending:
+        bookings.filter(
+          (item) =>
+            item.bookingStatus ===
+            "awaiting_payment"
+        ).length,
+      processing:
+        bookings.filter(
+          (item) =>
+            item.bookingStatus ===
+            "processing"
+        ).length,
+      completed:
+        bookings.filter(
+          (item) =>
+            item.bookingStatus ===
+            "completed"
+        ).length,
       revenue,
     };
   }, [bookings]);
 
-  /* -------------------------------------------------------
-     BOOKING DISPLAY HELPERS
-  ------------------------------------------------------- */
-
-  const getCustomerName = (booking) =>
-    booking.customerName ||
-    booking.fullName ||
-    booking.name ||
-    booking.userName ||
-    "Unknown Customer";
-
-  const getServiceName = (booking) =>
-    booking.serviceName ||
-    booking.service ||
-    booking.productName ||
-    booking.product ||
-    "Expert Service";
-
-  const getAmount = (booking) =>
-    booking.amount ||
-    booking.totalAmount ||
-    booking.price ||
-    booking.customerPrice ||
-    0;
-
-  /* -------------------------------------------------------
-     LOADING
-  ------------------------------------------------------- */
-
   if (loading) {
     return (
-      <div className="min-h-[500px] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500">
-            Loading expert bookings...
-          </p>
-        </div>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  /* -------------------------------------------------------
-     UI
-  ------------------------------------------------------- */
-
   return (
-    <div className="w-full space-y-6 p-4 md:p-6">
-      {/* HEADER */}
-
+    <div className="space-y-6 p-4 md:p-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-            Lemak Expert Product Management
-          </h1>
+          <div className="flex items-center gap-2">
+            <BriefcaseBusiness className="h-7 w-7 text-primary" />
+            <h1 className="text-2xl font-bold">
+              Lemak Expert
+            </h1>
+          </div>
 
-          <p className="mt-1 text-sm text-gray-500">
-            Manage expert service bookings,
-            payments and booking status.
+          <p className="text-sm text-muted-foreground">
+            Manage services, prices and customer orders.
           </p>
         </div>
 
         <Button
-          onClick={() =>
-            loadBookings(true)
-          }
-          disabled={refreshing}
           variant="outline"
-          className="gap-2"
+          onClick={() => loadAll(true)}
+          disabled={refreshing}
         >
           <RefreshCw
-            className={`h-4 w-4 ${
+            className={`mr-2 h-4 w-4 ${
               refreshing
                 ? "animate-spin"
                 : ""
             }`}
           />
-
-          {refreshing
-            ? "Refreshing..."
-            : "Refresh"}
+          Refresh
         </Button>
       </div>
 
-      {/* ERROR */}
-
       {error && (
-        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-
-          <div className="flex-1">
-            <p className="font-semibold">
-              Something went wrong
-            </p>
-
-            <p className="text-sm mt-1">
-              {error}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setError("")}
-            className="text-red-500 hover:text-red-700"
-          >
-            <XCircle className="h-5 w-5" />
-          </button>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
         </div>
       )}
 
-      {/* SUMMARY */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <Card>
+          <CardContent className="p-5">
+            <ShoppingBag className="mb-2 h-5 w-5 text-primary" />
+            <p className="text-2xl font-bold">
+              {stats.total}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Total Orders
+            </p>
+          </CardContent>
+        </Card>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <SummaryCard
-          title="Total"
-          value={summary.total}
-          icon={PackageCheck}
-        />
+        <Card>
+          <CardContent className="p-5">
+            <Clock3 className="mb-2 h-5 w-5 text-amber-500" />
+            <p className="text-2xl font-bold">
+              {stats.pending}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Awaiting Payment
+            </p>
+          </CardContent>
+        </Card>
 
-        <SummaryCard
-          title="Awaiting Payment"
-          value={summary.awaitingPayment}
-          icon={Clock3}
-        />
+        <Card>
+          <CardContent className="p-5">
+            <PackageCheck className="mb-2 h-5 w-5 text-purple-500" />
+            <p className="text-2xl font-bold">
+              {stats.processing}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Processing
+            </p>
+          </CardContent>
+        </Card>
 
-        <SummaryCard
-          title="Confirmed"
-          value={summary.confirmed}
-          icon={CheckCircle2}
-        />
+        <Card>
+          <CardContent className="p-5">
+            <CheckCircle2 className="mb-2 h-5 w-5 text-green-500" />
+            <p className="text-2xl font-bold">
+              {stats.completed}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Completed
+            </p>
+          </CardContent>
+        </Card>
 
-        <SummaryCard
-          title="Processing"
-          value={summary.processing}
-          icon={RefreshCw}
-        />
-
-        <SummaryCard
-          title="Completed"
-          value={summary.completed}
-          icon={CheckCircle2}
-        />
-
-        <SummaryCard
-          title="Paid"
-          value={summary.paid}
-          icon={CreditCard}
-        />
+        <Card>
+          <CardContent className="p-5">
+            <Banknote className="mb-2 h-5 w-5 text-primary" />
+            <p className="text-lg font-bold">
+              {money(stats.revenue)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Paid Revenue
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* REVENUE */}
+      <div className="flex gap-2 border-b">
+        <Button
+          variant={
+            tab === "orders"
+              ? "default"
+              : "ghost"
+          }
+          onClick={() =>
+            setTab("orders")
+          }
+        >
+          <ShoppingBag className="mr-2 h-4 w-4" />
+          Orders
+        </Button>
 
-      <Card>
-        <CardContent className="p-5">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-green-100 p-3 text-green-700">
-              <Banknote className="h-6 w-6" />
-            </div>
+        <Button
+          variant={
+            tab === "products"
+              ? "default"
+              : "ghost"
+          }
+          onClick={() =>
+            setTab("products")
+          }
+        >
+          <BriefcaseBusiness className="mr-2 h-4 w-4" />
+          Services & Prices
+        </Button>
+      </div>
 
-            <div>
-              <p className="text-sm text-gray-500">
-                Paid Booking Revenue
-              </p>
-
-              <p className="text-2xl font-bold">
-                {formatMoney(
-                  summary.revenue
-                )}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* FILTERS */}
-
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid gap-3 md:grid-cols-[1fr_220px_220px]">
+      {tab === "orders" && (
+        <>
+          <div className="grid gap-3 md:grid-cols-2">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
               <Input
+                className="pl-9"
+                placeholder="Search customers, services, locations..."
                 value={search}
-                onChange={(event) =>
+                onChange={(e) =>
                   setSearch(
-                    event.target.value
+                    e.target.value
                   )
                 }
-                placeholder="Search customer, service, phone, email or booking ID..."
-                className="pl-9"
               />
             </div>
 
@@ -769,451 +746,124 @@ export default function LemakExpertProductmanagement() {
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="Booking status" />
+                <SelectValue placeholder="Filter status" />
               </SelectTrigger>
 
               <SelectContent>
                 <SelectItem value="all">
-                  All Booking Statuses
+                  All statuses
                 </SelectItem>
 
                 {STATUS_OPTIONS.map(
-                  (status) => (
+                  (item) => (
                     <SelectItem
-                      key={status.value}
-                      value={status.value}
+                      key={item.value}
+                      value={item.value}
                     >
-                      {status.label}
+                      {item.label}
                     </SelectItem>
                   )
                 )}
               </SelectContent>
             </Select>
-
-            <Select
-              value={paymentFilter}
-              onValueChange={
-                setPaymentFilter
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Payment status" />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="all">
-                  All Payment Statuses
-                </SelectItem>
-
-                <SelectItem value="paid">
-                  Paid
-                </SelectItem>
-
-                <SelectItem value="pending">
-                  Pending
-                </SelectItem>
-
-                <SelectItem value="failed">
-                  Failed
-                </SelectItem>
-              </SelectContent>
-            </Select>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* BOOKINGS */}
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                Customer Orders
+              </CardTitle>
+            </CardHeader>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            Expert Product Bookings
-            <span className="ml-2 text-sm font-normal text-gray-500">
-              ({filteredBookings.length})
-            </span>
-          </CardTitle>
-        </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="p-3">
+                        Customer
+                      </th>
+                      <th className="p-3">
+                        Service
+                      </th>
+                      <th className="p-3">
+                        Amount
+                      </th>
+                      <th className="p-3">
+                        Payment
+                      </th>
+                      <th className="p-3">
+                        Status
+                      </th>
+                      <th className="p-3">
+                        Date
+                      </th>
+                      <th className="p-3">
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
 
-        <CardContent className="p-0">
-          {filteredBookings.length ===
-          0 ? (
-            <div className="flex min-h-[250px] flex-col items-center justify-center px-6 text-center">
-              <PackageCheck className="h-10 w-10 text-gray-300" />
-
-              <h3 className="mt-3 font-semibold">
-                No bookings found
-              </h3>
-
-              <p className="mt-1 text-sm text-gray-500">
-                No expert bookings match
-                your current filters.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px]">
-                <thead>
-                  <tr className="border-b bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                    <th className="px-5 py-4">
-                      Customer
-                    </th>
-
-                    <th className="px-5 py-4">
-                      Service
-                    </th>
-
-                    <th className="px-5 py-4">
-                      Amount
-                    </th>
-
-                    <th className="px-5 py-4">
-                      Payment
-                    </th>
-
-                    <th className="px-5 py-4">
-                      Booking Status
-                    </th>
-
-                    <th className="px-5 py-4">
-                      Date
-                    </th>
-
-                    <th className="px-5 py-4 text-right">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredBookings.map(
-                    (booking) => {
-                      const isUnpaid =
-                        String(
-                          booking.paymentStatus ||
-                            ""
-                        ).toLowerCase() !==
-                        "paid";
-
-                      const cancellable =
-                        isUnpaid &&
-                        booking.bookingStatus !==
-                          "cancelled";
-
-                      return (
+                  <tbody>
+                    {filteredBookings.map(
+                      (booking) => (
                         <tr
                           key={booking.id}
-                          className="border-b text-sm transition hover:bg-gray-50"
+                          className="border-b"
                         >
-                          <td className="px-5 py-4">
-                            <div className="font-semibold text-gray-900">
-                              {getCustomerName(
-                                booking
-                              )}
+                          <td className="p-3">
+                            <div className="font-medium">
+                              {booking.customerName ||
+                                "Customer"}
                             </div>
 
-                            {booking.email && (
-                              <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                                <Mail className="h-3 w-3" />
-                                {booking.email}
-                              </div>
-                            )}
-
-                            {booking.phone && (
-                              <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                                <Phone className="h-3 w-3" />
-                                {booking.phone}
-                              </div>
-                            )}
+                            <div className="text-xs text-muted-foreground">
+                              {booking.customerEmail ||
+                                "No email"}
+                            </div>
                           </td>
 
-                          <td className="px-5 py-4">
-                            <div className="font-medium text-gray-900">
-                              {getServiceName(
-                                booking
-                              )}
+                          <td className="p-3">
+                            <div className="font-medium">
+                              {booking.categoryName ||
+                                "Expert Service"}
                             </div>
 
-                            {booking.bookingReference && (
-                              <div className="mt-1 font-mono text-xs text-gray-500">
-                                {
-                                  booking.bookingReference
-                                }
-                              </div>
+                            <div className="text-xs text-muted-foreground">
+                              {booking.optionName ||
+                                "Service"}
+                            </div>
+                          </td>
+
+                          <td className="p-3 font-semibold">
+                            {money(
+                              booking.amount
                             )}
                           </td>
 
-                          <td className="px-5 py-4 font-bold text-gray-900">
-                            {formatMoney(
-                              getAmount(booking)
-                            )}
-                          </td>
-
-                          <td className="px-5 py-4">
+                          <td className="p-3">
                             <span
-                              className={`inline-block rounded-full border px-2.5 py-1 text-xs font-semibold ${getPaymentClass(
-                                booking.paymentStatus
-                              )}`}
+                              className={`rounded-full px-2 py-1 text-xs ${
+                                String(
+                                  booking.paymentStatus ||
+                                    ""
+                                ).toLowerCase() ===
+                                "paid"
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-amber-100 text-amber-700"
+                              }`}
                             >
-                              {String(
-                                booking.paymentStatus ||
-                                  "unknown"
-                              ).toLowerCase()}
+                              {booking.paymentStatus ||
+                                "pending"}
                             </span>
                           </td>
 
-                          <td className="px-5 py-4">
-                            <span
-                              className={`inline-block rounded-full border px-2.5 py-1 text-xs font-semibold ${getStatusClass(
-                                booking.bookingStatus
-                              )}`}
-                            >
-                              {getStatusLabel(
-                                booking.bookingStatus
-                              )}
-                            </span>
-                          </td>
-
-                          <td className="px-5 py-4 text-xs text-gray-500">
-                            {formatDate(
-                              booking.createdAt ||
-                                booking.createdDate ||
-                                booking.updatedDate
-                            )}
-                          </td>
-
-                          <td className="px-5 py-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                  openBooking(booking)
-                                }
-                                className="gap-1"
-                              >
-                                <Eye className="h-4 w-4" />
-                                View
-                              </Button>
-
-                              {cancellable && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={
-                                    actionLoading
-                                  }
-                                  onClick={() =>
-                                    cancelBooking(
-                                      booking
-                                    )
-                                  }
-                                  className="gap-1 border-red-200 text-red-600 hover:bg-red-50"
-                                >
-                                  <XCircle className="h-4 w-4" />
-                                  Cancel
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    }
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* DETAILS DIALOG */}
-
-      <Dialog
-        open={detailsOpen}
-        onOpenChange={setDetailsOpen}
-      >
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              Booking Details
-            </DialogTitle>
-          </DialogHeader>
-
-          {selectedBooking && (
-            <div className="space-y-4">
-              <div className="grid gap-3 text-sm">
-                <InfoRow
-                  icon={User}
-                  label="Customer"
-                  value={getCustomerName(
-                    selectedBooking
-                  )}
-                />
-
-                <InfoRow
-                  icon={Mail}
-                  label="Email"
-                  value={
-                    selectedBooking.email ||
-                    "—"
-                  }
-                />
-
-                <InfoRow
-                  icon={Phone}
-                  label="Phone"
-                  value={
-                    selectedBooking.phone ||
-                    "—"
-                  }
-                />
-
-                <InfoRow
-                  icon={PackageCheck}
-                  label="Service"
-                  value={getServiceName(
-                    selectedBooking
-                  )}
-                />
-
-                <InfoRow
-                  icon={MapPin}
-                  label="Location"
-                  value={
-                    selectedBooking.location ||
-                    selectedBooking.address ||
-                    "—"
-                  }
-                />
-
-                <InfoRow
-                  icon={CalendarDays}
-                  label="Service Date"
-                  value={
-                    selectedBooking.bookingDate ||
-                    selectedBooking.serviceDate ||
-                    "—"
-                  }
-                />
-
-                <InfoRow
-                  icon={Banknote}
-                  label="Amount"
-                  value={formatMoney(
-                    getAmount(selectedBooking)
-                  )}
-                />
-
-                <InfoRow
-                  icon={CreditCard}
-                  label="Payment Status"
-                  value={String(
-                    selectedBooking.paymentStatus ||
-                      "unknown"
-                  ).toLowerCase()}
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  Update Booking Status
-                </label>
-
-                <Select
-                  value={
-                    selectedBooking.bookingStatus ||
-                    "awaiting_payment"
-                  }
-                  onValueChange={(value) =>
-                    updateStatus(
-                      selectedBooking,
-                      value
-                    )
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Booking status" />
-                  </SelectTrigger>
-
-                  <SelectContent>
-                    {STATUS_OPTIONS.map(
-                      (status) => (
-                        <SelectItem
-                          key={status.value}
-                          value={status.value}
-                        >
-                          {status.label}
-                        </SelectItem>
-                      )
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedBooking.notes && (
-                <div className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
-                  <span className="font-semibold text-gray-700">
-                    Notes:{" "}
-                  </span>
-                  {selectedBooking.notes}
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------
-   SUMMARY CARD
-------------------------------------------------------- */
-
-function SummaryCard({ title, value, icon: Icon }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-blue-100 p-2 text-blue-700">
-            <Icon className="h-5 w-5" />
-          </div>
-
-          <div className="min-w-0">
-            <p className="truncate text-xs text-gray-500">
-              {title}
-            </p>
-
-            <p className="text-xl font-bold">
-              {Number(value || 0)}
-            </p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-/* -------------------------------------------------------
-   INFO ROW
-------------------------------------------------------- */
-
-function InfoRow({ icon: Icon, label, value }) {
-  return (
-    <div className="flex items-start gap-3 rounded-xl border p-3">
-      <div className="rounded-lg bg-blue-50 p-2 text-blue-700">
-        <Icon className="h-4 w-4" />
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <p className="text-xs text-gray-500">
-          {label}
-        </p>
-
-        <p className="break-words font-semibold text-gray-900">
-          {value}
-        </p>
-      </div>
-    </div>
-  );
-}
+                          <td className="p-3">
+                            <Select
+                              value={
+                                booking.bookingStatus ||
+                                "awaiting_payment"
+                              }
+                              onValueChange={(
+                                value
+             

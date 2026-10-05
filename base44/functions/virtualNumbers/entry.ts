@@ -1,957 +1,327 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
 
-const FLEEXA_BASE =
-  Deno.env.get("FLEEXA_API_URL") || "https://fleexa.com.ng/developer";
-const FLEEXA_KEY = Deno.env.get("FLEEXA_API_KEY") || "";
+const FB=Deno.env.get("FLEEXA_API_URL")||"https://fleexa.com.ng/developer";
+const FK=Deno.env.get("FLEEXA_API_KEY")||"";
+const SB=Deno.env.get("SMSPOOL_API_URL")||"https://api.smspool.net";
+const SK=Deno.env.get("SMSPOOL_API_KEY")||"";
+const RATE=Number(Deno.env.get("SMSPOOL_USD_NGN_RATE")||1600);
+const MARK=Number(Deno.env.get("VIRTUAL_NUMBER_MARKUP_PERCENT")||30);
 
-const SMSPOOL_BASE =
-  Deno.env.get("SMSPOOL_API_URL") || "https://api.smspool.net";
-const SMSPOOL_KEY = Deno.env.get("SMSPOOL_API_KEY") || "";
+const out=(x,s=200)=>new Response(JSON.stringify(x),{
+  status:s,
+  headers:{
+    "Content-Type":"application/json",
+    "Access-Control-Allow-Origin":"*",
+    "Access-Control-Allow-Headers":"authorization,content-type",
+    "Access-Control-Allow-Methods":"POST,OPTIONS"
+  }
+});
 
-const USD_NGN_RATE = Number(
-  Deno.env.get("SMSPOOL_USD_NGN_RATE") || "1600"
-);
-const MARKUP_PERCENT = Number(
-  Deno.env.get("VIRTUAL_NUMBER_MARKUP_PERCENT") || "30"
-);
+const c=x=>x==null?"":String(x).trim();
+const n=(x,d=0)=>Number.isFinite(Number(x))?Number(x):d;
+const sell=x=>Math.ceil(n(x)*(1+MARK/100));
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-    },
-  });
+async function rd(r){
+  const t=await r.text();
+  try{return t?JSON.parse(t):{}}
+  catch{return {providerText:t}}
 }
 
-function clean(v) {
-  return v === undefined || v === null ? "" : String(v).trim();
+const err=(x,f)=>typeof x==="string"&&x.trim()?x.trim():
+  c(x?.error)||c(x?.message)||c(x?.msg)||c(x?.detail)||c(x?.providerText)||f;
+
+async function wallet(b,e){
+  const a=await b.entities.Wallet.filter({userEmail:e});
+  if(!a?.[0])throw Error("Wallet not found.");
+  return {w:a[0],bal:n(a[0].balance)};
 }
 
-function num(v, fallback = 0) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : fallback;
+async function balance(b,w,x){
+  await b.entities.Wallet.update(w.id,{balance:n(x)});
 }
 
-function price(v) {
-  return Math.ceil(num(v) * (1 + MARKUP_PERCENT / 100));
-}
-
-function usdNaira(v) {
-  return num(v) * USD_NGN_RATE;
-}
-
-function fleexaHeaders(jsonBody = false) {
-  const h = {
-    Accept: "application/json",
-    Authorization: `Bearer ${FLEEXA_KEY}`,
-  };
-  if (FLEEXA_KEY) h["X-API-Key"] = FLEEXA_KEY;
-  if (jsonBody) h["Content-Type"] = "application/json";
+function fh(json=false){
+  const h={Accept:"application/json"};
+  if(FK){h.Authorization=`Bearer ${FK}`;h["X-API-Key"]=FK}
+  if(json)h["Content-Type"]="application/json";
   return h;
 }
 
-async function responseData(r) {
-  const text = await r.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
-
-function providerError(data, fallback) {
-  if (typeof data === "string" && data.trim()) return data;
-  return (
-    clean(data?.error) ||
-    clean(data?.message) ||
-    clean(data?.msg) ||
-    clean(data?.detail) ||
-    fallback
-  );
-}
-
-function arrayFrom(data) {
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.data)) return data.data;
-  if (Array.isArray(data?.services)) return data.services;
-  if (Array.isArray(data?.countries)) return data.countries;
-  return [];
-}
-
-async function wallet(base44, email) {
-  if (!email) throw new Error("User email is required.");
-  const rows = await base44.entities.Wallet.filter({ userEmail: email });
-  if (!rows?.[0]) throw new Error("Wallet not found for this account.");
-  return { wallet: rows[0], balance: num(rows[0].balance) };
-}
-
-async function setWallet(base44, w, balance) {
-  await base44.entities.Wallet.update(w.id, {
-    balance: Number(balance),
-  });
-}
-
-/* =========================
-   FLEEXA
-========================= */
-
-async function fleexaServices() {
-  if (!FLEEXA_KEY) throw new Error("Fleexa API key is not configured.");
-
-  const r = await fetch(`${FLEEXA_BASE}/sms4/apps`, {
-    headers: fleexaHeaders(),
-  });
-  const d = await responseData(r);
-
-  if (!r.ok) {
-    throw new Error(providerError(d, `Fleexa services failed: ${r.status}`));
-  }
-
-  const list = arrayFrom(d);
-
-  const services = list
-    .map((x) => {
-      const id =
-        clean(x?.id) ||
-        clean(x?.service_id) ||
-        clean(x?.serviceName) ||
-        clean(x?.name);
-
-      const name =
-        clean(x?.name) ||
-        clean(x?.serviceName) ||
-        clean(x?.title) ||
-        id;
-
-      if (!id || !name) return null;
-
-      return {
-        id,
-        realId: id,
-        name,
-        provider: "fleexa",
-        serverId: "a",
-        country: "US",
-        countryProviderId: "US",
-        countryName: "United States",
-      };
-    })
-    .filter(Boolean);
-
-  services.sort((a, b) => {
-    const aw = /whatsapp/i.test(a.name) ? 0 : 1;
-    const bw = /whatsapp/i.test(b.name) ? 0 : 1;
-    return aw - bw || a.name.localeCompare(b.name);
-  });
-
-  return services;
-}
-
-function fleexaRawPrice(d) {
-  const x = d?.data || d;
-  return (
-    x?.price_ngn ??
-    x?.rate ??
-    x?.price ??
-    x?.cost ??
-    x?.amount ??
-    x?.data?.price_ngn ??
-    x?.data?.price ??
-    x?.data?.cost
-  );
-}
-
-async function fleexaPrice(service) {
-  service = clean(service);
-  if (!service) throw new Error("Fleexa service is required.");
-  if (!FLEEXA_KEY) throw new Error("Fleexa API key is not configured.");
-
-  const r = await fetch(
-    `${FLEEXA_BASE}/sms4/prices?serviceName=${encodeURIComponent(service)}`,
-    { headers: fleexaHeaders() }
-  );
-
-  const d = await responseData(r);
-
-  if (!r.ok) {
-    throw new Error(
-      providerError(d, `Fleexa price request failed: ${r.status}`)
-    );
-  }
-
-  const providerPrice = num(fleexaRawPrice(d), NaN);
-
-  if (!Number.isFinite(providerPrice) || providerPrice <= 0) {
-    throw new Error(
-      providerError(d, "Fleexa returned an invalid price.")
-    );
-  }
-
-  return {
-    success: true,
-    serverId: "a",
-    provider: "fleexa",
-    service,
-    providerPrice,
-    customerPrice: price(providerPrice),
-    currency: "NGN",
-  };
-}
-
-async function fleexaBuy(base44, email, service, country) {
-  service = clean(service);
-  country = clean(country) || "US";
-
-  if (!service) throw new Error("Service is required.");
-  if (country.toUpperCase() !== "US") {
-    throw new Error("Fleexa currently supports United States numbers only.");
-  }
-
-  const p = await fleexaPrice(service);
-  const w = await wallet(base44, email);
-  const charge = num(p.customerPrice);
-
-  if (w.balance < charge) {
-    throw new Error(
-      `Insufficient wallet balance. Balance: ₦${w.balance.toFixed(
-        2
-      )}. Required: ₦${charge.toFixed(2)}.`
-    );
-  }
-
-  const newBalance = w.balance - charge;
-  await setWallet(base44, w.wallet, newBalance);
-
-  let d;
-
-  try {
-    const r = await fetch(`${FLEEXA_BASE}/sms4/buy`, {
-      method: "POST",
-      headers: fleexaHeaders(true),
-      body: JSON.stringify({
-        serviceName: service,
-        maxPrice: String(p.providerPrice),
-      }),
-    });
-
-    d = await responseData(r);
-
-    if (!r.ok) {
-      throw new Error(
-        providerError(d, `Fleexa purchase failed: ${r.status}`)
-      );
-    }
-
-    const x = d?.data || d;
-    if (x?.success === false) {
-      throw new Error(providerError(x, "Fleexa rejected the purchase."));
-    }
-    d = x;
-  } catch (e) {
-    await setWallet(base44, w.wallet, w.balance);
-    throw e;
-  }
-
-  const phone = clean(d?.phone) || clean(d?.number);
-  const activationId =
-    clean(d?.activation_id) ||
-    clean(d?.requestId) ||
-    clean(d?.id);
-
-  if (!phone || !activationId) {
-    await setWallet(base44, w.wallet, w.balance);
-    throw new Error(
-      "Fleexa did not return a valid phone number or activation ID."
-    );
-  }
-
-  const orderId = `fleexa_${activationId}`;
-
-  try {
-    const rental = await base44.entities.Rental.create({
-      userEmail: email,
-      phoneNumber: phone,
-      orderId,
-      providerOrderId: activationId,
-      provider: "fleexa",
-      serverId: "a",
-      country,
-      service,
-      status: "waiting_sms",
-    });
-
-    return {
-      success: true,
-      provider: "fleexa",
-      serverId: "a",
-      orderId,
-      rentalId: rental?.id || null,
-      phone,
-      charged: charge,
-      providerPrice: p.providerPrice,
-      customerPrice: p.customerPrice,
-      currency: "NGN",
-      country,
-      countryName: "United States",
-      status: "waiting_sms",
-      balance: newBalance,
-    };
-  } catch (e) {
-    await setWallet(base44, w.wallet, w.balance);
-    throw new Error(
-      `Rental record failed: ${e?.message || "Database error"}`
-    );
-  }
-}
-
-async function fleexaCheck(orderId) {
-  if (!FLEEXA_KEY) throw new Error("Fleexa API key is not configured.");
-
-  let id = clean(orderId);
-  if (id.startsWith("fleexa_")) id = id.slice(7);
-  if (!id) throw new Error("Fleexa request ID is required.");
-
-  const r = await fetch(
-    `${FLEEXA_BASE}/sms4/check/${encodeURIComponent(id)}`,
-    { headers: fleexaHeaders() }
-  );
-
-  const d = await responseData(r);
-
-  if (!r.ok) {
-    throw new Error(
-      providerError(d, `Fleexa OTP check failed: ${r.status}`)
-    );
-  }
-
-  const x = d?.data || d;
-  const code = clean(x?.code) || clean(x?.otp);
-  const sms = clean(x?.sms) || clean(x?.smsText) || clean(x?.message);
-  const phone = clean(x?.phone) || clean(x?.number);
-  const raw = clean(x?.status) || clean(x?.state);
-  const s = raw.toLowerCase();
-
-  let status = "waiting_sms";
-
-  if (
-    code ||
-    sms ||
-    ["completed", "complete", "received", "success"].includes(s)
-  ) {
-    status = "received";
-  } else if (["cancelled", "canceled"].includes(s)) {
-    status = "cancelled";
-  } else if (s === "expired") {
-    status = "expired";
-  }
-
-  return {
-    success: true,
-    provider: "fleexa",
-    serverId: "a",
-    orderId: `fleexa_${id}`,
-    requestId: id,
-    status,
-    code: code || null,
-    smsText: sms || null,
-    phone: phone || null,
-    raw: x,
-  };
-}
-
-async function fleexaCancel(orderId) {
-  if (!FLEEXA_KEY) throw new Error("Fleexa API key is not configured.");
-
-  let id = clean(orderId);
-  if (id.startsWith("fleexa_")) id = id.slice(7);
-  if (!id) throw new Error("Fleexa request ID is required.");
-
-  const r = await fetch(`${FLEEXA_BASE}/sms4/cancel`, {
-    method: "POST",
-    headers: fleexaHeaders(true),
-    body: JSON.stringify({ requestId: id }),
-  });
-
-  const d = await responseData(r);
-
-  if (!r.ok) {
-    throw new Error(
-      providerError(d, `Fleexa cancellation failed: ${r.status}`)
-    );
-  }
-
-  return {
-    success: true,
-    provider: "fleexa",
-    serverId: "a",
-    orderId: `fleexa_${id}`,
-    status: "cancelled",
-    data: d,
-  };
-}
-
-/* =========================
-   SMSPOOL
-========================= */
-
-async function smsPost(path, params = {}) {
-  if (!SMSPOOL_KEY) throw new Error("SMSPool API key is not configured.");
-
-  const body = new URLSearchParams();
-  body.set("key", SMSPOOL_KEY);
-
-  for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== null && String(v) !== "") {
-      body.set(k, String(v));
-    }
-  }
-
-  const r = await fetch(`${SMSPOOL_BASE}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json,text/plain,*/*",
-    },
-    body: body.toString(),
-  });
-
-  const d = await responseData(r);
-
-  if (!r.ok) {
-    throw new Error(
-      providerError(d, `SMSPool request failed: ${r.status}`)
-    );
-  }
-
+async function fp(path,opt={}){
+  const r=await fetch(FB+path,{...opt,headers:{...fh(!!opt.body),...(opt.headers||{})}});
+  const d=await rd(r);
+  if(!r.ok)throw Error(err(d,`Fleexa error ${r.status}`));
   return d;
 }
 
-async function smsPoolServices() {
-  const d = await smsPost("/stubs/handler_api", {
-    action: "getServicesList",
-    setting: "smspool",
+async function sp(path,p={}){
+  if(!SK)throw Error("SMSPool API key is not configured.");
+  const q=new URLSearchParams({key:SK});
+  Object.entries(p).forEach(([k,v])=>{
+    if(v!==undefined&&v!==null&&c(v)!=="")q.set(k,String(v))
   });
-
-  let list = arrayFrom(d);
-
-  if (!list.length && d && typeof d === "object" && !Array.isArray(d)) {
-    list = Object.entries(d).map(([id, v]) => ({
-      id,
-      ...(typeof v === "object" ? v : { name: v }),
-    }));
-  }
-
-  return list
-    .map((x) => {
-      const id =
-        clean(x?.id) ||
-        clean(x?.service) ||
-        clean(x?.service_id) ||
-        clean(x?.code);
-
-      const name =
-        clean(x?.name) ||
-        clean(x?.service_name) ||
-        clean(x?.title) ||
-        id;
-
-      if (!id) return null;
-
-      return {
-        id: `smspool_${id}`,
-        realId: id,
-        name,
-        provider: "smspool",
-        serverId: "b",
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const r=await fetch(SB+path,{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/x-www-form-urlencoded",
+      Accept:"application/json"
+    },
+    body:q.toString()
+  });
+  const d=await rd(r);
+  if(!r.ok)throw Error(err(d,`SMSPool error ${r.status}`));
+  if(d?.success===false||d?.status==="error")
+    throw Error(err(d,"SMSPool request failed."));
+  return d;
 }
 
-async function smsPoolCountries() {
-  const d = await smsPost("/stubs/handler_api", {
-    action: "getCountriesList",
-    setting: "smspool",
-  });
-
-  let list = arrayFrom(d);
-
-  if (!list.length && d && typeof d === "object" && !Array.isArray(d)) {
-    list = Object.entries(d).map(([id, v]) => ({
-      id,
-      ...(typeof v === "object" ? v : { name: v }),
-    }));
-  }
-
-  return list
-    .map((x) => {
-      const id =
-        clean(x?.id) ||
-        clean(x?.country) ||
-        clean(x?.country_id) ||
-        clean(x?.code);
-
-      const name =
-        clean(x?.name) ||
-        clean(x?.country_name) ||
-        clean(x?.title) ||
-        id;
-
-      const code =
-        clean(x?.code) ||
-        clean(x?.iso) ||
-        clean(x?.iso2) ||
-        id;
-
-      if (!id) return null;
-
-      return {
-        id: `smspool_${id}`,
-        providerId: id,
-        name,
-        code,
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => a.name.localeCompare(b.name));
+function list(d,key){
+  if(Array.isArray(d))return d;
+  if(Array.isArray(d?.data))return d.data;
+  if(Array.isArray(d?.[key]))return d[key];
+  if(d&&typeof d==="object")
+    return Object.entries(d).map(([id,v])=>({id,...(typeof v==="object"?v:{name:v})}));
+  return [];
 }
 
-async function smsPoolPrice(service, country) {
-  service = clean(service);
-  country = clean(country);
-
-  if (service.startsWith("smspool_")) service = service.slice(8);
-  if (country.startsWith("smspool_")) country = country.slice(8);
-
-  if (!service) throw new Error("SMSPool service is required.");
-  if (!country) throw new Error("SMSPool country is required.");
-
-  const d = await smsPost("/request/price", {
-    service,
-    country,
-  });
-
-  const usd = num(
-    d?.price ??
-      d?.cost ??
-      d?.amount ??
-      d?.data?.price ??
-      d?.data?.cost,
-    NaN
-  );
-
-  if (!Number.isFinite(usd) || usd <= 0) {
-    throw new Error(
-      providerError(d, "SMSPool returned an invalid price.")
-    );
-  }
-
-  const ngn = usdNaira(usd);
-
-  return {
-    success: true,
-    serverId: "b",
-    provider: "smspool",
-    service,
-    country,
-    providerPriceUsd: usd,
-    providerPrice: ngn,
-    customerPrice: price(ngn),
-    currency: "NGN",
-    providerCurrency: "USD",
-  };
+async function servicesA(){
+  const d=await fp("/sms4/apps");
+  return list(d).map(x=>{
+    const id=c(x.id||x.service_id||x.serviceName||x.name);
+    return id?{id,realId:id,name:c(x.name||x.serviceName||x.title||id),
+      provider:"fleexa",serverId:"a",country:"US",countryProviderId:"US",
+      countryName:"United States"}:null
+  }).filter(Boolean).sort((a,b)=>
+    (/whatsapp/i.test(a.name)?0:1)-(/whatsapp/i.test(b.name)?0:1)||
+    a.name.localeCompare(b.name));
 }
 
-async function smsPoolBuy(base44, email, service, country, countryName) {
-  service = clean(service);
-  country = clean(country);
+async function servicesB(){
+  const d=await sp("/stubs/handler_api",{
+    action:"getServicesList",setting:"smspool"
+  });
+  return list(d,"services").map(x=>{
+    const id=c(x.id||x.service||x.service_id||x.code);
+    return id?{id:"smspool_"+id,realId:id,
+      name:c(x.name||x.service_name||x.title||id),
+      provider:"smspool",serverId:"b"}:null
+  }).filter(Boolean);
+}
 
-  if (service.startsWith("smspool_")) service = service.slice(8);
-  if (country.startsWith("smspool_")) country = country.slice(8);
+async function countriesB(){
+  const d=await sp("/stubs/handler_api",{
+    action:"getCountriesList",setting:"smspool"
+  });
+  return list(d,"countries").map(x=>{
+    const id=c(x.id||x.country||x.country_id||x.code);
+    return id?{id:"smspool_"+id,providerId:id,
+      name:c(x.name||x.country_name||x.title||id),
+      code:c(x.code||x.iso||x.iso2||id)}:null
+  }).filter(Boolean);
+}
 
-  const p = await smsPoolPrice(service, country);
-  const w = await wallet(base44, email);
-  const charge = num(p.customerPrice);
+async function priceA(service){
+  const d=await fp(`/sms4/prices?serviceName=${encodeURIComponent(c(service))}`);
+  const x=d?.data||d;
+  const v=n(x.price_ngn??x.rate??x.price??x.cost??x.amount,NaN);
+  if(!Number.isFinite(v)||v<=0)throw Error(err(d,"Fleexa price unavailable."));
+  return {success:true,serverId:"a",provider:"fleexa",service:c(service),
+    providerPrice:v,customerPrice:sell(v),currency:"NGN"};
+}
 
-  if (w.balance < charge) {
-    throw new Error(
-      `Insufficient wallet balance. Balance: ₦${w.balance.toFixed(
-        2
-      )}. Required: ₦${charge.toFixed(2)}.`
-    );
-  }
+async function priceB(service,country){
+  service=c(service).replace(/^smspool_/,"");
+  country=c(country).replace(/^smspool_/,"");
+  const d=await sp("/request/price",{service,country});
+  const usd=n(d?.price??d?.cost??d?.amount??d?.data?.price,NaN);
+  if(!Number.isFinite(usd)||usd<=0)throw Error(err(d,"SMSPool price unavailable."));
+  const ngn=usd*RATE;
+  return {success:true,serverId:"b",provider:"smspool",service,country,
+    providerPriceUsd:usd,providerPrice:ngn,customerPrice:sell(ngn),
+    currency:"NGN",providerCurrency:"USD"};
+}
 
-  const newBalance = w.balance - charge;
-  await setWallet(base44, w.wallet, newBalance);
-
-  let d;
-
-  try {
-    d = await smsPost("/purchase/sms", {
-      country,
-      service,
-      max_price: p.providerPriceUsd,
-      quantity: 1,
-      activation_type: "SMS",
+async function buyA(b,e,p){
+  const q=await priceA(p.service),w=await wallet(b,e),charge=q.customerPrice;
+  if(w.bal<charge)throw Error(`Insufficient balance. Required ₦${charge}.`);
+  await balance(b,w.w,w.bal-charge);
+  try{
+    const d=await fp("/sms4/buy",{
+      method:"POST",
+      body:JSON.stringify({
+        serviceName:c(p.service),maxPrice:String(q.providerPrice)
+      })
     });
-
-    if (d?.success === false) {
-      throw new Error(
-        providerError(d, "SMSPool rejected the purchase.")
-      );
-    }
-
-    d = d?.data || d;
-  } catch (e) {
-    await setWallet(base44, w.wallet, w.balance);
-    throw e;
-  }
-
-  const phone =
-    clean(d?.phone) ||
-    clean(d?.number) ||
-    clean(d?.phone_number);
-
-  const providerOrderId =
-    clean(d?.orderid) ||
-    clean(d?.order_id) ||
-    clean(d?.id) ||
-    clean(d?.activation_id);
-
-  if (!phone || !providerOrderId) {
-    await setWallet(base44, w.wallet, w.balance);
-    throw new Error(
-      "SMSPool did not return a valid phone number or order ID."
-    );
-  }
-
-  const orderId = `smspool_${providerOrderId}`;
-
-  try {
-    const rental = await base44.entities.Rental.create({
-      userEmail: email,
-      phoneNumber: phone,
-      orderId,
-      providerOrderId,
-      provider: "smspool",
-      serverId: "b",
-      country,
-      countryName: clean(countryName),
-      service,
-      status: "waiting_sms",
+    const x=d?.data||d;
+    const phone=c(x.phone||x.number||x.phoneNumber);
+    const id=c(x.activation_id||x.requestId||x.request_id||x.id);
+    if(!phone||!id)throw Error("Fleexa did not return a valid number.");
+    const orderId="fleexa_"+id;
+    const r=await b.entities.Rental.create({
+      userEmail:e,phoneNumber:phone,orderId,providerOrderId:id,
+      provider:"fleexa",serverId:"a",country:"US",
+      countryName:"United States",service:c(p.service),
+      status:"waiting_sms",charged:charge,customerPrice:charge,
+      providerPrice:q.providerPrice,refunded:false
     });
-
-    return {
-      success: true,
-      provider: "smspool",
-      serverId: "b",
-      orderId,
-      rentalId: rental?.id || null,
-      phone,
-      charged: charge,
-      providerPrice: p.providerPrice,
-      providerPriceUsd: p.providerPriceUsd,
-      customerPrice: p.customerPrice,
-      currency: "NGN",
-      providerCurrency: "USD",
-      country,
-      countryName: clean(countryName),
-      status: "waiting_sms",
-      balance: newBalance,
-    };
-  } catch (e) {
-    await setWallet(base44, w.wallet, w.balance);
-    throw new Error(
-      `Rental record failed: ${e?.message || "Database error"}`
-    );
-  }
+    return {success:true,provider:"fleexa",serverId:"a",orderId,
+      requestId:id,rentalId:r?.id||null,phone,charged:charge,
+      providerPrice:q.providerPrice,customerPrice:charge,currency:"NGN",
+      country:"US",countryName:"United States",status:"waiting_sms",
+      balance:w.bal-charge};
+  }catch(e){await balance(b,w.w,w.bal);throw e}
 }
 
-async function smsPoolCheck(orderId) {
-  let id = clean(orderId);
-  if (id.startsWith("smspool_")) id = id.slice(8);
-  if (!id) throw new Error("SMSPool order ID is required.");
-
-  const d = await smsPost("/sms/check", { orderid: id });
-  const x = d?.data || d;
-
-  const code =
-    clean(x?.code) ||
-    clean(x?.otp) ||
-    clean(x?.sms_code);
-
-  const sms =
-    clean(x?.sms) ||
-    clean(x?.smsText) ||
-    clean(x?.message) ||
-    clean(x?.text);
-
-  const phone =
-    clean(x?.phone) ||
-    clean(x?.number);
-
-  const raw =
-    clean(x?.status) ||
-    clean(x?.state);
-
-  const s = raw.toLowerCase();
-
-  let status = "waiting_sms";
-
-  if (
-    code ||
-    sms ||
-    ["completed", "complete", "received", "success"].includes(s)
-  ) {
-    status = "received";
-  } else if (["cancelled", "canceled"].includes(s)) {
-    status = "cancelled";
-  } else if (s === "expired") {
-    status = "expired";
-  }
-
-  return {
-    success: true,
-    provider: "smspool",
-    serverId: "b",
-    orderId: `smspool_${id}`,
-    requestId: id,
-    status,
-    code: code || null,
-    smsText: sms || null,
-    phone: phone || null,
-    raw: x,
-  };
+async function buyB(b,e,p){
+  const q=await priceB(p.service,p.country),w=await wallet(b,e),charge=q.customerPrice;
+  if(w.bal<charge)throw Error(`Insufficient balance. Required ₦${charge}.`);
+  await balance(b,w.w,w.bal-charge);
+  try{
+    const d=await sp("/purchase/sms",{
+      country:q.country,service:q.service,
+      max_price:q.providerPriceUsd,quantity:1,activation_type:"SMS"
+    });
+    const x=d?.data||d;
+    const phone=c(x.phone||x.number||x.phone_number||x.phoneNumber);
+    const id=c(x.orderid||x.order_id||x.orderId||x.id||x.activation_id);
+    if(!phone||!id)throw Error("SMSPool did not return a valid number.");
+    const orderId="smspool_"+id;
+    const r=await b.entities.Rental.create({
+      userEmail:e,phoneNumber:phone,orderId,providerOrderId:id,
+      provider:"smspool",serverId:"b",country:q.country,
+      countryName:c(p.countryName),service:q.service,status:"waiting_sms",
+      charged:charge,customerPrice:charge,providerPrice:q.providerPrice,
+      providerPriceUsd:q.providerPriceUsd,refunded:false
+    });
+    return {success:true,provider:"smspool",serverId:"b",orderId,
+      requestId:id,rentalId:r?.id||null,phone,charged:charge,
+      providerPrice:q.providerPrice,providerPriceUsd:q.providerPriceUsd,
+      customerPrice:charge,currency:"NGN",providerCurrency:"USD",
+      country:q.country,countryName:c(p.countryName),
+      status:"waiting_sms",balance:w.bal-charge};
+  }catch(e){await balance(b,w.w,w.bal);throw e}
 }
 
-async function smsPoolCancel(orderId) {
-  let id = clean(orderId);
-  if (id.startsWith("smspool_")) id = id.slice(8);
-  if (!id) throw new Error("SMSPool order ID is required.");
+async function checkA(id){
+  id=c(id).replace(/^fleexa_/,"");
+  const d=await fp(`/sms4/check/${encodeURIComponent(id)}`);
+  const x=d?.data||d;
+  const code=c(x.code||x.otp),sms=c(x.sms||x.smsText||x.message||x.text);
+  const phone=c(x.phone||x.number);
+  const s=c(x.status||x.state).toLowerCase();
+  return {success:true,provider:"fleexa",serverId:"a",orderId:"fleexa_"+id,
+    requestId:id,status:code||sms?"received":
+    ["cancelled","canceled"].includes(s)?"cancelled":
+    s==="expired"?"expired":"waiting_sms",
+    code:code||null,smsText:sms||null,phone:phone||null};
+}
 
-  const d = await smsPost("/sms/cancel", {
-    orderid: id,
+async function checkB(id){
+  id=c(id).replace(/^smspool_/,"");
+  const d=await sp("/sms/check",{orderid:id}),x=d?.data||d;
+  const code=c(x.code||x.otp||x.sms_code),sms=c(x.sms||x.smsText||x.message||x.text);
+  const phone=c(x.phone||x.number),s=c(x.status||x.state).toLowerCase();
+  return {success:true,provider:"smspool",serverId:"b",orderId:"smspool_"+id,
+    requestId:id,status:code||sms?"received":
+    ["cancelled","canceled"].includes(s)?"cancelled":
+    s==="expired"?"expired":"waiting_sms",
+    code:code||null,smsText:sms||null,phone:phone||null};
+}
+
+async function cancelA(id){
+  id=c(id).replace(/^fleexa_/,"");
+  await fp("/sms4/cancel",{
+    method:"POST",body:JSON.stringify({requestId:id})
   });
-
-  return {
-    success: true,
-    provider: "smspool",
-    serverId: "b",
-    orderId: `smspool_${id}`,
-    status: "cancelled",
-    data: d,
-  };
+  return {provider:"fleexa"};
 }
 
-/* =========================
-   CATALOG
-========================= */
-
-async function catalog() {
-  return {
-    success: true,
-    servers: [
-      {
-        id: "a",
-        name: "Server 1",
-        available: Boolean(FLEEXA_KEY),
-      },
-      {
-        id: "b",
-        name: "Server 2",
-        available: Boolean(SMSPOOL_KEY),
-      },
-    ],
-  };
+async function cancelB(id){
+  id=c(id).replace(/^smspool_/,"");
+  await sp("/sms/cancel",{orderid:id});
+  return {provider:"smspool"};
 }
 
-/* =========================
-   ROUTER
-========================= */
+Deno.serve(async req=>{
+  if(req.method==="OPTIONS")return out({success:true});
+  if(req.method!=="POST")return out({success:false,error:"POST only"},405);
 
-Deno.serve(async (request) => {
-  if (request.method === "OPTIONS") {
-    return json({ success: true });
-  }
+  try{
+    const b=createClientFromRequest(req);
+    const p=await req.json().catch(()=>({}));
+    const a=c(p.action),s=c(p.serverId).toLowerCase();
 
-  try {
-    const base44 = createClientFromRequest(request);
+    if(a==="catalog")
+      return out({success:true,servers:[
+        {id:"a",name:"Server 1",available:!!FK},
+        {id:"b",name:"Server 2",available:!!SK}
+      ]});
 
-    let p = {};
-    try {
-      p = await request.json();
-    } catch {}
+    if(a==="services")
+      return out({success:true,serverId:s,
+        services:s==="a"?await servicesA():s==="b"?await servicesB():
+        (()=>{throw Error("Invalid server.")})()});
 
-    const action = clean(p?.action);
-    const server = clean(p?.serverId).toLowerCase();
+    if(a==="countries")
+      return out({success:true,serverId:s,countries:
+        s==="a"?[{id:"US",providerId:"US",name:"United States",code:"US"}]:
+        s==="b"?await countriesB():[]});
 
-    if (action === "catalog") {
-      return json(await catalog());
+    if(a==="price")
+      return out(s==="a"?await priceA(p.service):await priceB(p.service,p.country));
+
+    if(a==="order"){
+      const u=await b.auth.me(),e=c(u?.email||p.userEmail);
+      if(!e)throw Error("Please log in first.");
+      return out(s==="a"?await buyA(b,e,p):s==="b"?await buyB(b,e,p):
+        (()=>{throw Error("Invalid server.")})());
     }
 
-    if (action === "services") {
-      if (server === "a") {
-        return json({
-          success: true,
-          serverId: "a",
-          services: await fleexaServices(),
+    if(a==="checkOtp")
+      return out(s==="a"?await checkA(p.orderId||p.requestId):
+        s==="b"?await checkB(p.orderId||p.requestId):
+        (()=>{throw Error("Invalid server.")})());
+
+    if(a==="cancel"){
+      const u=await b.auth.me(),e=c(u?.email);
+      const id=c(p.orderId||p.requestId);
+      if(!e||!id)throw Error("Order information is required.");
+
+      const rental=(await b.entities.Rental.filter({
+        userEmail:e,orderId:id
+      }))?.[0];
+
+      if(rental?.refunded)
+        return out({success:true,status:"cancelled",refunded:true,
+          refundAmount:n(rental.refundAmount),orderId:id});
+
+      const result=s==="a"?await cancelA(id):s==="b"?await cancelB(id):
+        (()=>{throw Error("Invalid server.")})();
+
+      let refund=0,newBal=null;
+
+      if(rental){
+        refund=n(rental.customerPrice||rental.charged);
+        if(refund>0){
+          const w=await wallet(b,e);
+          newBal=w.bal+refund;
+          await balance(b,w.w,newBal);
+        }
+        await b.entities.Rental.update(rental.id,{
+          status:"cancelled",refunded:refund>0,refundAmount:refund
         });
       }
 
-      if (server === "b") {
-        return json({
-          success: true,
-          serverId: "b",
-          services: await smsPoolServices(),
-        });
-      }
-
-      throw new Error("Invalid virtual-number server.");
+      return out({success:true,provider:result.provider,serverId:s,
+        orderId:id,status:"cancelled",refunded:refund>0,
+        refundAmount:refund,balance:newBal,
+        message:refund>0?`₦${refund.toFixed(2)} refunded to your wallet.`:
+        "Virtual-number order cancelled."});
     }
 
-    if (action === "countries") {
-      if (server === "a") {
-        return json({
-          success: true,
-          serverId: "a",
-          countries: [
-            {
-              id: "US",
-              providerId: "US",
-              name: "United States",
-              code: "US",
-            },
-          ],
-        });
-      }
-
-      if (server === "b") {
-        return json({
-          success: true,
-          serverId: "b",
-          countries: await smsPoolCountries(),
-        });
-      }
-
-      throw new Error("Invalid virtual-number server.");
-    }
-
-    if (action === "price") {
-      if (server === "a") {
-        return json(await fleexaPrice(p?.service));
-      }
-
-      if (server === "b") {
-        return json(
-          await smsPoolPrice(
-            p?.service,
-            p?.country
-          )
-        );
-      }
-
-      throw new Error("Invalid virtual-number server.");
-    }
-
-    if (action === "order") {
-      const user = await base44.auth.me();
-
-      const email = clean(
-        p?.userEmail || user?.email
-      );
-
-      if (!email) {
-        throw new Error("Unable to identify logged-in user.");
-      }
-
-      if (server === "a") {
-        return json(
-          await fleexaBuy(
-            base44,
-            email,
-            p?.service,
-            p?.country
-          )
-        );
-      }
-
-      if (server === "b") {
-        return json(
-          await smsPoolBuy(
-            base44,
-            email,
-            p?.service,
-            p?.country,
-            p?.countryName
-          )
-        );
-      }
-
-    throw new Error("Invalid virtual-number server.");
-    }
-
-    if (action === "checkOtp") {
-      const id = clean(p?.requestId || p?.orderId);
-      if (!id) throw new Error("Order ID is required.");
-
-      let s = server;
-
-      if (!s) {
-        if (id.startsWith("fleexa_")) s = "a";
-        else if (id.startsWith("smspool_")) s = "b";
-      }
-
-      if (s === "a") {
-        return json(await fleexaCheck(id));
-      }
-
-      if (s === "b") {
-        return json(await smsPoolCheck(id));
-      }
-
-      throw new Error("Unable to determine virtual-number server.");
-    }
-
-    if (action === "cancel") {
-      const id = clean(p?.requestId || p?.orderId);
-      if (!id) throw new Error("Order ID is required.");
-
-      let s = server;
-
-      if (!s) {
-        if (id.startsWith("fleexa_")) s = "a";
-        else if (id.startsWith("smspool_")) s = "b";
-      }
-
-      if (s === "a") {
-        return json(await fleexaCancel(id));
-      }
-
-      if (s === "b") {
-        return json(await smsPoolCancel(id));
-      }
-
-      throw new Error("Unable to determine virtual-number server.");
-    }
-
-    throw new Error(
-      `Unknown virtual-number action: ${action || "none"}`
-    );
-
-  } catch (e) {
-    console.error("VIRTUAL NUMBERS ERROR:", e);
-
-    return json(
-      {
-        success: false,
-        error: e?.message || "Virtual-number backend error.",
-      },
-      500
-    );
+    throw Error("Unknown action.");
+  }catch(e){
+    console.error(e);
+    return out({success:false,error:String(e?.message||e)},400);
   }
 });

@@ -481,5 +481,5 @@ export default function VirtualNumbers() {
         </div>
       )}
     </div>
-    ):
+  );
 }

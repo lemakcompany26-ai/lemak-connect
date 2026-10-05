@@ -1,17 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Loader2,
-  RefreshCw,
-  Copy,
-  X,
-  MessageSquare,
-  Phone,
-  CheckCircle2,
-  Clock3,
-  ShieldCheck,
-  Send,
-} from "lucide-react";
+import { Loader2, CheckCircle2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import YellowOtpChat from "@/components/vnum/YellowOtpChat";
+import NumberServiceList from "@/components/vnum/NumberServiceList";
 
 const money = (n) =>
   `₦${Number(n || 0).toLocaleString("en-NG", {
@@ -756,93 +747,38 @@ export default function VirtualNumbers() {
       )}
 
       {/* ACTIVE OTP CHAT */}
-      {active && (
-        <div className="mb-6 overflow-hidden rounded-3xl border-2 border-yellow-400 shadow-lg">
-          {/* YELLOW CHAT HEADER */}
-          <div className="bg-yellow-400 px-4 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-full bg-black/10 flex items-center justify-center">
-                  <MessageSquare className="w-6 h-6 text-black" />
-                </div>
+      <YellowOtpChat
+        active={active}
+        otpCode={otpCode}
+        smsText={smsText}
+        checking={checkingOtp}
+        cancelling={buying}
+        onCopy={copyNumber}
+        onCheck={() => check(false)}
+        onCancel={cancel}
+        onClose={() => {
+          setActive(null);
+          setOtp(null);
+        }}
+      />
 
-                <div>
-                  <div className="font-bold text-black">
-                    OTP Chat
-                  </div>
-
-                  <div className="text-xs text-black/70">
-                    {active.serviceName ||
-                      "Virtual Number"}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1 text-xs font-medium text-black">
-                <span className="w-2 h-2 rounded-full bg-green-600 animate-pulse" />
-                Waiting
-              </div>
-            </div>
-          </div>
-
-          {/* CHAT BODY */}
-          <div className="bg-[#fff9db] min-h-[300px] p-4">
-            {/* NUMBER MESSAGE */}
-            <div className="flex gap-2 mb-4">
-              <div className="w-9 h-9 rounded-full bg-yellow-400 flex items-center justify-center shrink-0">
-                <Phone className="w-4 h-4 text-black" />
-              </div>
-
-              <div className="max-w-[85%]">
-                <div className="bg-white border border-yellow-200 rounded-2xl rounded-tl-sm p-3 shadow-sm">
-                  <div className="text-xs text-muted-foreground mb-1">
-                    Your virtual number
-                  </div>
-
-                  <div className="text-xl font-bold tracking-wide">
-                    {active.phone}
-                  </div>
-
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {active.countryName ||
-                      "Selected country"}
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={copyNumber}
-                  className="mt-2 text-xs font-medium flex items-center gap-1 text-black/60"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  Copy number
-                </button>
-              </div>
-            </div>
-
-            {/* WAITING MESSAGE / OTP MESSAGE */}
-            {!hasOtp ? (
-              <div className="flex gap-2 mb-4">
-                <div className="w-9 h-9 rounded-full bg-yellow-400 flex items-center justify-center shrink-0">
-                  <Clock3 className="w-4 h-4 text-black" />
-                </div>
-
-                <div className="bg-white border border-yellow-200 rounded-2xl rounded-tl-sm p-3 shadow-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="flex gap-1">
-                      <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" />
-                      <span
-                        className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
-                        style={{
-                          animationDelay:
-                            "150ms",
-                        }}
-                      />
-                      <span
-                        className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
-                        style={{
-                          animationDelay:
-                            "300ms",
-                        }}
-                      />
-                    </s
+      {/* SERVICES */}
+      {loadingServices ? (
+        <div className="py-10 text-center">
+          <Loader2 className="mx-auto animate-spin" />
+          <p className="mt-2 text-sm text-muted-foreground">
+            Loading services...
+          </p>
+        </div>
+      ) : (
+        <NumberServiceList
+          services={services}
+          prices={prices}
+          loadingPrices={loadingPrices}
+          buying={buying}
+          onBuy={buy}
+        />
+      )}
+    </div>
+  );
+}
